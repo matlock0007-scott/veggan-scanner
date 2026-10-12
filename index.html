@@ -7,7 +7,21 @@ const nonVegan=[['milk',/\b(?:cow'?s? milk|whole milk|skim(?:med)? milk|milk pow
 const ambiguous=[['butter',/\bbutter\b/i],['cream',/\bcream\b/i],['cheese',/\bcheese\b/i],['yogurt',/\byogh?urt\b/i],['meat or poultry',/\b(?:chicken|beef|pork|turkey|duck|lamb|mutton|fish)\b/i],['potentially animal-derived additives',/\b(?:natural flavou?rs?|mono-? and diglycerides|mono-?diglycerides|vitamin d3|glycerin|glycerol|stearic acid|l-?cysteine)\b/i]];
 const plantQualifier='(?:oat|soy|soya|almond|coconut|rice|pea|cashew|hazelnut|hemp|flax|sunflower|peanut|cocoa|shea|apple|vegan|plant[- ]based|dairy[- ]free|non[- ]dairy|imitation)';
 function cleanPlantPhrases(s){return s.replace(new RegExp('\\b'+plantQualifier+'\\s+(?:milk|butter|cream|cheese|yogh?urt|chicken|beef|pork|fish|egg)\\b','gi'),'plant alternative').replace(/\b(?:peanut|almond|cashew|cocoa|shea|apple) butter\b/gi,'plant spread').replace(/\b(?:coconut|oat|soy|almond|cashew|rice) (?:milk|cream|yogh?urt)\b/gi,'plant alternative')}
-function evaluate(p){const tags=(p.ingredients_analysis_tags||[]).map(x=>String(x).toLowerCase());const veganTag=tags.some(x=>x==='en:vegan'||x==='vegan');const nonTag=tags.some(x=>x==='en:non-vegan'||x==='non-vegan');const unknownTag=tags.some(x=>x.includes('vegan-status-unknown')||x.includes('maybe-vegan'));const raw=p.ingredients_text||'';const text=cleanPlantPhrases(raw);const certain=nonVegan.filter(([name,re])=>re.test(text)).map(x=>x[0]);const possible=ambiguous.filter(([name,re])=>re.test(text)).map(x=>x[0]);if(certain.length)return['NOT VEGAN','Listed animal-derived ingredients: '+certain.join(', ')+'.'];if(nonTag)return['NOT VEGAN','Open Food Facts classifies the ingredients as non-vegan. Verify the label if this conflicts with the packaging.'];if(possible.length)return['NEEDS VERIFICATION','Ingredients requiring source verification: '+possible.join(', ')+'. Plant-based alternatives may be vegan.'];if(veganTag)return['VEGAN (DATABASE)','Open Food Facts identifies the ingredients as vegan. Check the current packaging for changes.'];if(!raw.trim())return['NEEDS VERIFICATION','No ingredient list is available. Check the package or manufacturer.'];return['NEEDS VERIFICATION',unknownTag?'The database marks the vegan status as uncertain. No clearly animal-derived ingredients were detected.':'No clearly animal-derived ingredients were detected, but the database has not verified the product as vegan.']}
-async function lookup(code){const r=$('result');r.style.display='block';r.innerHTML='<h2>Checking…</h2>';try{const res=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'?fields=product_name,brands,ingredients_text,ingredients_analysis_tags');if(!res.ok)throw Error('HTTP '+res.status);const d=await res.json();if(!d.product){r.innerHTML='<h2>NOT FOUND</h2><p>Barcode '+esc(code)+' is not currently in the database.</p>'+again();return}const p=d.product,[s,detail]=evaluate(p);r.innerHTML='<h2>'+esc(s)+'</h2><p class="product">'+esc(p.product_name||'Unknown product')+'</p><p style="text-align:center">'+esc(p.brands||'')+'<br>Barcode: '+esc(code)+'</p><p>'+esc(detail)+'</p><div class="ingredients"><b>Ingredients</b><br><br>'+esc(p.ingredients_text||'No ingredient list available.')+'</div>'+again()}catch(e){r.innerHTML='<h2>ERROR</h2><p>Could not reach the product database.</p>'+again()}}
+function evaluate(p){
+  const tags=(p.ingredients_analysis_tags||[]).map(x=>String(x).toLowerCase());
+  const veganTag=tags.some(x=>x==='en:vegan'||x==='vegan');
+  const nonTag=tags.some(x=>x==='en:non-vegan'||x==='non-vegan');
+  const raw=p.ingredients_text||'';
+  const cleaned=cleanPlantPhrases(raw);
+  const certain=nonVegan.filter(([name,re])=>re.test(cleaned)).map(x=>x[0]);
+  const possible=ambiguous.filter(([name,re])=>re.test(cleaned)).map(x=>x[0]);
+  if(certain.length)return ['NOT VEGAN','Animal-derived ingredients detected: '+certain.join(', ')+'.'];
+  if(nonTag)return ['NOT VEGAN','Database identifies this product as non-vegan. Verify against packaging.'];
+  if(possible.length)return ['NEEDS VERIFICATION','Ingredient sources need verification: '+possible.join(', ')+'.'];
+  if(veganTag)return ['VEGAN (DATABASE)','Database identifies the ingredients as vegan. Check current packaging.'];
+  if(!raw.trim())return ['NEEDS VERIFICATION','No ingredient list available.'];
+  return ['LIKELY VEGAN','No clearly animal-derived ingredients detected. Vegan status is not independently verified.'];
+}
+
 function again(){return '<button onclick="startScan()">Scan another product</button>'}function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}$('scanBtn').onclick=startScan;$('cancel').onclick=stopScan;
 </script></body></html>
