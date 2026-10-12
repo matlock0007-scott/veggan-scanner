@@ -22,6 +22,42 @@ function evaluate(p){
   if(!raw.trim())return ['NEEDS VERIFICATION','No ingredient list available.'];
   return ['LIKELY VEGAN','No clearly animal-derived ingredients detected. Vegan status is not independently verified.'];
 }
+async function lookup(code) {
+  const r = $('result');
+  r.style.display = 'block';
+  r.innerHTML = '<h2>Looking up product...</h2>';
 
+  try {
+    const response = await fetch(
+      'https://world.openfoodfacts.org/api/v2/product/' +
+      encodeURIComponent(code) + '.json'
+    );
+
+    if (!response.ok) throw new Error('Lookup failed');
+
+    const data = await response.json();
+
+    if (!data.product) {
+      r.innerHTML = '<h2>Product not found</h2>' + again();
+      return;
+    }
+
+    const p = data.product;
+    const [status, reason] = evaluate(p);
+
+    r.innerHTML =
+      '<h2>' + esc(p.product_name || 'Unknown product') + '</h2>' +
+      '<h3>' + esc(status) + '</h3>' +
+      '<p>' + esc(reason) + '</p>' +
+      '<h3>Ingredients</h3>' +
+      '<p>' + esc(p.ingredients_text || 'Not available') + '</p>' +
+      again();
+
+  } catch (error) {
+    r.innerHTML =
+      '<h2>Product lookup failed</h2>' +
+      '<p>Please try again.</p>' + again();
+  }
+}
 function again(){return '<button onclick="startScan()">Scan another product</button>'}function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}$('scanBtn').onclick=startScan;$('cancel').onclick=stopScan;
 </script></body></html>
