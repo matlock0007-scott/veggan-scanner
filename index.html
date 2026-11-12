@@ -8,190 +8,252 @@
 <title>Vegan Scanner</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:system-ui;background:#f7f8f3;color:#10251a}
-main{max-width:680px;margin:auto;padding:30px 18px;text-align:center}
-.logo{margin:25px auto 15px;width:92px;height:92px;border-radius:50%;display:grid;place-items:center;background:#123f27;color:white;font-size:52px;font-weight:800}
-h1{font-size:36px}
-.sub{font-size:18px;color:#657068}
-button{width:100%;margin-top:18px;padding:18px;border:0;border-radius:15px;background:#123f27;color:white;font-size:19px;font-weight:700}
-.secondary{background:#e2ebe4;color:#123f27}
-input,textarea{width:100%;padding:13px;margin-top:10px;border:1px solid #9ba99f;border-radius:10px;font:inherit}
-textarea{min-height:110px}
-#scanner{display:none;position:fixed;inset:0;background:#000;z-index:5}
-video{width:100%;height:100%;object-fit:cover}
-.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;text-shadow:0 1px 4px black}
-.target{width:min(88vw,520px);height:230px;border:4px solid white;border-radius:24px}
-.hint{margin:18px;font-size:18px;font-weight:700}
-.cancel{width:auto;background:#222}
-#result{display:none;text-align:left;background:white;border-radius:20px;padding:20px;margin-top:24px;overflow-wrap:anywhere}
-#result h2{text-align:center;font-size:28px}
+body{margin:0;background:#f5f8f3;color:#173524;font:16px system-ui}
+main{max-width:650px;margin:auto;padding:25px 16px}
+header{text-align:center}
+h1{font-size:34px;margin-bottom:5px}
+.logo{background:#123f27;color:white;border-radius:50%;width:80px;height:80px;display:grid;place-items:center;margin:auto;font-size:48px;font-weight:800}
+button{border:0;border-radius:12px;background:#164b2e;color:white;font-size:17px;font-weight:700;padding:15px;width:100%;margin-top:10px}
+.alt{background:#dcebe0;color:#164b2e}
+input,textarea{width:100%;font:inherit;border:1px solid #9fb4a5;border-radius:10px;padding:12px;margin-top:10px}
+textarea{height:110px}
+section{background:white;border-radius:16px;padding:16px;margin-top:16px}
+small,.muted{color:#526459}
 .status{font-size:22px;font-weight:800}
-.ingredients{background:#f1f3ed;border-radius:14px;padding:15px;line-height:1.5;white-space:pre-wrap}
-.note{font-size:14px;color:#4f6256}
-footer{color:#929a94;margin-top:55px}
+.good{color:#146c36}
+.warn{color:#9a5b00}
+.bad{color:#a12626}
+.ingredients{white-space:pre-wrap;background:#f0f4ef;padding:12px;border-radius:10px}
+#scanner{position:fixed;inset:0;background:#000;display:none;z-index:10}
+video{width:100%;height:100%;object-fit:cover}
+.scanui{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:white;text-shadow:0 1px 4px #000}
+.target{width:85%;height:200px;border:4px solid white;border-radius:18px}
+.scanui button{max-width:200px;background:#333}
+.hidden{display:none}
+details{margin-top:18px}
+summary{cursor:pointer;font-weight:bold}
+#photo{display:none}
 </style>
 </head>
 <body>
 <main>
+<header>
 <div class="logo">V</div>
 <h1>Vegan Scanner</h1>
-<div class="sub">Scan food barcodes. Check ingredients and recorded vegan certifications.</div>
-<button id="scanBtn">Scan a barcode</button>
-<button class="secondary" id="manualBtn">Enter barcode manually</button>
-<section id="manual" hidden>
-<input id="barcode" inputmode="numeric" placeholder="Barcode numbers">
-<button id="lookupBtn">Look up product</button>
+<p>Check barcodes, ingredients and vegan labels</p>
+</header>
+<button id="scan">Scan barcode</button>
+<button class="alt" id="manualToggle">Enter barcode manually</button>
+<section id="manual" class="hidden">
+<input id="barcode" inputmode="numeric" placeholder="8–14 digit barcode">
+<button id="lookup">Look up product</button>
 </section>
-<section id="result" aria-live="polite"></section>
-<footer>Fast • Simple • Plant-based</footer>
+<button class="alt" id="photoButton">Photograph ingredient list or vegan label</button>
+<input type="file" id="photo" accept="image/*" capture="environment">
+<section id="result" class="hidden" aria-live="polite"></section>
+<section>
+<h3>Check package ingredients</h3>
+<textarea id="typed" placeholder="Type or paste ingredients here"></textarea>
+<button id="analyze">Check ingredients</button>
+<p><small>Ingredient analysis cannot verify every additive or manufacturing process. A recognized certification is stronger evidence.</small></p>
+</section>
+<details>
+<summary>Optional second database: USDA FoodData Central</summary>
+<p><small>USDA requires an API key. The key stays in this browser session and is sent to USDA. Never put a private key into public GitHub code.</small></p>
+<input id="usdaKey" type="password" autocomplete="off" placeholder="USDA API key (optional)">
+<p><small>Without a key, the app uses Open Food Facts plus package-photo reading.</small></p>
+</details>
+<p class="muted"><small>Community data may be incomplete or outdated. Confirm against current packaging.</small></p>
 </main>
 <div id="scanner">
-<video id="video" playsinline muted></video>
-<div class="overlay">
-<h2>Scan the product barcode</h2>
+<video id="video" autoplay muted playsinline></video>
+<div class="scanui">
+<h2>Scan barcode</h2>
 <div class="target"></div>
-<div class="hint">Hold the barcode steady inside the box</div>
-<button class="cancel" id="cancel">Cancel</button>
+<p>Hold the barcode inside the frame</p>
+<button id="stop">Cancel</button>
 </div>
 </div>
 <script>
-let stream,detector,timer,busy=false,lastProduct=null;
+'use strict';
 const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-async function startScan(){
- if(!('BarcodeDetector' in window)){
-  alert('Use Chrome on Android, or enter the barcode manually.');
-  return;
- }
- try{
-  detector=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39']});
-  stream=await navigator.mediaDevices.getUserMedia({
-   video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},
-   audio:false
-  });
-  $('video').srcObject=stream;
-  await $('video').play();
-  $('scanner').style.display='block';
-  busy=false;
-  timer=setInterval(detect,250);
- }catch(e){
-  stopScan();
-  alert('Camera could not start. Check camera permission.');
- }
-}
-async function detect(){
- if(busy||!$('video').videoWidth)return;
- busy=true;
- try{
-  const codes=await detector.detect($('video'));
-  if(codes.length){
-   const code=codes[0].rawValue;
-   stopScan();
-   lookup(code);
-  }
- }catch(e){}finally{busy=false;}
-}
-function stopScan(){
- clearInterval(timer);
- if(stream)stream.getTracks().forEach(t=>t.stop());
- stream=null;
- $('scanner').style.display='none';
-}
-const nonVegan=[
- ['dairy',/\b(?:milk|whey|casein(?:ate)?|lactose|buttermilk|milkfat|milk solids|milk powder|cheddar|parmesan|mozzarella|butter|cream|yogh?urt|cheese|ghee)\b/i],
- ['egg',/\b(?:eggs?|egg whites?|egg yolks?|albumen|ovalbumin)\b/i],
- ['gelatin',/\bgelati[ne]\b/i],
- ['honey',/\bhoney\b/i],
- ['beeswax',/\bbeeswax\b/i],
- ['shellac',/\bshellac\b/i],
- ['carmine',/\b(?:carmine|cochineal|e120)\b/i],
- ['animal fat',/\b(?:lard|tallow|beef fat|pork fat|chicken fat)\b/i],
- ['meat or seafood',/\b(?:anchov(?:y|ies)|oyster extract|fish sauce|shrimp|prawn|chicken|beef|pork|turkey|duck|lamb|mutton|fish)\b/i]
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let stream=null,interval=null,detector=null,scanning=false,latest=null;
+const animal=[
+['milk/dairy',/\b(?:milk|whey|casein(?:ate)?|lactose|buttermilk|milkfat|ghee|cheese|yogurt|yoghurt)\b/i],
+['egg',/\b(?:egg|eggs|albumen|ovalbumin)\b/i],
+['gelatin',/\bgelati[ne]\b/i],
+['honey',/\bhoney\b/i],
+['beeswax',/\bbeeswax\b/i],
+['shellac',/\bshellac\b/i],
+['carmine/cochineal',/\b(?:carmine|cochineal|e120)\b/i],
+['animal fats',/\b(?:lard|tallow|beef fat|pork fat|chicken fat)\b/i],
+['meat/fish',/\b(?:anchovies|anchovy|fish sauce|oyster extract|shrimp|prawn|beef|pork|chicken|turkey|lamb|fish)\b/i]
 ];
-const uncertain=/\b(?:natural flavou?rs?|mono-? and diglycerides|mono-?diglycerides|vitamin d3|glycerin|glycerol|stearic acid|l-?cysteine)\b/i;
-const plantWords='(?:oat|soy|soya|almond|coconut|rice|pea|cashew|hazelnut|hemp|flax|sunflower|peanut|cocoa|shea|apple|vegan|plant[- ]based|dairy[- ]free|non[- ]dairy|imitation)';
-function cleanPlant(s){
- return s.replace(
-  new RegExp('\\b'+plantWords+'\\s+(?:milk|butter|cream|cheese|yogh?urt|chicken|beef|pork|fish|egg)\\b','gi'),
-  'plant alternative'
- ).replace(/\b(?:peanut|almond|cashew|cocoa|shea|apple) butter\b/gi,'plant spread');
+const uncertain=/\b(?:natural flavou?rs?|mono-?diglycerides|mono-? and diglycerides|vitamin d3|glycerin|glycerol|stearic acid|l-?cysteine)\b/i;
+function normalizeIngredients(raw){
+return String(raw||'')
+.replace(/\b(?:vegan|plant[- ]based|meat[- ]free|dairy[- ]free|non[- ]dairy|soy|soya|oat|almond|cashew|coconut|pea|rice|hemp|imitation)\s+(?:milk|cheese|cream|butter|yogurt|yoghurt|egg|chicken|beef|pork|fish|sausage)\b/gi,'plant alternative')
+.replace(/\b(?:peanut|almond|cashew|sunflower|cocoa|shea|apple) butter\b/gi,'plant spread')
+.replace(/\b(?:chicken|beef|pork|fish)[- ](?:style|flavou?red|flavou?r)\b/gi,'flavor description');
 }
-function classify(p,manual){
- const raw=(manual===undefined?p.ingredients_text:manual)||'';
- const tags=(p.ingredients_analysis_tags||[]).map(x=>String(x).toLowerCase());
- const labels=(p.labels_tags||[]).map(x=>String(x).toLowerCase());
- const labelText=String(p.labels||'');
- const certified=labels.some(x=>/^(?:en:)?(?:vegan|certified-vegan|vegan-society|v-label-vegan|vegetarian-society-vegan-approved)$/.test(x))
- ||/\b(?:certified vegan|vegan approved|vegetarian society vegan approved)\b/i.test(labelText);
- const veganTag=tags.includes('en:vegan')||tags.includes('vegan');
- const nonTag=tags.includes('en:non-vegan')||tags.includes('non-vegan');
- const cleaned=cleanPlant(raw);
- const detected=nonVegan.filter(([,re])=>re.test(cleaned)).map(([name])=>name);
- if(detected.length)
-  return ['POSSIBLY NOT VEGAN','Potential animal ingredients detected: '+detected.join(', ')+'. Check for plant-based substitutes and packaging details.'];
- if(nonTag)
-  return ['NOT VEGAN (DATABASE)','The database classifies this product as non-vegan. Check the current package.'];
- if(certified)
-  return ['VEGAN (LABEL RECORDED)','The product database records a vegan label or certification. Confirm it on your package.'];
- if(!raw.trim())
-  return ['NEEDS VERIFICATION','No ingredient list is available from the product database. You can enter the package ingredients below.'];
- if(veganTag)
-  return ['VEGAN (DATABASE)','The database classifies the ingredients as vegan. Check the current package.'];
- if(uncertain.test(cleaned))
-  return ['NEEDS VERIFICATION','Some ingredients may have plant or animal origins. Check with the manufacturer.'];
- return ['NEEDS VERIFICATION','No obvious animal ingredients detected, but this does not prove the product is vegan.'];
+function analyzeIngredients(raw){
+const clean=normalizeIngredients(raw);
+const hits=animal.filter(x=>x[1].test(clean)).map(x=>x[0]);
+if(hits.length)return {label:'POSSIBLY NOT VEGAN',kind:'bad',why:'Possible animal ingredients: '+hits.join(', ')+'. Check context and package.'};
+if(uncertain.test(clean))return {label:'NEEDS VERIFICATION',kind:'warn',why:'Some additives or flavors can come from plants or animals.'};
+if(!raw.trim())return {label:'NEEDS VERIFICATION',kind:'warn',why:'No ingredients available.'};
+return {label:'NO OBVIOUS ANIMAL INGREDIENTS',kind:'warn',why:'This ingredient screen is not proof of vegan status.'};
 }
-function showProduct(p,code,manual){
- lastProduct={p,code};
- const [status,reason]=classify(p,manual);
- const raw=manual===undefined?p.ingredients_text:manual;
- $('result').innerHTML=
-  '<h2>'+esc(p.product_name||'Unknown product')+'</h2>'+
-  '<p class="status">'+esc(status)+'</p>'+
-  '<p>'+esc(reason)+'</p>'+
-  '<h3>Ingredients</h3>'+
-  '<div class="ingredients">'+esc(raw||'Not available')+'</div>'+
-  '<p class="note">Source: Open Food Facts, a community-maintained database. “Plant-based” and “dairy-free” alone do not prove vegan status.</p>'+
-  '<h3>Ingredients missing or incorrect?</h3>'+
-  '<p>Enter the ingredients printed on the package to check them. This does not update the database.</p>'+
-  '<textarea id="ingredientEntry" placeholder="Type or paste ingredients here">'+esc(manual||'')+'</textarea>'+
-  '<button class="secondary" id="checkIngredients">Check entered ingredients</button>'+
-  '<button id="again">Scan another product</button>';
- $('checkIngredients').onclick=()=>{
-  const entered=$('ingredientEntry').value.trim();
-  if(!entered){
-   alert('Enter the ingredients first.');
-   return;
-  }
-  showProduct(p,code,entered);
- };
- $('again').onclick=startScan;
+function isVeganLabel(p){
+const labels=[...(p.labels_tags||[]),p.labels||''].join(' ').toLowerCase();
+return /(?:^|[\s,:])(?:en:)?(?:certified[- ]vegan|vegan[- ]society|v[- ]label[- ]vegan|vegetarian[- ]society[- ]vegan[- ]approved|vegan[- ]approved|vegan)(?=$|[\s,;])/i.test(labels);
+}
+function decide(p,raw){
+const a=analyzeIngredients(raw);
+const tags=(p.ingredients_analysis_tags||[]).join(' ').toLowerCase();
+if(a.kind==='bad')return a;
+if(/en:non-vegan/.test(tags))return {label:'NOT VEGAN (DATABASE)',kind:'bad',why:'The product database identifies animal-derived ingredients.'};
+if(isVeganLabel(p))return {label:'VEGAN LABEL RECORDED',kind:'good',why:'A vegan label is recorded in the database. Check the package.'};
+if(/en:vegan(?:\s|$)/.test(tags))return {label:'VEGAN (DATABASE)',kind:'good',why:'The product database marks the ingredients vegan. Check packaging.'};
+return a;
+}
+function show(html){
+$('result').classList.remove('hidden');
+$('result').innerHTML=html;
+$('result').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function render(p,code,sources){
+latest={p,code};
+const raw=p.ingredients_text||'';
+const d=decide(p,raw);
+show('<h2>'+esc(p.product_name||'Product '+code)+'</h2><p class="status '+d.kind+'">'+esc(d.label)+'</p><p>'+esc(d.why)+'</p><p><small>Source: '+esc(sources.join(' + '))+'</small></p><h3>Ingredients</h3><div class="ingredients">'+esc(raw||'Not available from the databases searched')+'</div><button class="alt" id="rescan">Scan another product</button>');
+$('rescan').onclick=startScan;
+if(raw)$('typed').value=raw;
+}
+async function getOFF(code){
+const r=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json',{cache:'no-store'});
+if(!r.ok)throw Error('Open Food Facts unavailable');
+const j=await r.json();
+return j.status===1?j.product:null;
+}
+async function getUSDA(code,key){
+if(!key)return null;
+const url='https://api.nal.usda.gov/fdc/v1/foods/search?api_key='+encodeURIComponent(key);
+const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:code,dataType:['Branded'],pageSize:10})});
+if(!r.ok)throw Error('USDA request failed');
+const j=await r.json();
+const food=(j.foods||[]).find(f=>String(f.gtinUpc||'').replace(/^0+/,'')===code.replace(/^0+/,''));
+if(!food)return null;
+return {product_name:food.description||'',ingredients_text:food.ingredients||'',brands:food.brandOwner||''};
 }
 async function lookup(code){
- code=String(code).trim();
- if(!/^\d{8,14}$/.test(code)){
-  alert('Enter an 8 to 14 digit barcode.');
-  return;
- }
- $('result').style.display='block';
- $('result').innerHTML='<h2>Looking up product...</h2>';
- try{
-  const response=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json',{cache:'no-store'});
-  if(!response.ok)throw Error('Lookup failed');
-  const data=await response.json();
-  if(!data.product||data.status===0){
-   $('result').innerHTML='<h2>Product not found</h2><p>Try another barcode.</p>';
-   return;
-  }
-  showProduct(data.product,code);
- }catch(e){
-  $('result').innerHTML='<h2>Product lookup failed</h2><p>Check your connection and try again.</p>';
- }
+code=String(code).trim();
+if(!/^\d{8,14}$/.test(code)){
+alert('Enter an 8 to 14 digit barcode.');
+return;
 }
-$('scanBtn').onclick=startScan;
-$('cancel').onclick=stopScan;
-$('manualBtn').onclick=()=>$('manual').hidden=!$('manual').hidden;
-$('lookupBtn').onclick=()=>lookup($('barcode').value);
+show('<h2>Searching product databases...</h2>');
+const sources=[];
+let off=null,usda=null;
+try{
+off=await getOFF(code);
+if(off)sources.push('Open Food Facts');
+}catch(e){}
+const key=$('usdaKey').value.trim();
+if(key){
+try{
+usda=await getUSDA(code,key);
+if(usda)sources.push('USDA FoodData Central');
+}catch(e){sources.push('USDA unavailable');}
+}
+if(!off&&!usda){
+show('<h2>Product information unavailable</h2><p>Try photographing the ingredients or vegan certification on the package.</p>');
+return;
+}
+const p={...(off||{})};
+if(usda){
+if(!p.ingredients_text)p.ingredients_text=usda.ingredients_text;
+if(!p.product_name)p.product_name=usda.product_name;
+}
+render(p,code,sources);
+}
+async function startScan(){
+if(!('BarcodeDetector' in window)){
+alert('Barcode camera scanning is not supported in this browser. Enter the barcode manually.');
+return;
+}
+try{
+detector=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']});
+stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+$('video').srcObject=stream;
+await $('video').play();
+$('scanner').style.display='block';
+interval=setInterval(async()=>{
+if(scanning||!$('video').videoWidth)return;
+scanning=true;
+try{
+const found=await detector.detect($('video'));
+if(found.length){
+const code=found[0].rawValue;
+stopScan();
+lookup(code);
+}
+}catch(e){}finally{scanning=false;}
+},300);
+}catch(e){
+stopScan();
+alert('Camera unavailable. Check permission or enter barcode manually.');
+}
+}
+function stopScan(){
+clearInterval(interval);
+interval=null;
+if(stream)stream.getTracks().forEach(t=>t.stop());
+stream=null;
+$('scanner').style.display='none';
+}
+async function photoOCR(file){
+show('<h2>Reading package photo...</h2><p>This may take a moment on the first use.</p>');
+try{
+if(!window.Tesseract){
+await new Promise((resolve,reject)=>{
+const s=document.createElement('script');
+s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+s.onload=resolve;
+s.onerror=reject;
+document.head.appendChild(s);
+});
+}
+const result=await Tesseract.recognize(file,'eng');
+const text=result.data.text.trim();
+if(!text){
+show('<h2>No readable text found</h2><p>Retake the picture closer, with good lighting.</p>');
+return;
+}
+const label=/\b(?:certified vegan|vegan approved|vegan society|vegan certified)\b/i.test(text);
+const a=analyzeIngredients(text);
+const labelResult=label&&a.kind!=='bad';
+show('<h2>Package photo results</h2><p class="status '+(labelResult?'good':a.kind)+'">'+esc(labelResult?'VEGAN CLAIM DETECTED — VERIFY SYMBOL':a.label)+'</p><p>'+esc(labelResult?'The photo appears to contain a vegan certification claim. Confirm the actual symbol and product.':a.why)+'</p><h3>Text read from photo</h3><div class="ingredients">'+esc(text)+'</div><p><small>Photo text recognition can misread labels. Review the text below before relying on the result.</small></p>');
+$('typed').value=text;
+}catch(e){
+show('<h2>Photo reading unavailable</h2><p>Check internet access or type the ingredients below. Photo recognition needs an online library to load.</p>');
+}
+}
+$('scan').onclick=startScan;
+$('stop').onclick=stopScan;
+$('manualToggle').onclick=()=>$('manual').classList.toggle('hidden');
+$('lookup').onclick=()=>lookup($('barcode').value);
+$('analyze').onclick=()=>{
+const raw=$('typed').value.trim();
+const a=analyzeIngredients(raw);
+show('<h2>Ingredient check</h2><p class="status '+a.kind+'">'+esc(a.label)+'</p><p>'+esc(a.why)+'</p><div class="ingredients">'+esc(raw||'No ingredients entered')+'</div>');
+};
+$('photoButton').onclick=()=>$('photo').click();
+$('photo').onchange=e=>{
+const file=e.target.files&&e.target.files[0];
+if(file)photoOCR(file);
+};
 </script>
 </body>
 </html>
