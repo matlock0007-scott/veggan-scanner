@@ -9,29 +9,39 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:system-ui;background:#f7f8f3;color:#10251a}
-main{max-width:680px;margin:auto;padding:35px 18px;text-align:center}
-.logo{margin:40px auto 20px;width:92px;height:92px;border-radius:50%;display:grid;place-items:center;background:#123f27;color:#fff;font-size:52px;font-weight:800}
-h1{font-size:38px}
-.sub{font-size:20px;color:#657068}
-button{width:100%;margin-top:30px;padding:20px;border:0;border-radius:16px;background:#123f27;color:#fff;font-size:20px;font-weight:750}
+main{max-width:680px;margin:auto;padding:30px 18px;text-align:center}
+.logo{margin:25px auto 15px;width:92px;height:92px;border-radius:50%;display:grid;place-items:center;background:#123f27;color:white;font-size:52px;font-weight:800}
+h1{font-size:36px}
+.sub{font-size:18px;color:#657068}
+button{width:100%;margin-top:18px;padding:18px;border:0;border-radius:15px;background:#123f27;color:white;font-size:19px;font-weight:700}
+.secondary{background:#e2ebe4;color:#123f27}
+input,textarea{width:100%;padding:13px;margin-top:10px;border:1px solid #9ba99f;border-radius:10px;font:inherit}
+textarea{min-height:110px}
 #scanner{display:none;position:fixed;inset:0;background:#000;z-index:5}
 video{width:100%;height:100%;object-fit:cover}
-.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-shadow:0 1px 4px #000}
-.box{width:min(88vw,520px);height:240px;border:4px solid #fff;border-radius:24px}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;text-shadow:0 1px 4px black}
+.target{width:min(88vw,520px);height:230px;border:4px solid white;border-radius:24px}
 .hint{margin:18px;font-size:18px;font-weight:700}
-.cancel{width:auto;padding:14px 28px;background:#111c}
-#result{display:none;text-align:left;background:#fff;border-radius:24px;padding:24px;margin-top:30px}
-#result h2{text-align:center;font-size:34px}
-.ingredients{background:#f1f3ed;border-radius:16px;padding:18px;line-height:1.5;overflow-wrap:anywhere}
-footer{color:#929a94;margin-top:70px}
+.cancel{width:auto;background:#222}
+#result{display:none;text-align:left;background:white;border-radius:20px;padding:20px;margin-top:24px;overflow-wrap:anywhere}
+#result h2{text-align:center;font-size:28px}
+.status{font-size:22px;font-weight:800}
+.ingredients{background:#f1f3ed;border-radius:14px;padding:15px;line-height:1.5;white-space:pre-wrap}
+.note{font-size:14px;color:#4f6256}
+footer{color:#929a94;margin-top:55px}
 </style>
 </head>
 <body>
 <main>
 <div class="logo">V</div>
 <h1>Vegan Scanner</h1>
-<div class="sub">Scan a food barcode and check whether the listed ingredients are vegan.</div>
+<div class="sub">Scan food barcodes. Check ingredients and recorded vegan certifications.</div>
 <button id="scanBtn">Scan a barcode</button>
+<button class="secondary" id="manualBtn">Enter barcode manually</button>
+<section id="manual" hidden>
+<input id="barcode" inputmode="numeric" placeholder="Barcode numbers">
+<button id="lookupBtn">Look up product</button>
+</section>
 <section id="result" aria-live="polite"></section>
 <footer>Fast • Simple • Plant-based</footer>
 </main>
@@ -39,18 +49,18 @@ footer{color:#929a94;margin-top:70px}
 <video id="video" playsinline muted></video>
 <div class="overlay">
 <h2>Scan the product barcode</h2>
-<div class="box"></div>
+<div class="target"></div>
 <div class="hint">Hold the barcode steady inside the box</div>
 <button class="cancel" id="cancel">Cancel</button>
 </div>
 </div>
 <script>
-let stream,detector,timer,busy=false;
-const $=x=>document.getElementById(x);
-
+let stream,detector,timer,busy=false,lastProduct=null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function startScan(){
  if(!('BarcodeDetector' in window)){
-  alert('Barcode scanning is not supported in this browser. Try current Chrome on Android.');
+  alert('Use Chrome on Android, or enter the barcode manually.');
   return;
  }
  try{
@@ -65,8 +75,8 @@ async function startScan(){
   busy=false;
   timer=setInterval(detect,250);
  }catch(e){
-  alert('Camera could not start. Check browser camera permission.');
   stopScan();
+  alert('Camera could not start. Check camera permission.');
  }
 }
 async function detect(){
@@ -79,7 +89,7 @@ async function detect(){
    stopScan();
    lookup(code);
   }
- }catch(e){}finally{busy=false}
+ }catch(e){}finally{busy=false;}
 }
 function stopScan(){
  clearInterval(timer);
@@ -87,9 +97,8 @@ function stopScan(){
  stream=null;
  $('scanner').style.display='none';
 }
-
 const nonVegan=[
- ['dairy',/\b(?:milk|whey|casein(?:ate)?|lactose|buttermilk|milkfat|milk solids|milk powder|cheddar|parmesan|mozzarella|butter|cream|yogh?urt|cheese)\b/i],
+ ['dairy',/\b(?:milk|whey|casein(?:ate)?|lactose|buttermilk|milkfat|milk solids|milk powder|cheddar|parmesan|mozzarella|butter|cream|yogh?urt|cheese|ghee)\b/i],
  ['egg',/\b(?:eggs?|egg whites?|egg yolks?|albumen|ovalbumin)\b/i],
  ['gelatin',/\bgelati[ne]\b/i],
  ['honey',/\bhoney\b/i],
@@ -99,83 +108,90 @@ const nonVegan=[
  ['animal fat',/\b(?:lard|tallow|beef fat|pork fat|chicken fat)\b/i],
  ['meat or seafood',/\b(?:anchov(?:y|ies)|oyster extract|fish sauce|shrimp|prawn|chicken|beef|pork|turkey|duck|lamb|mutton|fish)\b/i]
 ];
-
-const ambiguous=[
- ['potentially animal-derived additives',/\b(?:natural flavou?rs?|mono-? and diglycerides|mono-?diglycerides|vitamin d3|glycerin|glycerol|stearic acid|l-?cysteine)\b/i]
-];
-
-const plantQualifier='(?:oat|soy|soya|almond|coconut|rice|pea|cashew|hazelnut|hemp|flax|sunflower|peanut|cocoa|shea|apple|vegan|plant[- ]based|dairy[- ]free|non[- ]dairy|imitation)';
-
-function cleanPlantPhrases(s){
+const uncertain=/\b(?:natural flavou?rs?|mono-? and diglycerides|mono-?diglycerides|vitamin d3|glycerin|glycerol|stearic acid|l-?cysteine)\b/i;
+const plantWords='(?:oat|soy|soya|almond|coconut|rice|pea|cashew|hazelnut|hemp|flax|sunflower|peanut|cocoa|shea|apple|vegan|plant[- ]based|dairy[- ]free|non[- ]dairy|imitation)';
+function cleanPlant(s){
  return s.replace(
-  new RegExp('\\b'+plantQualifier+'\\s+(?:milk|butter|cream|cheese|yogh?urt|chicken|beef|pork|fish|egg)\\b','gi'),
+  new RegExp('\\b'+plantWords+'\\s+(?:milk|butter|cream|cheese|yogh?urt|chicken|beef|pork|fish|egg)\\b','gi'),
   'plant alternative'
  ).replace(/\b(?:peanut|almond|cashew|cocoa|shea|apple) butter\b/gi,'plant spread');
 }
-
-function evaluate(p){
+function classify(p,manual){
+ const raw=(manual===undefined?p.ingredients_text:manual)||'';
  const tags=(p.ingredients_analysis_tags||[]).map(x=>String(x).toLowerCase());
+ const labels=(p.labels_tags||[]).map(x=>String(x).toLowerCase());
+ const labelText=String(p.labels||'');
+ const certified=labels.some(x=>/^(?:en:)?(?:vegan|certified-vegan|vegan-society|v-label-vegan|vegetarian-society-vegan-approved)$/.test(x))
+ ||/\b(?:certified vegan|vegan approved|vegetarian society vegan approved)\b/i.test(labelText);
  const veganTag=tags.includes('en:vegan')||tags.includes('vegan');
  const nonTag=tags.includes('en:non-vegan')||tags.includes('non-vegan');
- const raw=p.ingredients_text||'';
-
- if(!raw.trim())
-  return ['NEEDS VERIFICATION','No ingredient list available.'];
-
- const cleaned=cleanPlantPhrases(raw);
- const certain=nonVegan.filter(([,re])=>re.test(cleaned)).map(([name])=>name);
- const possible=ambiguous.filter(([,re])=>re.test(cleaned)).map(([name])=>name);
-
- if(certain.length)
-  return ['NOT VEGAN','Animal-derived ingredients detected: '+certain.join(', ')+'.'];
-
+ const cleaned=cleanPlant(raw);
+ const detected=nonVegan.filter(([,re])=>re.test(cleaned)).map(([name])=>name);
+ if(detected.length)
+  return ['POSSIBLY NOT VEGAN','Potential animal ingredients detected: '+detected.join(', ')+'. Check for plant-based substitutes and packaging details.'];
  if(nonTag)
-  return ['NOT VEGAN','Database identifies this product as non-vegan. Check current packaging.'];
-
- if(possible.length)
-  return ['NEEDS VERIFICATION','Ingredient sources need verification: '+possible.join(', ')+'.'];
-
+  return ['NOT VEGAN (DATABASE)','The database classifies this product as non-vegan. Check the current package.'];
+ if(certified)
+  return ['VEGAN (LABEL RECORDED)','The product database records a vegan label or certification. Confirm it on your package.'];
+ if(!raw.trim())
+  return ['NEEDS VERIFICATION','No ingredient list is available from the product database. You can enter the package ingredients below.'];
  if(veganTag)
-  return ['VEGAN (DATABASE)','Database identifies the ingredients as vegan. Check current packaging.'];
-
- return ['NEEDS VERIFICATION','No clearly animal-derived ingredients found, but vegan status is not verified.'];
+  return ['VEGAN (DATABASE)','The database classifies the ingredients as vegan. Check the current package.'];
+ if(uncertain.test(cleaned))
+  return ['NEEDS VERIFICATION','Some ingredients may have plant or animal origins. Check with the manufacturer.'];
+ return ['NEEDS VERIFICATION','No obvious animal ingredients detected, but this does not prove the product is vegan.'];
 }
-
-async function lookup(code){
- const r=$('result');
- r.style.display='block';
- r.innerHTML='<h2>Looking up product...</h2>';
- try{
-  const response=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json');
-  if(!response.ok)throw new Error('Lookup failed');
-  const data=await response.json();
-  if(!data.product){
-   r.innerHTML='<h2>Product not found</h2>'+again();
+function showProduct(p,code,manual){
+ lastProduct={p,code};
+ const [status,reason]=classify(p,manual);
+ const raw=manual===undefined?p.ingredients_text:manual;
+ $('result').innerHTML=
+  '<h2>'+esc(p.product_name||'Unknown product')+'</h2>'+
+  '<p class="status">'+esc(status)+'</p>'+
+  '<p>'+esc(reason)+'</p>'+
+  '<h3>Ingredients</h3>'+
+  '<div class="ingredients">'+esc(raw||'Not available')+'</div>'+
+  '<p class="note">Source: Open Food Facts, a community-maintained database. “Plant-based” and “dairy-free” alone do not prove vegan status.</p>'+
+  '<h3>Ingredients missing or incorrect?</h3>'+
+  '<p>Enter the ingredients printed on the package to check them. This does not update the database.</p>'+
+  '<textarea id="ingredientEntry" placeholder="Type or paste ingredients here">'+esc(manual||'')+'</textarea>'+
+  '<button class="secondary" id="checkIngredients">Check entered ingredients</button>'+
+  '<button id="again">Scan another product</button>';
+ $('checkIngredients').onclick=()=>{
+  const entered=$('ingredientEntry').value.trim();
+  if(!entered){
+   alert('Enter the ingredients first.');
    return;
   }
-  const p=data.product;
-  const [status,reason]=evaluate(p);
-  r.innerHTML=
-   '<h2>'+esc(p.product_name||'Unknown product')+'</h2>'+
-   '<h3>'+esc(status)+'</h3>'+
-   '<p>'+esc(reason)+'</p>'+
-   '<h3>Ingredients</h3>'+
-   '<p>'+esc(p.ingredients_text||'Not available')+'</p>'+
-   again();
- }catch(error){
-  r.innerHTML='<h2>Product lookup failed</h2><p>Please try again.</p>'+again();
+  showProduct(p,code,entered);
+ };
+ $('again').onclick=startScan;
+}
+async function lookup(code){
+ code=String(code).trim();
+ if(!/^\d{8,14}$/.test(code)){
+  alert('Enter an 8 to 14 digit barcode.');
+  return;
  }
-}
-function again(){
- return '<button onclick="startScan()">Scan another product</button>';
-}
-function esc(s){
- return String(s??'').replace(/[&<>"']/g,c=>({
-  '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
- }[c]));
+ $('result').style.display='block';
+ $('result').innerHTML='<h2>Looking up product...</h2>';
+ try{
+  const response=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json',{cache:'no-store'});
+  if(!response.ok)throw Error('Lookup failed');
+  const data=await response.json();
+  if(!data.product||data.status===0){
+   $('result').innerHTML='<h2>Product not found</h2><p>Try another barcode.</p>';
+   return;
+  }
+  showProduct(data.product,code);
+ }catch(e){
+  $('result').innerHTML='<h2>Product lookup failed</h2><p>Check your connection and try again.</p>';
+ }
 }
 $('scanBtn').onclick=startScan;
 $('cancel').onclick=stopScan;
+$('manualBtn').onclick=()=>$('manual').hidden=!$('manual').hidden;
+$('lookupBtn').onclick=()=>lookup($('barcode').value);
 </script>
 </body>
 </html>
