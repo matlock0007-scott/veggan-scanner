@@ -332,8 +332,53 @@ $('ingredients').value='';
 $('nutrition').textContent='Nutrition information appears here when available.';
 $('productPhoto').hidden=true;
 $('productPhoto').removeAttribute('src');
+$('productPhoto').onload=null;
+$('productPhoto').onerror=null;
 $('photoPlaceholder').hidden=false;
+$('photoPlaceholder').textContent='Product picture appears here';
 clearResult();
+}
+
+function showProductImages(p){
+const selected=p.selected_images||{};
+const front=selected.front||{};
+const images=[
+front.display?.en,
+...Object.values(front.display||{}),
+front.small?.en,
+...Object.values(front.small||{}),
+p.image_front_url,
+p.image_front_small_url,
+p.image_url,
+p.image_small_url
+].filter(x=>typeof x==='string'&&x.startsWith('https://'));
+
+const uniqueImages=[...new Set(images)];
+const productImg=$('productPhoto');
+let imageIndex=0;
+
+productImg.hidden=true;
+$('photoPlaceholder').hidden=false;
+$('photoPlaceholder').textContent='Product picture unavailable';
+
+productImg.onload=()=>{
+productImg.hidden=false;
+$('photoPlaceholder').hidden=true;
+};
+
+productImg.onerror=()=>{
+imageIndex++;
+if(imageIndex<uniqueImages.length){
+productImg.src=uniqueImages[imageIndex];
+}else{
+productImg.hidden=true;
+$('photoPlaceholder').hidden=false;
+}
+};
+
+if(uniqueImages.length){
+productImg.src=uniqueImages[0];
+}
 }
 
 async function lookupProduct(){
@@ -361,10 +406,8 @@ $('productName').value=p.product_name||'';
 $('brand').value=p.brands||'';
 const ing=p.ingredients_text_en||p.ingredients_text||'';
 $('ingredients').value=ing;
-const img=p.image_front_small_url||p.image_url||'';
-$('productPhoto').hidden=!img;
-$('photoPlaceholder').hidden=!!img;
-if(img)$('productPhoto').src=img;
+
+showProductImages(p);
 
 const n=p.nutriments||{};
 const parts=[
@@ -377,7 +420,7 @@ const parts=[
 ].filter(x=>x[1]!==undefined&&x[1]!==null&&x[1]!==''&&Number.isFinite(Number(x[1])));
 
 $('nutrition').textContent=parts.length?
-'Per 100g: '+parts.map(x=>x[0]+' '+x[1]+'g').join(' • '):
+'Per 100g: '+parts.map(x=>x[0]+' '+Number(x[1]).toFixed(1)+'g').join(' • '):
 'Nutrition data unavailable';
 
 $('lookupMessage').textContent=ing?
