@@ -10,7 +10,8 @@
 *{box-sizing:border-box}
 body{margin:0;background:#f4faf5;color:#173b2a;font-family:system-ui,Arial}
 header{background:#126c42;color:white;text-align:center;padding:24px 12px}
-h1{margin:0}header p{margin:6px}
+h1{margin:0}
+header p{margin:6px}
 main{max-width:700px;margin:auto;padding:15px}
 section{background:white;border-radius:16px;padding:18px;margin-bottom:15px;box-shadow:0 2px 12px #1232}
 h2{font-size:20px;margin-top:0}
@@ -51,6 +52,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <p>Free scanning • Independent results • For the animals</p>
 </header>
 <main>
+
 <section>
 <h2>Scan a barcode</h2>
 <button id="startCamera">📷 Start Barcode Scanner</button>
@@ -84,7 +86,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 
 <section>
 <h2>Ingredients</h2>
-<p>Take one picture. Verified Vegan will automatically try to find and read the ingredient list.</p>
+<p>Take one picture. Verified Vegan will automatically find and read the ingredient list.</p>
 <input id="photoInput" type="file" accept="image/*" capture="environment">
 <button id="takePhoto">📸 Take Ingredient Picture</button>
 <button id="choosePhoto" class="secondary">Choose Existing Photo</button>
@@ -142,17 +144,116 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 
 <script>
 'use strict';
+
 const $=id=>document.getElementById(id);
 const KEY='verified-vegan-v1';
 const DBKEY='verified-vegan-supabase-config-v1';
+
 let stream=null,scanActive=false,lastResult=null;
 let photoBitmap=null,cropRect=null,dragStart=null;
 let ocrWorker=null,ocrBusy=false,ocrRequest=0;
-let ingredientSource='none',ocrRejected=false;
+let ingredientSource='none';
 let allergens={contains:'',mayContain:''};
 
+const clean=s=>String(s||'').replace(/\s+/g,' ').trim();
+
+/*
+INGREDIENT EXTRACTION FIX
+
+The ingredient list ends BEFORE:
+- CONTAINS CORN, SOY
+- MAY CONTAIN
+- MADE IN A FACILITY
+- manufacturing warnings
+- company addresses
+- nutrition panels
+
+The cutoff works even when OCR puts the warning
+on the same line as the last ingredient.
+*/
+
+function normalizeOCR(s){
+return String(s||'')
+.replace(/\r/g,'\n')
+.replace(/[“”]/g,'"')
+.replace(/[‘’]/g,"'")
+.replace(/[|]/g,'I');
+}
+
+function sectionMarkers(){
+return [
+/\bmay\s+(?:also\s+)?contain\s*:?\s+/i,
+/\bcontains\s*:?\s+(?=[a-z])/i,
+/\bmade\s+in\s+a\s+facility\b/i,
+/\bmanufactured\s+in\s+a\s+facility\b/i,
+/\bprocessed\s+in\s+a\s+facility\b/i,
+/\b(?:facility|equipment)\s+that\s+(?:also\s+)?(?:uses|processes|handles)\b/i,
+/\b(?:wheat|dairy|eggs?|nuts?|seeds?)\s+(?:are\s+)?not\s+used\s+in\s+this\s+product\b/i,
+/\b(?:allergen|allergens|allergen information)\s*:/i,
+/\b(?:nutrition facts|nutrition information)\b/i,
+/\b(?:distributed by|manufactured by|product of usa|product of the usa)\b/i,
+/\b(?:california residents|warning\s*:|storage instructions|cooking instructions)\b/i,
+/\b(?:starlite\s+cuisine\s+p\.?\s*o\.?\s*box)\b/i,
+/\b(?:p\.?\s*o\.?\s*box\s+\d+)\b/i,
+/\b(?:visit us at|www\.)\b/i,
+/\b(?:best before|keep frozen|refrigerate after opening)\b/i
+];
+}
+
+function findBoundary(text){
+let earliest=-1;
+let kind='';
+for(let re of sectionMarkers()){
+let m=re.exec(text);
+if(m&&(! (earliest>=0) || m.index<earliest)){
+earliest=m.index;
+kind=m[0];
+}
+}
+return {index:earliest,kind};
+}
+
+function extractStatements(text){
+let contains='';
+let mayContain='';
+let source=normalizeOCR(text);
+let m=source.match(/\bcontains\s*:?\s+([^\n.]{2,160})/i);
+if(m)contains=clean(m[1]);
+m=source.match(/\bmay\s+(?:also\s+)?contain\s*:?\s+([^\n.]{2,160})/i);
+if(m)mayContain=clean(m[1]);
+return {contains,mayContain};
+}
+
+function splitPackageText(raw){
+let source=normalizeOCR(raw);
+let statements=extractStatements(source);
+let heading=/\bingredients?\s*[:\-]\s*/i;
+let match=heading.exec(source);
+let foundHeading=!!match;
+
+if(match)source=source.slice(match.index+match[0].length);
+
+let boundary=findBoundary(source);
+if(boundary.index>=0)source=source.slice(0,boundary.index);
+
+source=source
+.replace(/\b(?:ingredients?)\s*[:\-]\s*/gi,'')
+.replace(/\s+/g,' ')
+.replace(/^[\s:;.,\-]+|[\s:;.,\-]+$/g,'')
+.trim();
+
+if(source.length>2500)source=source.slice(0,2500);
+
+return {
+ingredients:source,
+contains:statements.contains,
+mayContain:statements.mayContain,
+foundHeading
+};
+}
+
 const rules=[
-['Milk or dairy',/\b(milk|whey|casein|caseinate|lactose|lactalbumin|butter|buttermilk|cream|cheese|yogurt|yoghurt|ghee|milkfat|milk solids)\b/i],
+['Milk or dairy',/\b(milk|whey|casein|caseinate|lactose|lactalbumin|buttermilk|cream|cheese|yogurt|yoghurt|ghee|milkfat|milk solids)\b/i],
 ['Egg',/\b(egg|eggs|albumen|ovalbumin|egg whites?|egg yolks?)\b/i],
 ['Honey or bee products',/\b(honey|royal jelly|propolis|beeswax|cera alba|e901)\b/i],
 ['Gelatin',/\b(gelatin|gelatine|isinglass)\b/i],
@@ -163,51 +264,22 @@ const rules=[
 ['Other animal ingredients',/\b(collagen|keratin|lanolin|wool fat)\b/i]
 ];
 
-const clean=s=>String(s||'').replace(/\s+/g,' ').trim();
-
-function splitPackageText(raw){
-let lines=String(raw||'').replace(/\r/g,'').split(/\n/).map(clean).filter(Boolean);
-let start=lines.findIndex(x=>/\bingredients?\s*[:\-]/i.test(x));
-let parts=[],contains='',mayContain='';
-let stop=/^(?:contains\s*:?\s+|may (?:also )?contain\b|allergen(?:s| information)?\s*:|made in a facility|manufactured in a facility|processed in a facility|distributed by|manufactured by|nutrition facts|storage\b|directions\b|preparation instructions|cooking instructions|warning\s*:|www\.|visit us|product of|best before|refrigerate|keep frozen)/i;
-
-if(start>=0){
-for(let i=start;i<lines.length;i++){
-let line=lines[i];
-if(i===start)line=line.replace(/^.*?\bingredients?\s*[:\-]\s*/i,'');
-if(i>start&&stop.test(line))break;
-parts.push(line);
-if(parts.join(' ').length>2500)break;
-}
-}else parts=lines.slice();
-
-let body=clean(parts.join(' '));
-let boundary=/(?:^|[.;]\s+)\s*(may (?:also )?contain|contains)\s*:?\s+/i;
-let m=boundary.exec(body);
-if(m){
-let remainder=body.slice(m.index+m[0].length).trim();
-body=body.slice(0,m.index).trim();
-if(/^may/i.test(m[1]))mayContain=remainder;
-else contains=remainder;
-}
-
-for(let line of lines){
-if(/^may (?:also )?contain\s*:?\s+/i.test(line))
-mayContain=line.replace(/^may (?:also )?contain\s*:?\s+/i,'');
-else if(/^contains\s*:?\s+/i.test(line))
-contains=line.replace(/^contains\s*:?\s+/i,'');
-}
-return {ingredients:clean(body),contains:clean(contains),mayContain:clean(mayContain),foundHeading:start>=0};
-}
-
 function classify(raw){
 let t=splitPackageText(raw).ingredients;
-if(!t)return {status:'Needs Verification',reasons:[],explanation:'No readable ingredient list is available.',caution:'Photograph or enter the complete ingredient list.'};
+
+if(!t)return {
+status:'Needs Verification',
+reasons:[],
+explanation:'No readable ingredient list is available.',
+caution:'Photograph or enter the complete ingredient list.'
+};
 
 let reasons=rules.filter(r=>r[1].test(t)).map(r=>r[0]);
+
 let cautions=[];
 if(/\b(natural flavo[u]?rs?|mono(?:-|\s)?and(?:-|\s)?diglycerides|glycerin|glycerine|vitamin d3|cholecalciferol|enzymes|rennet|l[.-]?cysteine)\b/i.test(t))
-cautions.push('Some ingredients have uncertain plant or animal origins. Manufacturer confirmation may be necessary.');
+cautions.push('Some ingredients may have uncertain plant or animal origins. Manufacturer confirmation may be necessary.');
+
 if(/\bsugar\b/i.test(t)&&!/\borganic (?:cane )?sugar\b/i.test(t))
 cautions.push('Generic sugar may have processing-source uncertainty.');
 
@@ -215,94 +287,143 @@ return {
 status:reasons.length?'Not Vegan':'Vegan',
 reasons:reasons.length?reasons:['No explicitly animal-derived ingredients detected in the supplied ingredient text.'],
 explanation:reasons.length?'Animal-derived ingredients were detected.':'Ingredient text screening found no explicitly animal-derived ingredients.',
-caution:cautions.join(' ')+' Ingredient screening alone cannot establish manufacturing or processing-aid certification.'
+caution:cautions.join(' ')+' Ingredient screening alone does not establish manufacturer certification.'
 };
 }
 
 function setStatus(status){
 let el=$('productStatus');
 el.textContent=status;
-el.className=status==='Vegan'?'vegan':status==='Not Vegan'?'notvegan':status==='Needs Verification'?'unknown':'pending';
+el.className=
+status==='Vegan'?'vegan':
+status==='Not Vegan'?'notvegan':
+status==='Needs Verification'?'unknown':'pending';
 }
+
 function clearResult(){
 lastResult=null;
 $('result').style.display='none';
 }
+
 function updateAllergens(){
-$('containsText').textContent=allergens.contains?'Contains: '+allergens.contains:'Contains statement: none extracted';
-$('mayContainText').textContent=allergens.mayContain?'May contain: '+allergens.mayContain:'May contain statement: none extracted';
-$('allergenPanel').style.display=allergens.contains||allergens.mayContain?'block':'none';
+$('containsText').textContent=allergens.contains?
+'Contains: '+allergens.contains:
+'Contains statement: none extracted';
+
+$('mayContainText').textContent=allergens.mayContain?
+'May contain: '+allergens.mayContain:
+'May contain statement: none extracted';
+
+$('allergenPanel').style.display=
+allergens.contains||allergens.mayContain?'block':'none';
 }
+
 function showResult(result){
 lastResult=result;
 setStatus(result.status);
 $('explanation').textContent=result.explanation;
 $('reasons').replaceChildren();
+
 result.reasons.forEach(reason=>{
 let li=document.createElement('li');
 li.textContent=reason;
 $('reasons').append(li);
 });
+
 $('caution').textContent=result.caution||'';
 $('result').style.display='block';
 }
 
 $('check').onclick=()=>{
 if(ocrBusy)return;
+
 if(ingredientSource==='ocr'&&!$('confirmed').checked){
-alert('Please compare the recognized ingredient list with the package, correct mistakes, and check the confirmation box.');
+alert('Compare the recognized ingredient list with the package, correct mistakes, and check the confirmation box.');
 return;
 }
+
 let raw=$('ingredients').value;
+
 if(!clean(raw)){
-setStatus('Needs Verification');
 showResult(classify(''));
 return;
 }
-showResult(classify(raw));
+
+/* Final safety cleanup before classification */
+let parsed=splitPackageText(raw);
+$('ingredients').value=parsed.ingredients;
+
+if(!parsed.ingredients){
+showResult(classify(''));
+return;
+}
+
+showResult(classify(parsed.ingredients));
 $('result').scrollIntoView({behavior:'smooth',block:'start'});
 };
 
 function getScans(){
-try{return JSON.parse(localStorage.getItem(KEY)||'[]')}catch{return []}
+try{return JSON.parse(localStorage.getItem(KEY)||'[]')}
+catch{return []}
 }
+
 function renderHistory(){
 let box=$('history');
 box.replaceChildren();
 let scans=getScans();
-if(!scans.length){box.textContent='No saved scans yet.';return}
+
+if(!scans.length){
+box.textContent='No saved scans yet.';
+return;
+}
+
 scans.slice(0,20).forEach(s=>{
 let div=document.createElement('div');
 div.className='entry';
 let title=document.createElement('strong');
-title.textContent=(s.product_name||s.product||'Unnamed product')+' — '+(s.vegan_result||s.result||'');
+title.textContent=
+(s.product_name||s.product||'Unnamed product')+
+' — '+(s.vegan_result||s.result||'');
+
 let small=document.createElement('div');
 small.className='muted';
-small.textContent=(s.brand||'')+' • '+(s.barcode||'')+' • '+(s.created_at||s.timestamp||'');
+small.textContent=
+(s.brand||'')+' • '+(s.barcode||'')+
+' • '+(s.created_at||s.timestamp||'');
+
 div.append(title,small);
 box.append(div);
 });
 }
 
 function dbConfig(){
-try{return JSON.parse(localStorage.getItem(DBKEY)||'{}')}catch{return {}}
+try{return JSON.parse(localStorage.getItem(DBKEY)||'{}')}
+catch{return {}}
 }
+
 let config=dbConfig();
 $('supabaseUrl').value=config.url||'';
 $('supabaseKey').value=config.key||'';
+
 $('connectDb').onclick=()=>{
 let url=$('supabaseUrl').value.trim().replace(/\/+$/,'');
 let key=$('supabaseKey').value.trim();
+
 if(!/^https:\/\/[\w.-]+\.supabase\.co$/.test(url)||!key){
 $('dbMessage').textContent='Enter a valid Supabase URL and public key.';
 return;
 }
+
 localStorage.setItem(DBKEY,JSON.stringify({url,key}));
 $('dbMessage').textContent='Connection settings saved on this device.';
 };
 
 $('save').onclick=async()=>{
-if(!lastResult){alert('Verify ingredients first.');return}
+if(!lastResult){
+alert('Verify ingredients first.');
+return;
+}
+
 let record={
 barcode:$('barcode').value.trim(),
 brand:$('brand').value.trim(),
@@ -313,28 +434,42 @@ decision_reasons:lastResult.reasons,
 created_at:new Date().toISOString(),
 contributor:'anonymous'
 };
+
 let scans=getScans();
 scans.unshift(record);
 localStorage.setItem(KEY,JSON.stringify(scans.slice(0,500)));
 renderHistory();
+
 let db=dbConfig();
+
 if(db.url&&db.key){
 try{
 let response=await fetch(db.url+'/rest/v1/product_tests',{
 method:'POST',
-headers:{'Content-Type':'application/json',apikey:db.key,Authorization:'Bearer '+db.key,Prefer:'return=minimal'},
+headers:{
+'Content-Type':'application/json',
+apikey:db.key,
+Authorization:'Bearer '+db.key,
+Prefer:'return=minimal'
+},
 body:JSON.stringify(record)
 });
+
 if(!response.ok)throw Error('HTTP '+response.status);
 $('dbMessage').textContent='Scan saved locally and to Supabase.';
 }catch(e){
 $('dbMessage').textContent='Scan saved locally. Cloud save failed: '+e.message;
 }
-}else $('dbMessage').textContent='Scan saved locally. No cloud connection configured.';
+}else{
+$('dbMessage').textContent='Scan saved locally. No cloud connection configured.';
+}
 };
 
 $('export').onclick=()=>{
-let blob=new Blob([JSON.stringify(getScans(),null,2)],{type:'application/json'});
+let blob=new Blob(
+[JSON.stringify(getScans(),null,2)],
+{type:'application/json'}
+);
 let url=URL.createObjectURL(blob);
 let a=document.createElement('a');
 a.href=url;
@@ -346,11 +481,14 @@ setTimeout(()=>URL.revokeObjectURL(url),1000);
 function showPhoto(url,source){
 let img=$('productPhoto');
 img.hidden=!url;
+
 if(url)img.src=url;
 else img.removeAttribute('src');
+
 $('photoPlaceholder').style.display=url?'none':'block';
 $('photoSource').textContent=source||'';
 }
+
 function showNutrition(n){
 let fields=[
 ['Calories',n['energy-kcal_100g'],'kcal'],
@@ -361,79 +499,124 @@ let fields=[
 ['Fiber',n.fiber_100g,'g'],
 ['Salt',n.salt_100g,'g']
 ];
+
 let valid=fields.filter(x=>x[1]!==undefined&&x[1]!==null);
-$('nutrition').textContent=valid.length?'Per 100 g: '+valid.map(x=>x[0]+': '+Number(x[1]).toFixed(1)+' '+x[2]).join(' • '):'Nutrition information not available.';
+
+$('nutrition').textContent=valid.length?
+'Per 100 g: '+valid.map(x=>
+x[0]+': '+Number(x[1]).toFixed(1)+' '+x[2]
+).join(' • '):
+'Nutrition information not available.';
 }
 
 async function lookupProduct(){
 let barcode=$('barcode').value.trim();
+
 if(!/^\d{8,14}$/.test(barcode)){
 $('lookupMessage').textContent='Enter a valid 8–14 digit barcode.';
 return;
 }
+
 $('lookupMessage').textContent='Looking up product…';
 clearResult();
 setStatus('Looking up…');
+
 try{
-let response=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(barcode)+'.json');
+let response=await fetch(
+'https://world.openfoodfacts.org/api/v2/product/'+
+encodeURIComponent(barcode)+'.json'
+);
+
 if(!response.ok)throw Error('Product service unavailable');
+
 let data=await response.json();
+
 if(data.status!==1||!data.product){
-$('lookupMessage').textContent='Product not found. You can enter details and photograph ingredients.';
+$('lookupMessage').textContent=
+'Product not found. You can enter details and photograph ingredients.';
 setStatus('Needs Verification');
 return;
 }
+
 let p=data.product;
 $('productName').value=p.product_name||'';
 $('brand').value=p.brands||'';
 showPhoto(p.image_front_url||p.image_url||'','Product image');
 showNutrition(p.nutriments||{});
+
 let raw=p.ingredients_text||'';
-$('ingredients').value=raw;
+let parsed=splitPackageText(raw);
+$('ingredients').value=parsed.ingredients;
 ingredientSource='database';
-ocrRejected=false;
 $('confirmed').checked=false;
-allergens={contains:'',mayContain:''};
+
+allergens={
+contains:parsed.contains,
+mayContain:parsed.mayContain
+};
 updateAllergens();
-if(raw){
-showResult(classify(raw));
-$('lookupMessage').textContent='Product found. Review the ingredient list and result.';
+
+if(parsed.ingredients){
+showResult(classify(parsed.ingredients));
+$('lookupMessage').textContent=
+'Product found. Review the ingredient list and result.';
 }else{
 setStatus('Needs Verification');
-$('lookupMessage').textContent='Product found, but no ingredient list is available. Take an ingredient picture.';
+$('lookupMessage').textContent=
+'Product found, but no ingredient list is available. Take an ingredient picture.';
 }
 }catch(e){
 setStatus('Needs Verification');
 $('lookupMessage').textContent='Lookup failed: '+e.message;
 }
 }
+
 $('lookup').onclick=lookupProduct;
 
 function stopCamera(){
 scanActive=false;
-if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+if(stream){
+stream.getTracks().forEach(t=>t.stop());
+stream=null;
+}
 $('video').srcObject=null;
 $('cameraPanel').style.display='none';
 }
+
 $('stopCamera').onclick=stopCamera;
+
 $('startCamera').onclick=async()=>{
 if(!navigator.mediaDevices?.getUserMedia){
-alert('Camera requires HTTPS and permission.');return;
+alert('Camera requires HTTPS and permission.');
+return;
 }
+
 if(!('BarcodeDetector' in window)){
-alert('Barcode scanning is unavailable on this browser. Enter the barcode manually.');return;
+alert('Barcode scanning is unavailable on this browser. Enter the barcode manually.');
+return;
 }
+
 try{
-let detector=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});
-stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+let detector=new BarcodeDetector({
+formats:['ean_13','ean_8','upc_a','upc_e']
+});
+
+stream=await navigator.mediaDevices.getUserMedia({
+video:{facingMode:{ideal:'environment'}},
+audio:false
+});
+
 $('video').srcObject=stream;
 $('cameraPanel').style.display='block';
 scanActive=true;
+
 async function scan(){
 if(!scanActive)return;
+
 try{
 if($('video').readyState>=2){
 let hits=await detector.detect($('video'));
+
 if(hits.length){
 $('barcode').value=hits[0].rawValue;
 stopCamera();
@@ -442,20 +625,26 @@ return;
 }
 }
 }catch(e){}
+
 if(scanActive)setTimeout(scan,250);
 }
 scan();
-}catch(e){stopCamera();alert('Camera could not start: '+e.message)}
+}catch(e){
+stopCamera();
+alert('Camera could not start: '+e.message);
+}
 };
 
 const photoInput=$('photoInput');
 const cropCanvas=$('cropCanvas');
 const ctx=cropCanvas.getContext('2d');
+
 $('takePhoto').onclick=()=>{
 photoInput.setAttribute('capture','environment');
 photoInput.value='';
 photoInput.click();
 };
+
 $('choosePhoto').onclick=()=>{
 photoInput.removeAttribute('capture');
 photoInput.value='';
@@ -466,10 +655,14 @@ function ocrMessage(message,error=false){
 $('ocrMessage').textContent=message;
 $('ocrMessage').className=error?'muted warning':'muted';
 }
+
 function busy(value){
 ocrBusy=value;
-['takePhoto','choosePhoto','readCrop','check'].forEach(id=>$(id).disabled=value);
+['takePhoto','choosePhoto','readCrop','check'].forEach(id=>{
+$(id).disabled=value;
+});
 }
+
 async function getWorker(){
 if(!window.Tesseract){
 await new Promise((resolve,reject)=>{
@@ -480,135 +673,228 @@ script.onerror=()=>reject(Error('Text reader could not load'));
 document.head.append(script);
 });
 }
-if(!ocrWorker)ocrWorker=await Tesseract.createWorker('eng');
+
+if(!ocrWorker){
+ocrWorker=await Tesseract.createWorker('eng');
+}
+
 return ocrWorker;
 }
+
 function prepareCanvas(bitmap,max=2200,enhance=false){
 let scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));
 let canvas=document.createElement('canvas');
+
 canvas.width=Math.max(1,Math.round(bitmap.width*scale));
 canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+
 let c=canvas.getContext('2d',{willReadFrequently:enhance});
 c.drawImage(bitmap,0,0,canvas.width,canvas.height);
+
 if(enhance){
 let img=c.getImageData(0,0,canvas.width,canvas.height);
+
 for(let i=0;i<img.data.length;i+=4){
-let gray=.299*img.data[i]+.587*img.data[i+1]+.114*img.data[i+2];
+let gray=
+.299*img.data[i]+
+.587*img.data[i+1]+
+.114*img.data[i+2];
+
 let v=Math.max(0,Math.min(255,(gray-128)*1.3+135));
-img.data[i]=img.data[i+1]=img.data[i+2]=v;
+
+img.data[i]=v;
+img.data[i+1]=v;
+img.data[i+2]=v;
 }
 c.putImageData(img,0,0);
 }
 return canvas;
 }
+
 function quality(text,confidence){
 let t=clean(text);
 let words=t.match(/[A-Za-z]{3,}/g)||[];
 let letters=(t.match(/[A-Za-z]/g)||[]).length;
 let symbols=(t.match(/[^\w\s.,:;()%/\-]/g)||[]).length;
-return words.length>=5&&letters>=30&&symbols/Math.max(t.length,1)<.15&&Number(confidence)>=35;
+
+return words.length>=5&&
+letters>=30&&
+symbols/Math.max(t.length,1)<.15&&
+Number(confidence)>=35;
 }
+
 async function recognize(canvas){
 let worker=await getWorker();
 return worker.recognize(canvas);
 }
+
 function parseOCR(result){
 let d=result.data||{};
 let parsed=splitPackageText(d.text||'');
+
 if(!parsed.foundHeading&&d.lines){
-let alt=splitPackageText(d.lines.map(x=>x.text||'').join('\n'));
+let alt=splitPackageText(
+d.lines.map(x=>x.text||'').join('\n')
+);
 if(alt.foundHeading)parsed=alt;
 }
-return {parsed,confidence:Number(d.confidence)||0};
+
+return {
+parsed,
+confidence:Number(d.confidence)||0
+};
 }
+
 function displayOCR(parsed){
-$('ingredients').value=parsed.ingredients;
-allergens={contains:parsed.contains,mayContain:parsed.mayContain};
+/* Always apply boundary cleanup before display */
+let final=splitPackageText(parsed.ingredients);
+
+$('ingredients').value=final.ingredients;
+
+allergens={
+contains:parsed.contains||final.contains,
+mayContain:parsed.mayContain||final.mayContain
+};
+
 updateAllergens();
 ingredientSource='ocr';
-ocrRejected=false;
 $('confirmed').checked=false;
 clearResult();
 setStatus('Verify Ingredients');
-$('qualityNote').textContent='Check every word against the package. Automatic text recognition can make mistakes.';
-ocrMessage('Ingredients found automatically! Review and correct the list before confirming.');
-$('ingredients').scrollIntoView({behavior:'smooth',block:'center'});
+
+$('qualityNote').textContent=
+'Check every word against the package. Automatic text recognition can make mistakes.';
+
+ocrMessage(
+'Ingredients found automatically! Packaging warnings have been separated. Check and correct the ingredient list before confirming.'
+);
+
+$('ingredients').scrollIntoView({
+behavior:'smooth',
+block:'center'
+});
 }
+
 function failedOCR(message){
 ingredientSource='ocr';
-ocrRejected=true;
 $('confirmed').checked=false;
 clearResult();
 setStatus('Needs Verification');
 ocrMessage(message,true);
 $('manualCropButton').style.display='block';
 }
+
 async function autoRead(){
 if(ocrBusy||!photoBitmap)return;
+
 busy(true);
 let id=++ocrRequest;
 ingredientSource='ocr';
-ocrRejected=true;
 $('ingredients').value='';
 $('confirmed').checked=false;
 allergens={contains:'',mayContain:''};
 updateAllergens();
 clearResult();
 setStatus('Needs Verification');
+
 ocrMessage('Finding and reading ingredients automatically…');
+
 try{
-let first=parseOCR(await recognize(prepareCanvas(photoBitmap)));
+let first=parseOCR(
+await recognize(prepareCanvas(photoBitmap))
+);
+
 if(id!==ocrRequest)return;
+
 let best=first;
+
 if(!first.parsed.foundHeading||first.confidence<65){
 ocrMessage('Improving the ingredient photo reading…');
-let second=parseOCR(await recognize(prepareCanvas(photoBitmap,2200,true)));
+
+let second=parseOCR(
+await recognize(prepareCanvas(photoBitmap,2200,true))
+);
+
 if(id!==ocrRequest)return;
-if((second.parsed.foundHeading&&!best.parsed.foundHeading)||
-(second.parsed.foundHeading===best.parsed.foundHeading&&second.confidence>best.confidence))
+
+if(
+(second.parsed.foundHeading&&!best.parsed.foundHeading)||
+(second.parsed.foundHeading===best.parsed.foundHeading&&
+second.confidence>best.confidence)
+){
 best=second;
 }
-if(best.parsed.foundHeading&&quality(best.parsed.ingredients,best.confidence)){
+}
+
+if(
+best.parsed.foundHeading&&
+quality(best.parsed.ingredients,best.confidence)
+){
 displayOCR(best.parsed);
 }else{
-failedOCR('Could not confidently find the ingredient list. Try a sharper photo or Adjust Ingredient Area Manually.');
+failedOCR(
+'Could not confidently find the ingredient list. Try a sharper photo or Adjust Ingredient Area Manually.'
+);
 }
 }catch(e){
-if(id===ocrRequest)failedOCR('Automatic reading failed: '+e.message);
-}finally{busy(false)}
+if(id===ocrRequest){
+failedOCR('Automatic reading failed: '+e.message);
+}
+}finally{
+busy(false);
+}
 }
 
 photoInput.addEventListener('change',async()=>{
 let file=photoInput.files?.[0];
 if(!file||ocrBusy)return;
+
 try{
 if(photoBitmap)photoBitmap.close();
 photoBitmap=await createImageBitmap(file);
+
 let canvas=prepareCanvas(photoBitmap,1000);
 cropCanvas.width=canvas.width;
 cropCanvas.height=canvas.height;
 ctx.drawImage(canvas,0,0);
+
 cropRect=null;
 $('cropPanel').style.display='none';
 $('manualCropButton').style.display='block';
+
 let preview=$('ingredientPreview');
-if(preview.src.startsWith('blob:'))URL.revokeObjectURL(preview.src);
+
+if(preview.src.startsWith('blob:')){
+URL.revokeObjectURL(preview.src);
+}
+
 preview.src=URL.createObjectURL(file);
 preview.style.display='block';
+
 await autoRead();
-}catch(e){failedOCR('Could not open picture: '+e.message)}
+}catch(e){
+failedOCR('Could not open picture: '+e.message);
+}
 });
 
 $('manualCropButton').onclick=()=>{
 $('cropPanel').style.display='block';
 drawCrop();
-$('cropPanel').scrollIntoView({behavior:'smooth',block:'start'});
+$('cropPanel').scrollIntoView({
+behavior:'smooth',
+block:'start'
+});
 };
+
 function drawCrop(){
 if(!photoBitmap)return;
-let w=cropCanvas.width,h=cropCanvas.height;
+
+let w=cropCanvas.width;
+let h=cropCanvas.height;
+
 ctx.clearRect(0,0,w,h);
 ctx.drawImage(photoBitmap,0,0,w,h);
+
 if(cropRect){
 ctx.fillStyle='rgba(0,0,0,.45)';
 ctx.fillRect(0,0,w,cropRect.y);
@@ -617,26 +903,47 @@ ctx.fillRect(0,cropRect.y,cropRect.x,cropRect.h);
 ctx.fillRect(cropRect.x+cropRect.w,cropRect.y,w-cropRect.x-cropRect.w,cropRect.h);
 ctx.strokeStyle='#00e676';
 ctx.lineWidth=4;
-ctx.strokeRect(cropRect.x,cropRect.y,cropRect.w,cropRect.h);
+ctx.strokeRect(
+cropRect.x,cropRect.y,
+cropRect.w,cropRect.h
+);
 }
 }
+
 function point(e){
 let r=cropCanvas.getBoundingClientRect();
+
 return {
-x:Math.max(0,Math.min(cropCanvas.width,(e.clientX-r.left)*cropCanvas.width/r.width)),
-y:Math.max(0,Math.min(cropCanvas.height,(e.clientY-r.top)*cropCanvas.height/r.height))
+x:Math.max(0,Math.min(
+cropCanvas.width,
+(e.clientX-r.left)*cropCanvas.width/r.width
+)),
+y:Math.max(0,Math.min(
+cropCanvas.height,
+(e.clientY-r.top)*cropCanvas.height/r.height
+))
 };
 }
+
 cropCanvas.addEventListener('pointerdown',e=>{
 if(!photoBitmap)return;
+
 cropCanvas.setPointerCapture(e.pointerId);
 dragStart=point(e);
-cropRect={x:dragStart.x,y:dragStart.y,w:0,h:0};
+cropRect={
+x:dragStart.x,
+y:dragStart.y,
+w:0,
+h:0
+};
 drawCrop();
 });
+
 cropCanvas.addEventListener('pointermove',e=>{
 if(!dragStart)return;
+
 let p=point(e);
+
 cropRect={
 x:Math.min(dragStart.x,p.x),
 y:Math.min(dragStart.y,p.y),
@@ -645,61 +952,119 @@ h:Math.abs(p.y-dragStart.y)
 };
 drawCrop();
 });
-cropCanvas.addEventListener('pointerup',()=>dragStart=null);
-cropCanvas.addEventListener('pointercancel',()=>dragStart=null);
-$('resetCrop').onclick=()=>{cropRect=null;drawCrop()};
+
+cropCanvas.addEventListener('pointerup',()=>{
+dragStart=null;
+});
+
+cropCanvas.addEventListener('pointercancel',()=>{
+dragStart=null;
+});
+
+$('resetCrop').onclick=()=>{
+cropRect=null;
+drawCrop();
+};
 
 function croppedCanvas(){
 if(!photoBitmap)throw Error('No picture selected');
+
 let sx=photoBitmap.width/cropCanvas.width;
 let sy=photoBitmap.height/cropCanvas.height;
-let x=0,y=0,w=photoBitmap.width,h=photoBitmap.height;
+
+let x=0,y=0;
+let w=photoBitmap.width;
+let h=photoBitmap.height;
+
 if(cropRect&&cropRect.w>15&&cropRect.h>15){
 x=Math.round(cropRect.x*sx);
 y=Math.round(cropRect.y*sy);
-w=Math.min(photoBitmap.width-x,Math.round(cropRect.w*sx));
-h=Math.min(photoBitmap.height-y,Math.round(cropRect.h*sy));
+w=Math.min(
+photoBitmap.width-x,
+Math.round(cropRect.w*sx)
+);
+h=Math.min(
+photoBitmap.height-y,
+Math.round(cropRect.h*sy)
+);
 }
+
 let out=document.createElement('canvas');
 let scale=Math.min(2,2200/Math.max(w,h));
+
 out.width=Math.max(1,Math.round(w*scale));
 out.height=Math.max(1,Math.round(h*scale));
-out.getContext('2d').drawImage(photoBitmap,x,y,w,h,0,0,out.width,out.height);
+
+out.getContext('2d').drawImage(
+photoBitmap,x,y,w,h,
+0,0,out.width,out.height
+);
+
 return out;
 }
+
 $('readCrop').onclick=async()=>{
 if(ocrBusy||!photoBitmap)return;
+
 busy(true);
 let id=++ocrRequest;
 $('confirmed').checked=false;
-ocrRejected=true;
 ingredientSource='ocr';
 $('ingredients').value='';
 clearResult();
 setStatus('Needs Verification');
 ocrMessage('Reading selected ingredients…');
+
 try{
-let {parsed,confidence}=parseOCR(await recognize(croppedCanvas()));
+let {parsed,confidence}=parseOCR(
+await recognize(croppedCanvas())
+);
+
 if(id!==ocrRequest)return;
-if(quality(parsed.ingredients,confidence))displayOCR(parsed);
-else failedOCR('Selected text is unclear. Try a closer picture or enter ingredients manually.');
+
+if(quality(parsed.ingredients,confidence)){
+displayOCR(parsed);
+}else{
+failedOCR(
+'Selected text is unclear. Try a closer picture or enter ingredients manually.'
+);
+}
 }catch(e){
-if(id===ocrRequest)failedOCR('Could not read selection: '+e.message);
-}finally{busy(false)}
+if(id===ocrRequest){
+failedOCR('Could not read selection: '+e.message);
+}
+}finally{
+busy(false);
+}
 };
 
 $('ingredients').addEventListener('input',()=>{
-if(ingredientSource==='ocr'&&!ocrRejected)$('confirmed').checked=false;
-else{ingredientSource='manual';ocrRejected=false}
-if(lastResult){clearResult();setStatus('Verify Ingredients')}
+if(ingredientSource==='ocr'){
+$('confirmed').checked=false;
+}else{
+ingredientSource='manual';
+}
+
+if(lastResult){
+clearResult();
+setStatus('Verify Ingredients');
+}
 });
+
 $('confirmed').addEventListener('change',()=>{
-if(lastResult){clearResult();setStatus('Verify Ingredients')}
+if(lastResult){
+clearResult();
+setStatus('Verify Ingredients');
+}
 });
+
 window.addEventListener('pagehide',()=>{
 stopCamera();
-if(ocrWorker)ocrWorker.terminate().catch(()=>{});
+if(ocrWorker){
+ocrWorker.terminate().catch(()=>{});
+}
 });
+
 renderHistory();
 </script>
 </body>
