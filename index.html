@@ -1,5 +1,5 @@
 
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -11,8 +11,7 @@
 *{box-sizing:border-box}
 body{margin:0}
 header{background:#126c42;color:white;text-align:center;padding:24px 12px}
-h1{margin:0}
-header p{margin:6px}
+h1{margin:0}header p{margin:6px}
 main{max-width:700px;margin:auto;padding:15px}
 section{background:white;border-radius:15px;padding:18px;margin-bottom:15px;box-shadow:0 2px 12px #1232}
 h2{margin-top:0;font-size:20px}
@@ -23,7 +22,7 @@ button{background:#126c42;color:white;font-weight:700;border:0;cursor:pointer}
 button.secondary{background:#426755}
 button:disabled{opacity:.6}
 video{width:100%;background:#111;border-radius:12px;max-height:340px}
-#cameraPanel,#result,#photoInput{display:none}
+#cameraPanel,#result,#photoInput,#cropPanel{display:none}
 .muted,small{color:#617469}
 .entry{border-bottom:1px solid #ddd;padding:8px 0}
 li{margin-bottom:7px}
@@ -41,8 +40,15 @@ li{margin-bottom:7px}
 #result{border-top:3px solid #126c42}
 #explanation{font-weight:600}
 #ocrMessage{font-weight:600}
-#ocrPreview{max-width:100%;max-height:230px;object-fit:contain;border-radius:10px;margin:8px auto;display:none}
 .warning{color:#9c2219!important}
+#cropCanvas{width:100%;height:auto;display:block;touch-action:none;border-radius:10px;border:1px solid #a9c2b2}
+#cropPanel{margin-top:15px}
+.cropHint{font-size:14px;color:#52675a}
+.cropActions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cropActions button{font-size:14px;padding:12px 5px}
+#confirmedRow{display:flex;align-items:flex-start;gap:10px;margin:12px 0}
+#confirmedRow input{width:24px;height:24px;flex:none;margin:0}
+#confirmedRow label{flex:1}
 </style>
 </head>
 <body>
@@ -52,7 +58,6 @@ li{margin-bottom:7px}
 <p>Free scanning • Independent results • For the animals</p>
 </header>
 <main>
-
 <section>
 <h2>Scan a barcode</h2>
 <button id="startCamera">📷 Start Barcode Scanner</button>
@@ -86,17 +91,28 @@ li{margin-bottom:7px}
 
 <section>
 <h2>Ingredients</h2>
-<p>Take a close-up picture of the ingredient list. Keep the words straight, clear, and well lit.</p>
-
+<p>Take a close-up picture of the ingredient list. Then select just the ingredients before reading.</p>
 <input id="photoInput" type="file" accept="image/*" capture="environment">
 <button id="takePhoto">📸 Take Ingredient Picture</button>
 <button id="choosePhoto" class="secondary">Choose Existing Photo</button>
 
-<img id="ocrPreview" alt="Ingredient photo preview">
-<p id="ocrMessage" class="muted" role="status">No ingredient picture taken yet.</p>
+<div id="cropPanel">
+<h2>Crop your ingredient picture</h2>
+<p class="cropHint">Use your finger to draw a box around the ingredients. Keep all ingredient words inside the box, but leave out the address and other writing.</p>
+<canvas id="cropCanvas"></canvas>
+<div class="cropActions">
+<button id="resetCrop" class="secondary">Reset Crop</button>
+<button id="readCrop">Read Selected Ingredients</button>
+</div>
+</div>
 
+<p id="ocrMessage" class="muted" role="status">No ingredient picture taken yet.</p>
 <label for="ingredients">Ingredient list</label>
 <textarea id="ingredients" placeholder="Recognized ingredients appear here. You can also type them manually."></textarea>
+<div id="confirmedRow">
+<input type="checkbox" id="confirmed">
+<label for="confirmed">I checked the entire ingredient list against the package and corrected any mistakes.</label>
+</div>
 <button id="check">🌱 Verify Ingredients</button>
 </section>
 
@@ -138,9 +154,9 @@ li{margin-bottom:7px}
 const $=id=>document.getElementById(id);
 const KEY='verified-vegan-v1';
 const DBKEY='verified-vegan-supabase-config-v1';
-
 let stream=null,scanActive=false,lastResult=null;
-let requestNumber=0,ocrRequest=0,ocrBusy=false;
+let requestNumber=0,ocrBusy=false,ocrRequest=0;
+let photoBitmap=null,cropRect=null,dragStart=null;
 let ingredientSource='none',ocrRejected=false;
 
 const rules=[
@@ -155,22 +171,19 @@ const rules=[
 ['Other animal ingredients',/\b(collagen|keratin|lanolin|wool fat)\b/i]
 ];
 
-function normalize(s){
-return String(s||'').replace(/\s+/g,' ').trim();
-}
+function normalize(s){return String(s||'').replace(/\s+/g,' ').trim()}
 
 function ingredientsOnly(s){
 let t=normalize(s);
 const m=t.match(/\bingredients?\s*:/i);
 if(m)t=t.slice(m.index+m[0].length);
-return t.split(/\b(?:may contain|may also contain|processed in a facility|made in a facility|manufactured in a facility|nutrition facts|supplement facts)\b/i)[0].trim();
+return t.split(/\b(?:may contain|may also contain|contains\s*:|processed in a facility|made in a facility|manufactured in a facility|nutrition facts|supplement facts|distributed by|manufactured by|preparation instructions|storage instructions|california residents|www\.)\b/i)[0].trim();
 }
 
 function classify(raw){
 const t=ingredientsOnly(raw);
 if(!t)return {
-status:'Needs Verification',
-reasons:[],
+status:'Needs Verification',reasons:[],
 explanation:'No readable ingredient list is available.',
 caution:'Photograph or enter the full ingredient list.'
 };
@@ -181,8 +194,7 @@ cautions.push('Some ingredients have uncertain plant or animal origins; ask the 
 if(/\bsugar\b/i.test(t)&&!/\borganic (?:cane )?sugar\b/i.test(t))
 cautions.push('Generic sugar may have processing-source uncertainty.');
 if(reasons.length)return {
-status:'Not Vegan',
-reasons,
+status:'Not Vegan',reasons,
 explanation:'Explicit animal-derived ingredient terms were found.',
 caution:cautions.join(' ')
 };
@@ -245,8 +257,7 @@ el.append(div);
 
 function needsReadableIngredients(){
 return {
-status:'Needs Verification',
-reasons:[],
+status:'Needs Verification',reasons:[],
 explanation:'Ingredient photo could not be read reliably.',
 caution:'Take a clearer close-up or enter the complete ingredient list manually.'
 };
@@ -257,11 +268,13 @@ if(ocrBusy){
 $('ocrMessage').textContent='Please wait until the photo finishes processing.';
 return;
 }
-const raw=$('ingredients').value;
-if(ocrRejected||!normalize(raw)){
+if(ocrRejected||!normalize($('ingredients').value)){
 showResult(needsReadableIngredients());
+}else if(ingredientSource==='ocr'&&!$('confirmed').checked){
+$('ocrMessage').textContent='Please compare the ingredients with the package and check the confirmation box first.';
+return;
 }else{
-showResult(classify(raw));
+showResult(classify($('ingredients').value));
 }
 $('productSection').scrollIntoView({behavior:'smooth',block:'start'});
 };
@@ -270,15 +283,13 @@ function getDbConfig(){
 try{return JSON.parse(localStorage.getItem(DBKEY)||'{}')}
 catch{return {}}
 }
-
 function setDbMessage(s){$('dbMessage').textContent=s}
 
 const savedDb=getDbConfig();
 $('supabaseUrl').value=savedDb.url||'';
 $('supabaseKey').value=savedDb.key||'';
 setDbMessage(savedDb.url&&savedDb.key?
-'Existing Supabase settings found.':
-'Cloud connection not configured.');
+'Existing Supabase settings found.':'Cloud connection not configured.');
 
 $('connectDb').onclick=()=>{
 const url=$('supabaseUrl').value.trim().replace(/\/$/,'');
@@ -353,13 +364,12 @@ function resetProduct(){
 $('productName').value='';
 $('brand').value='';
 $('ingredients').value='';
+$('confirmed').checked=false;
 ingredientSource='none';
 ocrRejected=false;
 $('nutrition').textContent='Nutrition information appears here when available.';
 const photo=$('productPhoto');
-photo.onload=null;
-photo.onerror=null;
-photo.hidden=true;
+photo.onload=null;photo.onerror=null;photo.hidden=true;
 photo.removeAttribute('src');
 $('photoPlaceholder').hidden=false;
 $('photoPlaceholder').textContent='Product picture appears here';
@@ -383,8 +393,7 @@ return String(s||'').toLowerCase()
 
 function namesCompatible(primary,backup){
 if(!primary||!backup)return false;
-const a=normalizedWords(primary);
-const b=normalizedWords(backup);
+const a=normalizedWords(primary),b=normalizedWords(backup);
 if(!a.length||!b.length)return false;
 return a.some(word=>b.includes(word));
 }
@@ -434,8 +443,7 @@ const timeout=setTimeout(()=>controller.abort(),8000);
 let response;
 try{
 response=await fetch(url,{
-headers:{'Accept':'application/json'},
-signal:controller.signal
+headers:{'Accept':'application/json'},signal:controller.signal
 });
 }finally{clearTimeout(timeout)}
 if(!response.ok)throw Error('Backup lookup unavailable');
@@ -450,9 +458,7 @@ if(requestId!==requestNumber)return false;
 if(await loadPicture(url,'Backup image — confirm packaging matches',requestId))return true;
 }
 return false;
-}catch(e){
-return false;
-}
+}catch(e){return false}
 }
 
 async function findPicture(code,p,requestId){
@@ -521,35 +527,27 @@ if(currentRequest===requestNumber)
 $('lookupMessage').textContent='Lookup failed. Check your connection or enter ingredients manually.';
 }
 }
-
 $('lookup').onclick=lookupProduct;
 
 function stopCamera(){
 scanActive=false;
-if(stream){
-stream.getTracks().forEach(t=>t.stop());
-stream=null;
-}
+if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
 $('video').srcObject=null;
 $('cameraPanel').style.display='none';
 }
-
 $('stopCamera').onclick=stopCamera;
 
 $('startCamera').onclick=async()=>{
 if(!navigator.mediaDevices?.getUserMedia){
-alert('Camera requires HTTPS and browser permission.');
-return;
+alert('Camera requires HTTPS and browser permission.');return;
 }
 if(!('BarcodeDetector' in window)){
-alert('This browser does not support built-in barcode detection. Enter the barcode manually.');
-return;
+alert('This browser does not support built-in barcode detection. Enter the barcode manually.');return;
 }
 try{
 const detector=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});
 stream=await navigator.mediaDevices.getUserMedia({
-video:{facingMode:{ideal:'environment'}},
-audio:false
+video:{facingMode:{ideal:'environment'}},audio:false
 });
 $('video').srcObject=stream;
 $('cameraPanel').style.display='block';
@@ -570,22 +568,20 @@ return;
 if(scanActive)setTimeout(scan,250);
 };
 scan();
-}catch(e){
-stopCamera();
-alert('Camera could not start: '+e.message);
-}
+}catch(e){stopCamera();alert('Camera could not start: '+e.message)}
 };
 
-// INGREDIENT CAMERA AND OCR
+// INGREDIENT PHOTO CAPTURE AND CROPPING
 
 const photoInput=$('photoInput');
+const cropCanvas=$('cropCanvas');
+const cropContext=cropCanvas.getContext('2d');
 
 $('takePhoto').onclick=()=>{
 photoInput.setAttribute('capture','environment');
 photoInput.value='';
 photoInput.click();
 };
-
 $('choosePhoto').onclick=()=>{
 photoInput.removeAttribute('capture');
 photoInput.value='';
@@ -594,78 +590,146 @@ photoInput.click();
 
 photoInput.addEventListener('change',async()=>{
 const file=photoInput.files?.[0];
-if(file)await readIngredientPhoto(file);
+if(!file)return;
+try{
+if(photoBitmap)photoBitmap.close();
+photoBitmap=await createImageBitmap(file);
+const maxWidth=1000;
+const scale=Math.min(1,maxWidth/photoBitmap.width);
+cropCanvas.width=Math.round(photoBitmap.width*scale);
+cropCanvas.height=Math.round(photoBitmap.height*scale);
+cropRect=null;
+drawCrop();
+$('cropPanel').style.display='block';
+$('ocrMessage').className='muted';
+$('ocrMessage').textContent='Draw a box around the ingredient list, then tap Read Selected Ingredients.';
+$('confirmed').checked=false;
+ingredientSource='ocr';
+ocrRejected=true;
+$('ingredients').value='';
+clearResult();
+setProductStatus('Needs Verification');
+$('cropPanel').scrollIntoView({behavior:'smooth',block:'start'});
+}catch(e){
+$('ocrMessage').textContent='Could not open picture: '+e.message;
+}
 });
+
+function drawCrop(){
+if(!photoBitmap)return;
+const w=cropCanvas.width,h=cropCanvas.height;
+cropContext.clearRect(0,0,w,h);
+cropContext.drawImage(photoBitmap,0,0,w,h);
+if(cropRect){
+cropContext.fillStyle='rgba(0,0,0,.45)';
+cropContext.fillRect(0,0,w,cropRect.y);
+cropContext.fillRect(0,cropRect.y+cropRect.h,w,h-cropRect.y-cropRect.h);
+cropContext.fillRect(0,cropRect.y,cropRect.x,cropRect.h);
+cropContext.fillRect(cropRect.x+cropRect.w,cropRect.y,w-cropRect.x-cropRect.w,cropRect.h);
+cropContext.strokeStyle='#00e676';
+cropContext.lineWidth=4;
+cropContext.strokeRect(cropRect.x,cropRect.y,cropRect.w,cropRect.h);
+}
+}
+
+function canvasPoint(e){
+const r=cropCanvas.getBoundingClientRect();
+return {
+x:Math.max(0,Math.min(cropCanvas.width,(e.clientX-r.left)*cropCanvas.width/r.width)),
+y:Math.max(0,Math.min(cropCanvas.height,(e.clientY-r.top)*cropCanvas.height/r.height))
+};
+}
+
+cropCanvas.addEventListener('pointerdown',e=>{
+if(!photoBitmap)return;
+cropCanvas.setPointerCapture(e.pointerId);
+dragStart=canvasPoint(e);
+cropRect={x:dragStart.x,y:dragStart.y,w:0,h:0};
+drawCrop();
+});
+cropCanvas.addEventListener('pointermove',e=>{
+if(!dragStart)return;
+const p=canvasPoint(e);
+cropRect={
+x:Math.min(dragStart.x,p.x),
+y:Math.min(dragStart.y,p.y),
+w:Math.abs(p.x-dragStart.x),
+h:Math.abs(p.y-dragStart.y)
+};
+drawCrop();
+});
+function finishCrop(){dragStart=null}
+cropCanvas.addEventListener('pointerup',finishCrop);
+cropCanvas.addEventListener('pointercancel',finishCrop);
+
+$('resetCrop').onclick=()=>{
+cropRect=null;
+drawCrop();
+};
+
+function createCroppedCanvas(){
+if(!photoBitmap)throw Error('No picture selected');
+const sx=photoBitmap.width/cropCanvas.width;
+const sy=photoBitmap.height/cropCanvas.height;
+let x=0,y=0,w=photoBitmap.width,h=photoBitmap.height;
+if(cropRect&&cropRect.w>15&&cropRect.h>15){
+x=Math.round(cropRect.x*sx);
+y=Math.round(cropRect.y*sy);
+w=Math.min(photoBitmap.width-x,Math.round(cropRect.w*sx));
+h=Math.min(photoBitmap.height-y,Math.round(cropRect.h*sy));
+}
+const scale=Math.min(2,2200/Math.max(w,h));
+const out=document.createElement('canvas');
+out.width=Math.max(1,Math.round(w*scale));
+out.height=Math.max(1,Math.round(h*scale));
+const ctx=out.getContext('2d',{willReadFrequently:true});
+ctx.drawImage(photoBitmap,x,y,w,h,0,0,out.width,out.height);
+const img=ctx.getImageData(0,0,out.width,out.height);
+const d=img.data;
+for(let i=0;i<d.length;i+=4){
+const gray=.299*d[i]+.587*d[i+1]+.114*d[i+2];
+const adjusted=Math.max(0,Math.min(255,(gray-128)*1.45+145));
+d[i]=d[i+1]=d[i+2]=adjusted;
+}
+ctx.putImageData(img,0,0);
+return out;
+}
+
+function extractIngredientBlock(text){
+let t=String(text||'').replace(/\r/g,' ');
+const m=/\bingredients?\s*[:\-]/i.exec(t);
+if(m)t=t.slice(m.index+m[0].length);
+t=t.split(/\b(?:contains\s*:|may contain|made in a facility|manufactured in a facility|nutrition facts|distributed by|manufactured by|preparation instructions|storage instructions|california residents|www\.)\b/i)[0];
+return normalize(t);
+}
 
 function ocrQuality(text,confidence){
 const t=normalize(text);
 const words=t.match(/[A-Za-z]{3,}/g)||[];
 const letters=(t.match(/[A-Za-z]/g)||[]).length;
 const symbols=(t.match(/[^\w\s.,:;()%/-]/g)||[]).length;
-const common=/\b(ingredients?|water|salt|sugar|flour|oil|starch|acid|natural|flavor|contains|soy|wheat|corn|rice|protein|syrup|extract|powder|gum|spices|vitamin|dextrose|lecithin|milk|eggs?)\b/i.test(t);
-const readable=words.length>=5&&letters>=30&&
+const common=/\b(water|salt|sugar|flour|oil|starch|acid|natural|flavor|contains|soy|wheat|corn|rice|protein|syrup|extract|powder|gum|spices|vitamin|dextrose|lecithin|milk|eggs?|onion|garlic|pepper)\b/i.test(t);
+return words.length>=5&&letters>=30&&
 symbols/Math.max(t.length,1)<0.12&&
 Number(confidence)>=45&&common;
-return readable;
 }
 
-function extractIngredientBlock(text){
-const t=String(text||'').replace(/\r/g,'');
-const match=/\bingredients?\s*[:\-]/i.exec(t);
-if(!match)return normalize(t);
-let result=t.slice(match.index+match[0].length);
-result=result.split(/\b(?:nutrition facts|distributed by|manufactured by|preparation instructions|directions for use|storage instructions|serving size|calories per serving)\b/i)[0];
-return normalize(result);
-}
-
-async function preprocessPhoto(file){
-const bitmap=await createImageBitmap(file);
-try{
-const maxSide=2200;
-const scale=Math.min(2.2,maxSide/Math.max(bitmap.width,bitmap.height));
-const w=Math.max(1,Math.round(bitmap.width*scale));
-const h=Math.max(1,Math.round(bitmap.height*scale));
-const canvas=document.createElement('canvas');
-canvas.width=w;
-canvas.height=h;
-const ctx=canvas.getContext('2d',{willReadFrequently:true});
-ctx.drawImage(bitmap,0,0,w,h);
-const img=ctx.getImageData(0,0,w,h);
-const d=img.data;
-for(let i=0;i<d.length;i+=4){
-const gray=.299*d[i]+.587*d[i+1]+.114*d[i+2];
-const adjusted=Math.max(0,Math.min(255,(gray-128)*1.65+145));
-d[i]=d[i+1]=d[i+2]=adjusted;
-}
-ctx.putImageData(img,0,0);
-return canvas;
-}finally{
-bitmap.close();
-}
-}
-
-async function readIngredientPhoto(file){
-if(ocrBusy)return;
+$('readCrop').onclick=async()=>{
+if(ocrBusy||!photoBitmap)return;
 ocrBusy=true;
-const thisRequest=++ocrRequest;
+const id=++ocrRequest;
+$('readCrop').disabled=true;
 $('takePhoto').disabled=true;
 $('choosePhoto').disabled=true;
 $('check').disabled=true;
+$('confirmed').checked=false;
 ocrRejected=true;
 ingredientSource='ocr';
 $('ingredients').value='';
 clearResult();
 setProductStatus('Needs Verification');
 $('ocrMessage').className='muted';
-$('ocrMessage').textContent='Preparing your ingredient picture…';
-
-const preview=$('ocrPreview');
-if(preview.dataset.objectUrl)URL.revokeObjectURL(preview.dataset.objectUrl);
-const objectUrl=URL.createObjectURL(file);
-preview.dataset.objectUrl=objectUrl;
-preview.src=objectUrl;
-preview.style.display='block';
-
+$('ocrMessage').textContent='Reading the selected ingredients…';
 try{
 if(!window.Tesseract){
 await new Promise((resolve,reject)=>{
@@ -676,55 +740,58 @@ s.onerror=()=>reject(Error('Text reader could not load'));
 document.head.append(s);
 });
 }
-
-$('ocrMessage').textContent='Reading ingredients. Please wait…';
+const cropped=createCroppedCanvas();
 const worker=await Tesseract.createWorker('eng');
 let result;
 try{
-const processed=await preprocessPhoto(file);
-result=await worker.recognize(processed);
+result=await worker.recognize(cropped);
 }finally{
 await worker.terminate();
 }
-if(thisRequest!==ocrRequest)return;
-
-const raw=result.data.text||'';
-const extracted=extractIngredientBlock(raw);
+if(id!==ocrRequest)return;
+const extracted=extractIngredientBlock(result.data.text||'');
 const confidence=result.data.confidence||0;
-
 if(!ocrQuality(extracted,confidence)){
-ocrRejected=true;
-$('ingredients').value='';
 $('ocrMessage').className='muted warning';
-$('ocrMessage').textContent='Could not read ingredients reliably. Take a closer, sharper picture of only the ingredient list, or type it manually.';
+$('ocrMessage').textContent='Could not read the ingredients reliably. Try cropping closer or taking a sharper picture.';
 showResult(needsReadableIngredients());
 return;
 }
-
 $('ingredients').value=extracted;
 ocrRejected=false;
 $('ocrMessage').className='muted';
-$('ocrMessage').textContent='Ingredients extracted. IMPORTANT: Compare every word with the package and correct any errors before verifying.';
+$('ocrMessage').textContent='Ingredients extracted. Compare every word with the package, correct mistakes, then check the confirmation box before verifying.';
 setProductStatus('Verify Ingredients');
 $('ingredients').scrollIntoView({behavior:'smooth',block:'center'});
 }catch(e){
-if(thisRequest!==ocrRequest)return;
-ocrRejected=true;
-$('ingredients').value='';
+if(id!==ocrRequest)return;
 $('ocrMessage').className='muted warning';
-$('ocrMessage').textContent='Photo reader could not process this picture: '+e.message+'. Try a clearer photo.';
+$('ocrMessage').textContent='Could not process the picture: '+e.message;
 showResult(needsReadableIngredients());
 }finally{
 ocrBusy=false;
+$('readCrop').disabled=false;
 $('takePhoto').disabled=false;
 $('choosePhoto').disabled=false;
 $('check').disabled=false;
 }
-}
+};
 
 $('ingredients').addEventListener('input',()=>{
+if(ingredientSource==='ocr'&&!ocrRejected){
+$('confirmed').checked=false;
+}else{
 ingredientSource='manual';
 ocrRejected=false;
+}
+if(lastResult){
+lastResult=null;
+$('result').style.display='none';
+setProductStatus('Verify Ingredients');
+}
+});
+
+$('confirmed').addEventListener('change',()=>{
 if(lastResult){
 lastResult=null;
 $('result').style.display='none';
