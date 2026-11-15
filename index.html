@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -170,6 +171,7 @@ let currentNutrition={};
 let currentServingSize='';
 let loadedCloudId=null;
 let lookupNumber=0;
+let photoRequest=0;
 
 function readJSON(key,fallback){
 try{
@@ -224,16 +226,26 @@ $('result').style.display='block';
 }
 
 function showPhoto(url,source=''){
+const request=++photoRequest;
 currentPhoto=url||'';
 const img=$('productPhoto');
+img.onload=null;
+img.onerror=null;
 img.hidden=!url;
+if(url){
+img.onload=()=>{
+if(request===photoRequest)img.hidden=false;
+};
 img.onerror=()=>{
+if(request!==photoRequest)return;
 img.hidden=true;
 $('photoPlaceholder').style.display='block';
 $('photoSource').textContent='Picture unavailable';
 };
-if(url)img.src=url;
-else img.removeAttribute('src');
+img.src=url;
+}else{
+img.removeAttribute('src');
+}
 $('photoPlaceholder').style.display=url?'none':'block';
 $('photoSource').textContent=source;
 }
@@ -270,6 +282,52 @@ return true;
 return false;
 }
 
+/*
+Picture lookup is separate from classification.
+Open Food Facts supplies only the missing image.
+It cannot change the saved Vegan or Not Vegan result.
+*/
+async function fillMissingProductPhoto(barcode,serial){
+if(currentPhoto)return;
+const code=clean(barcode);
+if(!code)return;
+
+$('photoSource').textContent='Looking for product picture…';
+
+try{
+const response=await fetch(
+'https://world.openfoodfacts.org/api/v2/product/'+
+encodeURIComponent(code)+
+'.json?fields=code,image_front_url,image_url'
+);
+if(!response.ok)throw Error('Picture lookup unavailable');
+
+const data=await response.json();
+if(serial!==lookupNumber)return;
+if(currentPhoto)return;
+
+const p=data.product||{};
+const url=p.image_front_url||p.image_url||'';
+
+if(data.status===1&&url){
+showPhoto(url,'Product database picture');
+}else{
+$('photoSource').textContent='No product picture available';
+}
+}catch{
+if(serial!==lookupNumber)return;
+if(!currentPhoto){
+$('photoSource').textContent='Picture unavailable from product database';
+}
+}
+}
+
+function ensureProductPhoto(barcode,serial){
+if(!currentPhoto){
+void fillMissingProductPhoto(barcode,serial);
+}
+}
+
 const frontInput=$('frontInput');
 
 $('takeFront').onclick=()=>{
@@ -291,8 +349,8 @@ try{
 const bitmap=await createImageBitmap(file);
 const canvas=document.createElement('canvas');
 const scale=Math.min(1,650/Math.max(bitmap.width,bitmap.height));
-canvas.width=Math.round(bitmap.width*scale);
-canvas.height=Math.round(bitmap.height*scale);
+canvas.width=Math.max(1,Math.round(bitmap.width*scale));
+canvas.height=Math.max(1,Math.round(bitmap.height*scale));
 canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
 bitmap.close();
 const url=canvas.toDataURL('image/jpeg',.65);
@@ -300,7 +358,7 @@ showPhoto(url,'Your product picture');
 const saved=saveProductPhoto(url);
 $('frontMessage').textContent=saved?
 'Product picture saved on this device.':
-'Picture displayed. Save storage may be unavailable.';
+'Picture displayed. Device storage may be unavailable.';
 }catch(e){
 $('frontMessage').textContent=e.message;
 }
@@ -525,7 +583,7 @@ function localMatch(barcode){
 return getScans().find(s=>sameBarcode(s.barcode,barcode));
 }
 
-function loadLocalRecord(s){
+function loadLocalRecord(s,serial){
 $('productName').value=s.product_name||'';
 $('brand').value=s.brand||'';
 const text=s.ingredient_text||s.ingredients||'';
@@ -541,10 +599,7 @@ screened.status!==status){
 setStatus('Needs Verification');
 $('lookupMessage').textContent=
 'Local classification conflicts with saved ingredients. Review required.';
-return;
-}
-
-if(status!=='Needs Verification'){
+}else if(status!=='Needs Verification'){
 showResult({
 status,
 reasons:s.decision_reasons||s.reasons||screened.reasons,
@@ -553,16 +608,19 @@ caution:!text?
 'Saved classification has no ingredient list. Add ingredients to verify.':
 screened.caution
 });
-}else{
-setStatus('Needs Verification');
-}
-
 $('lookupMessage').textContent=
 'Product loaded from saved device history.';
-restoreProductPhoto();
+}else{
+setStatus('Needs Verification');
+$('lookupMessage').textContent=
+'Local product found, but ingredient verification is needed.';
 }
 
-function loadCloudRecord(p){
+restoreProductPhoto();
+ensureProductPhoto($('barcode').value,serial);
+}
+
+function loadCloudRecord(p,serial){
 loadedCloudId=p.id??null;
 $('productName').value=p.product_name||'';
 $('brand').value=p.brand||'';
@@ -574,6 +632,7 @@ currentServingSize=p.serving_size||'';
 if(!restoreProductPhoto()){
 showPhoto(p.image_url||'','Saved product picture');
 }
+ensureProductPhoto($('barcode').value,serial);
 
 const status=normalizeStatus(p.vegan_status);
 const screened=classify(ingredients);
@@ -694,14 +753,14 @@ const cloud=await findCloudRecord(barcode);
 if(serial!==lookupNumber)return;
 
 if(cloud.record){
-loadCloudRecord(cloud.record);
+loadCloudRecord(cloud.record,serial);
 return;
 }
 
 const local=localMatch(barcode);
 
 if(local){
-loadLocalRecord(local);
+loadLocalRecord(local,serial);
 if(cloud.error){
 $('lookupMessage').textContent+=
 ' Cloud lookup issue: '+cloud.error;
