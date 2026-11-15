@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,7 +7,6 @@
 <meta name="theme-color" content="#126c42">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Verified Vegan">
-
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" type="image/png" href="./icon-192.png">
 <link rel="apple-touch-icon" href="./icon-192.png">
@@ -20,8 +20,8 @@ main{max-width:720px;margin:auto;padding:14px}
 section{background:white;border-radius:16px;padding:17px;margin-bottom:15px;box-shadow:0 2px 12px #1232}
 h2{font-size:20px;margin:0 0 12px}
 h3{margin:15px 0 8px}
-input,textarea,button{font:inherit;width:100%;padding:12px;border-radius:10px;margin:5px 0}
-input,textarea{border:1px solid #a9c2b2}
+input,textarea,button,select{font:inherit;width:100%;padding:12px;border-radius:10px;margin:5px 0}
+input,textarea,select{border:1px solid #a9c2b2}
 textarea{min-height:120px}
 button{border:0;background:#126c42;color:white;font-weight:700;cursor:pointer}
 button.secondary{background:#426755}
@@ -76,24 +76,12 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 #contactSupport{text-align:center}
 #contactSupport a{color:#126c42;font-weight:700;overflow-wrap:anywhere}
 #contactSupport .copyright{font-size:13px;color:#617469;margin-top:20px}
-
-/* MONTHLY LEADERBOARD */
 #leaderboardSection{border:2px solid #d7e8dc}
 .leaderboardHeading{text-align:center}
 .leaderboardHeading h2{font-size:23px}
 #leaderboardMonth{font-weight:700;color:#126c42}
 #leaderboardList{margin:15px 0}
-.leaderboardEntry{
-display:grid;
-grid-template-columns:55px minmax(0,1fr) auto;
-align-items:center;
-gap:10px;
-padding:15px 10px;
-border-radius:12px;
-margin:9px 0;
-background:#f1f7f2;
-border:1px solid #d7e8dc
-}
+.leaderboardEntry{display:grid;grid-template-columns:55px minmax(0,1fr) auto;align-items:center;gap:10px;padding:15px 10px;border-radius:12px;margin:9px 0;background:#f1f7f2;border:1px solid #d7e8dc}
 .leaderboardEntry.first{background:#fff6d8;border-color:#e6cf78}
 .leaderboardEntry.second{background:#f0f2f5;border-color:#d4d8df}
 .leaderboardEntry.third{background:#f9eee4;border-color:#e7c8a9}
@@ -104,23 +92,19 @@ border:1px solid #d7e8dc
 .leaderboardPoints{text-align:right;font-weight:800;color:#126c42;font-size:19px}
 .leaderboardPoints span{display:block;font-size:11px;font-weight:400;color:#617469}
 #leaderboardMessage{text-align:center;overflow-wrap:anywhere}
-.leaderboardSponsor{
-background:#f1f7f2;
-border-radius:12px;
-padding:16px;
-text-align:center;
-margin-top:15px
-}
+.leaderboardSponsor{background:#f1f7f2;border-radius:12px;padding:16px;text-align:center;margin-top:15px}
 .leaderboardSponsor strong{display:block;font-size:18px;color:#126c42}
 .leaderboardSponsor p{font-size:14px;color:#617469;margin-bottom:0}
 #leaderboardUpdated{font-size:12px;text-align:center;color:#617469}
+#productCategoryDisplay{font-weight:700;color:#126c42;margin:8px 0}
+#productSourceDisplay{font-size:13px;color:#617469}
+#nonfoodNotice{background:#fff4d7;padding:12px;border-radius:10px;margin:12px 0;display:none}
+#testingNotice{background:#f1f7f2;padding:12px;border-radius:10px;margin:10px 0;font-size:13px}
 </style>
 </head>
 <body>
 <header>
 <h1>🌱 Verified Vegan</h1>
-
-
 <p>Vegans, Know What's in Your Food!</p>
 <p>Free scanning • Independent results • For the animals</p>
 </header>
@@ -128,8 +112,8 @@ margin-top:15px
 
 <section id="scannerSection">
 <div id="scannerView">
-<h2>📷 Scan a Barcode</h2>
-<p id="scannerHint">Point your camera at a product barcode for an instant lookup.</p>
+<h2>📷 Scan Any Product Barcode</h2>
+<p id="scannerHint">Scan food, cosmetics, shampoo, soap, cleaners, and other household products.</p>
 <button id="startCamera">📷 Scan Barcode</button>
 <div id="cameraPanel">
 <video id="video" autoplay muted playsinline></video>
@@ -142,12 +126,15 @@ margin-top:15px
 <input id="barcode" inputmode="numeric" autocomplete="off" placeholder="Barcode number">
 <button id="lookup">Look Up Product</button>
 </div>
+<div id="testingNotice">🌱 Searches food, beauty, and general product databases. Some products require ingredient verification.</div>
 </div>
 
 <div id="productDetails">
 <h2>Product Details</h2>
 <button id="scanAnother" class="secondary">📷 Scan Another Product</button>
 <div id="brandDisplay"></div>
+<p id="productCategoryDisplay"></p>
+<p id="productSourceDisplay"></p>
 <div class="productTop">
 <div class="photoBox">
 <img id="productPhoto" alt="Product packaging" hidden>
@@ -159,6 +146,10 @@ margin-top:15px
 <p id="productBarcode" class="muted small"></p>
 <p id="lookupMessage" class="muted" aria-live="polite"></p>
 <p id="autoSaveMessage" class="small muted" aria-live="polite"></p>
+<div id="nonfoodNotice">
+<strong>Nonfood Product Verification</strong>
+<p>Animal-derived ingredients are checked separately from animal testing. Unknown ingredient origins require verification. Cruelty-free status is not confirmed by this scanner.</p>
+</div>
 <div id="contributionSteps" class="steps">
 <strong>🏆 Contribute Missing Information & Earn Points</strong>
 <ol>
@@ -181,7 +172,14 @@ margin-top:15px
 <input id="productName" placeholder="Product name">
 <label for="brand">Brand</label>
 <input id="brand" placeholder="Brand">
-<h2>Nutrition Facts</h2>
+<label for="productCategory">Product category</label>
+<select id="productCategory">
+<option value="food">Food & Beverages</option>
+<option value="beauty">Beauty & Personal Care</option>
+<option value="household">Household & Cleaning</option>
+<option value="other">Other Products</option>
+</select>
+<h2 id="nutritionHeading">Nutrition Facts</h2>
 <div id="nutrition" class="muted">Nutrition information appears here when available.</div>
 </div>
 </section>
@@ -233,28 +231,21 @@ margin-top:15px
 <div id="contributionHistory"></div>
 </section>
 
-<!-- PUBLIC MONTHLY LEADERBOARD -->
 <section id="leaderboardSection">
 <div class="leaderboardHeading">
 <h2>🏆 Monthly Leaderboard</h2>
 <p id="leaderboardMonth">Loading current month…</p>
 <p class="muted small">Top 3 Verified Vegan contributors</p>
 </div>
-
 <div id="leaderboardList" aria-live="polite"></div>
 <p id="leaderboardMessage" class="muted" aria-live="polite">Loading leaderboard…</p>
-
-<button id="refreshLeaderboard" class="secondary">
-🔄 Refresh Monthly Leaderboard
-</button>
+<button id="refreshLeaderboard" class="secondary">🔄 Refresh Monthly Leaderboard</button>
 <p id="leaderboardUpdated"></p>
-
 <div class="leaderboardSponsor">
 <strong>🎁 Prizes Coming Soon!</strong>
 <p>Monthly prizes are awaiting sponsors. No prizes are currently being awarded or promised.</p>
 <p>Keep helping animals by improving product information. Only approved contributions count toward the rankings.</p>
 </div>
-
 <p class="small muted" style="text-align:center;margin-top:15px">
 Rankings reset for each calendar month. Administrator accounts are excluded. Rankings are provisional until the month ends.
 </p>
@@ -314,7 +305,6 @@ Hold the camera straight, fill the picture with the ingredient label, avoid glar
 <p>Your feedback helps us make Verified Vegan more accurate, reliable, and useful for everyone.</p>
 <p class="copyright">© 2026 Verified Vegan. Helping animals, one product at a time. 🌱</p>
 </section>
-
 </main>
 
 <script>
@@ -332,6 +322,21 @@ const COCONUT_BARCODE='850030458001';
 const COCONUT_BRAND='Madly Hadley';
 const COCONUT_PHOTO=SUPABASE_URL+'/storage/v1/object/public/product-images/PXL_20261115_031846467.MP.jpg';
 
+const PRODUCT_SOURCES=[
+{name:'Open Food Facts',category:'food',host:'world.openfoodfacts.org'},
+{name:'Open Beauty Facts',category:'beauty',host:'world.openbeautyfacts.org'},
+{name:'Open Products Facts',category:'other',host:'world.openproductsfacts.org'}
+];
+
+const CATEGORY_NAMES={
+food:'Food & Beverages',
+beauty:'Beauty & Personal Care',
+household:'Household & Cleaning',
+other:'Other Products'
+};
+
+let productCategory='food';
+let productSource='';
 let stream=null,scanActive=false,scannerStarting=false,scannerSession=0;
 let lastResult=null,photoBitmap=null,ocrWorker=null,ocrBusy=false;
 let ocrLoadPromise=null,ocrSession=0,ocrRejected=false;
@@ -347,13 +352,29 @@ let cloudRecordExists=false,contributionBaseline=null;
 let productSession=0,savingContribution=false;
 let adminAuthorized=false,adminBusy=false,adminCheckSerial=0;
 let adminAccessChecking=false;
-
-/* MONTHLY LEADERBOARD STATE */
-
 let leaderboardLoading=false;
 let leaderboardRequestSerial=0;
 let leaderboardLastMonth='';
 let leaderboardRefreshTime=0;
+
+function setCategory(category,source=''){
+productCategory=CATEGORY_NAMES[category]?category:'other';
+productSource=source;
+$('productCategory').value=productCategory;
+$('productCategoryDisplay').textContent='Category: '+CATEGORY_NAMES[productCategory];
+$('productSourceDisplay').textContent=source?'Source: '+source:'';
+$('nonfoodNotice').style.display=productCategory==='food'?'none':'block';
+$('nutritionHeading').style.display=productCategory==='food'?'block':'none';
+$('nutrition').style.display=productCategory==='food'?'block':'none';
+}
+$('productCategory').addEventListener('change',()=>{
+setCategory($('productCategory').value,productSource);
+if($('ingredients').value.trim()){
+clearResult();
+setStatus('Needs Verification');
+$('lookupMessage').textContent='Category changed. Tap Verify Ingredients to reassess.';
+}
+});
 
 function readJSON(key,fallback){
 try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}
@@ -465,6 +486,7 @@ $('autoSaveMessage').textContent='';
 $('saveMessage').textContent='';
 $('frontMessage').textContent='Contributed photos upload to Supabase when you save.';
 updateAllergens();showNutrition({});clearResult();
+setCategory('food');
 setStatus('Scan a product');
 autoSavePromise=null;autoSaveBusy=false;
 }
@@ -531,178 +553,95 @@ const year=date.getFullYear();
 const month=String(date.getMonth()+1).padStart(2,'0');
 return year+'-'+month+'-01';
 }
-
 function leaderboardMonthName(date=new Date()){
-return date.toLocaleDateString('en-US',{
-month:'long',
-year:'numeric'
-});
+return date.toLocaleDateString('en-US',{month:'long',year:'numeric'});
 }
-
 function makeLeaderboardElement(tag,className,textValue){
 const element=document.createElement(tag);
 if(className)element.className=className;
 if(textValue!==undefined)element.textContent=String(textValue);
 return element;
 }
-
 function displayLeaderboard(rows){
 const list=$('leaderboardList');
 list.replaceChildren();
-
 if(!Array.isArray(rows)||rows.length===0){
-$('leaderboardMessage').textContent=
-'No approved contributions yet this month. Be the first to help!';
+$('leaderboardMessage').textContent='No approved contributions yet this month. Be the first to help!';
 return;
 }
-
 const topThree=rows
 .filter(row=>row&&Number.isFinite(Number(row.approved_points)))
 .sort((a,b)=>{
 const points=Number(b.approved_points)-Number(a.approved_points);
 if(points!==0)return points;
-const contributions=
-Number(b.approved_contributions)-Number(a.approved_contributions);
+const contributions=Number(b.approved_contributions)-Number(a.approved_contributions);
 if(contributions!==0)return contributions;
 return Number(a.rank_number)-Number(b.rank_number);
-})
-.slice(0,3);
-
+}).slice(0,3);
 if(!topThree.length){
-$('leaderboardMessage').textContent=
-'No approved contributions yet this month.';
+$('leaderboardMessage').textContent='No approved contributions yet this month.';
 return;
 }
-
 const medals=['🥇','🥈','🥉'];
 const classes=['first','second','third'];
-
 topThree.forEach((entry,index)=>{
-const card=makeLeaderboardElement(
-'div','leaderboardEntry '+classes[index]
-);
-
-const medal=makeLeaderboardElement(
-'div','leaderboardMedal',medals[index]
-);
-
+const card=makeLeaderboardElement('div','leaderboardEntry '+classes[index]);
+const medal=makeLeaderboardElement('div','leaderboardMedal',medals[index]);
 const person=makeLeaderboardElement('div','leaderboardPerson');
-const name=makeLeaderboardElement(
-'strong','',
-clean(entry.contributor_name)||'Vegan Contributor'
-);
-
-const contributionCount=Math.max(
-0,Number(entry.approved_contributions)||0
-);
-
-const detail=makeLeaderboardElement(
-'span','',
-contributionCount+' approved contribution'+
-(contributionCount===1?'':'s')
-);
-
+const name=makeLeaderboardElement('strong','',clean(entry.contributor_name)||'Vegan Contributor');
+const contributionCount=Math.max(0,Number(entry.approved_contributions)||0);
+const detail=makeLeaderboardElement('span','',contributionCount+' approved contribution'+(contributionCount===1?'':'s'));
 person.append(name,detail);
-
 const points=makeLeaderboardElement('div','leaderboardPoints');
-const approvedPoints=Math.max(
-0,Number(entry.approved_points)||0
-);
-
-const pointValue=makeLeaderboardElement(
-'div','',approvedPoints.toLocaleString()
-);
+const approvedPoints=Math.max(0,Number(entry.approved_points)||0);
+const pointValue=makeLeaderboardElement('div','',approvedPoints.toLocaleString());
 const pointLabel=makeLeaderboardElement('span','','points');
-
 points.append(pointValue,pointLabel);
 card.append(medal,person,points);
 list.append(card);
 });
-
-$('leaderboardMessage').textContent=
-'Current standings based on approved contributions.';
+$('leaderboardMessage').textContent='Current standings based on approved contributions.';
 }
-
 async function loadMonthlyLeaderboard(){
 if(leaderboardLoading)return;
-
 leaderboardLoading=true;
 const request=++leaderboardRequestSerial;
 const button=$('refreshLeaderboard');
 button.disabled=true;
-
 const monthKey=leaderboardMonthKey();
 leaderboardLastMonth=monthKey;
-
 $('leaderboardMonth').textContent=leaderboardMonthName();
 $('leaderboardMessage').textContent='Loading approved monthly points…';
-
 try{
-const rows=await apiRequest(
-'/rest/v1/rpc/vv_monthly_leaderboard',
-{
-method:'POST',
-body:JSON.stringify({p_month:monthKey})
-}
-);
-
-if(request!==leaderboardRequestSerial)return;
-
-if(!Array.isArray(rows)){
-throw Error('Unexpected leaderboard response from Supabase.');
-}
-
-displayLeaderboard(rows);
-
-leaderboardRefreshTime=Date.now();
-
-$('leaderboardUpdated').textContent=
-'Last updated: '+new Date(leaderboardRefreshTime)
-.toLocaleString('en-US',{
-month:'short',
-day:'numeric',
-hour:'numeric',
-minute:'2-digit'
+const rows=await apiRequest('/rest/v1/rpc/vv_monthly_leaderboard',{
+method:'POST',body:JSON.stringify({p_month:monthKey})
 });
-
+if(request!==leaderboardRequestSerial)return;
+if(!Array.isArray(rows))throw Error('Unexpected leaderboard response from Supabase.');
+displayLeaderboard(rows);
+leaderboardRefreshTime=Date.now();
+$('leaderboardUpdated').textContent='Last updated: '+new Date(leaderboardRefreshTime).toLocaleString('en-US',{
+month:'short',day:'numeric',hour:'numeric',minute:'2-digit'
+});
 }catch(e){
 if(request!==leaderboardRequestSerial)return;
-
 $('leaderboardList').replaceChildren();
-
-$('leaderboardMessage').textContent=
-'Leaderboard unavailable: '+e.message;
-
-$('leaderboardUpdated').textContent=
-'Unable to refresh rankings. Try again.';
+$('leaderboardMessage').textContent='Leaderboard unavailable: '+e.message;
+$('leaderboardUpdated').textContent='Unable to refresh rankings. Try again.';
 }finally{
 if(request===leaderboardRequestSerial){
-leaderboardLoading=false;
-button.disabled=false;
+leaderboardLoading=false;button.disabled=false;
 }
 }
 }
-
 $('refreshLeaderboard').onclick=loadMonthlyLeaderboard;
-
 function refreshLeaderboardAfterReview(){
-loadMonthlyLeaderboard().catch(e=>{
-console.warn('Leaderboard refresh:',e.message);
-});
+loadMonthlyLeaderboard().catch(e=>console.warn('Leaderboard refresh:',e.message));
 }
-
 document.addEventListener('visibilitychange',()=>{
 if(document.visibilityState!=='visible')return;
-
-const monthChanged=
-leaderboardLastMonth!==leaderboardMonthKey();
-
-const stale=
-Date.now()-leaderboardRefreshTime>5*60*1000;
-
-if(monthChanged||stale){
-loadMonthlyLeaderboard();
-}
+if(leaderboardLastMonth!==leaderboardMonthKey()||
+Date.now()-leaderboardRefreshTime>5*60*1000)loadMonthlyLeaderboard();
 });
 
 /* AUTHENTICATION */
@@ -717,8 +656,7 @@ $('adminSection').style.display=admin?'block':'none';
 $('refreshRewards').style.display=admin?'none':'block';
 $('contributionSteps').style.display=admin?'none':'block';
 $('adminNotice').style.display=admin?'block':'none';
-$('authSection').querySelector('h2').textContent=
-admin?'🛡️ Administrator Account':'🏆 Community Rewards';
+$('authSection').querySelector('h2').textContent=admin?'🛡️ Administrator Account':'🏆 Community Rewards';
 $('rewardsIntro').textContent=admin?
 'Manage Verified Vegan and review community contributions.':
 'Help improve Verified Vegan and earn points for approved contributions.';
@@ -726,10 +664,8 @@ $('rewardsDescription').textContent=admin?
 'Administrator accounts do not earn points or participate in rewards.':
 'Scanning is free without signing in. Accounts are only for rewards.';
 $('welcomeUser').textContent=signedIn?
-'Signed in: '+(currentUser.email||'Contributor')+
-(admin?' — Administrator':''):'';
-$('save').textContent=admin?
-'💾 Save Scan — Administrator':'💾 Save Scan / Submit Contribution';
+'Signed in: '+(currentUser.email||'Contributor')+(admin?' — Administrator':''):'';
+$('save').textContent=admin?'💾 Save Scan — Administrator':'💾 Save Scan / Submit Contribution';
 if(!signedIn){
 $('earnedPoints').textContent='0';
 $('pendingPoints').textContent='0';
@@ -737,7 +673,6 @@ $('contributionHistory').replaceChildren();
 $('adminPending').replaceChildren();
 }
 }
-
 function saveSession(session){
 const oldId=currentUser?.id||null;
 authSession=session;
@@ -764,20 +699,17 @@ if(!response.ok)throw Error(await responseError(response));
 return response.json();
 }
 function authRedirect(){return location.origin+location.pathname}
-
 $('signUp').onclick=async()=>{
 const email=$('authEmail').value.trim();
 const password=$('authPassword').value;
 if(!email||password.length<8){
-$('authMessage').textContent='Enter an email and password of at least 8 characters.';
-return;
+$('authMessage').textContent='Enter an email and password of at least 8 characters.';return;
 }
 $('authMessage').textContent='Creating account…';
 try{
 const data=await authCall('signup?redirect_to='+encodeURIComponent(authRedirect()),{email,password});
 if(data.access_token){
-saveSession(data);
-await initializeSignedInAccount();
+saveSession(data);await initializeSignedInAccount();
 $('authMessage').textContent='Account created and signed in.';
 }else $('authMessage').textContent='Check your email to confirm your account, then log in.';
 }catch(e){$('authMessage').textContent='Sign up failed: '+e.message}
@@ -786,11 +718,9 @@ $('signIn').onclick=async()=>{
 $('authMessage').textContent='Signing in…';
 try{
 const data=await authCall('token?grant_type=password',{
-email:$('authEmail').value.trim(),
-password:$('authPassword').value
+email:$('authEmail').value.trim(),password:$('authPassword').value
 });
-saveSession(data);
-await initializeSignedInAccount();
+saveSession(data);await initializeSignedInAccount();
 $('authMessage').textContent='Signed in successfully.';
 }catch(e){$('authMessage').textContent='Log in failed: '+e.message}
 };
@@ -828,7 +758,6 @@ saveSession(null);
 $('passwordPanel').style.display='none';
 $('authMessage').textContent='Logged out.';
 };
-
 async function refreshSession(){
 if(!authSession?.refresh_token)throw Error('Please log in again.');
 if(authRefreshPromise)return authRefreshPromise;
@@ -862,8 +791,7 @@ const send=t=>fetch(db.url+path,{
 });
 let response=await send(token);
 if(response.status===401){
-token=await refreshSession();
-response=await send(token);
+token=await refreshSession();response=await send(token);
 }
 if(!response.ok)throw Error(await responseError(response));
 if(response.status===204)return null;
@@ -873,9 +801,8 @@ return text?JSON.parse(text):null;
 async function ensureProfile(){
 if(!currentUser||adminAuthorized)return;
 const id=currentUser.id;
-const rows=await userRequest(
-'/rest/v1/vv_profiles?user_id=eq.'+encodeURIComponent(id)+'&select=user_id'
-);
+const rows=await userRequest('/rest/v1/vv_profiles?user_id=eq.'+
+encodeURIComponent(id)+'&select=user_id');
 if(!rows.length){
 await userRequest('/rest/v1/vv_profiles',{
 method:'POST',headers:{Prefer:'return=minimal'},
@@ -895,16 +822,14 @@ if(!currentUser||adminAuthorized)return;
 $('rewardMessage').textContent='Loading rewards…';
 try{
 const id=currentUser.id;
-const totals=await userRequest(
-'/rest/v1/vv_my_rewards?user_id=eq.'+encodeURIComponent(id)+'&select=*'
-);
+const totals=await userRequest('/rest/v1/vv_my_rewards?user_id=eq.'+
+encodeURIComponent(id)+'&select=*');
 if(adminAuthorized)return;
 $('earnedPoints').textContent=totals[0]?.earned_points??0;
 $('pendingPoints').textContent=totals[0]?.pending_points??0;
-const contributions=await userRequest(
-'/rest/v1/vv_contributions?user_id=eq.'+encodeURIComponent(id)+
-'&select=barcode,contribution_type,points,status,created_at&order=created_at.desc&limit=30'
-);
+const contributions=await userRequest('/rest/v1/vv_contributions?user_id=eq.'+
+encodeURIComponent(id)+
+'&select=barcode,contribution_type,points,status,created_at&order=created_at.desc&limit=30');
 if(adminAuthorized)return;
 const box=$('contributionHistory');
 box.replaceChildren();
@@ -922,8 +847,7 @@ if(!adminAuthorized)$('rewardMessage').textContent='Rewards unavailable: '+e.mes
 }
 }
 $('refreshRewards').onclick=async()=>{
-await loadRewards();
-await loadMonthlyLeaderboard();
+await loadRewards();await loadMonthlyLeaderboard();
 };
 async function restoreAuth(){
 const saved=readJSON(AUTHKEY,null);
@@ -953,10 +877,8 @@ adminAccessChecking=!!userId;
 updateAccountMode();
 if(!userId)return false;
 try{
-const rows=await userRequest(
-'/rest/v1/vv_admins?user_id=eq.'+
-encodeURIComponent(userId)+'&select=user_id&limit=1'
-);
+const rows=await userRequest('/rest/v1/vv_admins?user_id=eq.'+
+encodeURIComponent(userId)+'&select=user_id&limit=1');
 if(serial!==adminCheckSerial||currentUser?.id!==userId)return false;
 adminAuthorized=Array.isArray(rows)&&rows.some(r=>r.user_id===userId);
 updateAccountMode();
@@ -964,8 +886,7 @@ if(adminAuthorized)await loadAdminPending();
 return adminAuthorized;
 }catch(e){
 if(serial===adminCheckSerial){
-adminAuthorized=false;
-updateAccountMode();
+adminAuthorized=false;updateAccountMode();
 $('authMessage').textContent='Administrator check unavailable: '+e.message;
 }
 return false;
@@ -976,9 +897,8 @@ if(serial===adminCheckSerial)adminAccessChecking=false;
 async function confirmAccountMode(){
 if(!currentUser)return false;
 if(adminAccessChecking){
-for(let i=0;i<30&&adminAccessChecking;i++){
+for(let i=0;i<30&&adminAccessChecking;i++)
 await new Promise(resolve=>setTimeout(resolve,100));
-}
 }
 if(!adminAccessChecking)await checkAdminAccess();
 if(adminAccessChecking)throw Error('Administrator verification is still loading. Try again.');
@@ -987,8 +907,7 @@ return adminAuthorized;
 function adminText(parent,tag,value){
 const element=document.createElement(tag);
 element.textContent=String(value??'');
-parent.append(element);
-return element;
+parent.append(element);return element;
 }
 async function loadAdminPending(){
 if(!currentUser||!adminAuthorized||adminBusy)return;
@@ -997,10 +916,8 @@ const box=$('adminPending');
 box.replaceChildren();
 $('adminMessage').textContent='Loading pending contributions…';
 try{
-const rows=await userRequest(
-'/rest/v1/vv_contributions?status=eq.pending'+
-'&select=*&order=created_at.asc&limit=100'
-);
+const rows=await userRequest('/rest/v1/vv_contributions?status=eq.pending'+
+'&select=*&order=created_at.asc&limit=100');
 if(!currentUser||currentUser.id!==userId||!adminAuthorized)return;
 if(!Array.isArray(rows))throw Error('Unexpected contribution response.');
 const reviewable=rows.filter(c=>c.user_id!==userId);
@@ -1041,12 +958,10 @@ actions.append(approve,reject);card.append(actions);box.append(card);
 async function reviewContribution(contribution,approve){
 if(adminBusy||!adminAuthorized||!currentUser)return;
 if(contribution.user_id===currentUser.id){
-$('adminMessage').textContent='Administrators cannot approve their own contributions.';
-return;
+$('adminMessage').textContent='Administrators cannot approve their own contributions.';return;
 }
 if(contribution.id===undefined||contribution.id===null){
-$('adminMessage').textContent='This contribution has no review ID.';
-return;
+$('adminMessage').textContent='This contribution has no review ID.';return;
 }
 const action=approve?'approve':'reject';
 if(!confirm('Are you sure you want to '+action+
@@ -1054,12 +969,10 @@ if(!confirm('Are you sure you want to '+action+
 adminBusy=true;
 $('refreshAdmin').disabled=true;
 $('adminMessage').textContent='Submitting administrator decision…';
-let decisionMessage='';
-let reviewSucceeded=false;
+let decisionMessage='',reviewSucceeded=false;
 try{
 await userRequest('/rest/v1/rpc/vv_review_contribution',{
-method:'POST',
-body:JSON.stringify({p_id:contribution.id,p_approve:approve})
+method:'POST',body:JSON.stringify({p_id:contribution.id,p_approve:approve})
 });
 decisionMessage=approve?'✅ Contribution approved.':'Contribution rejected.';
 reviewSucceeded=true;
@@ -1116,20 +1029,19 @@ img.src=candidate.url;
 next();
 }
 function showPhoto(url,source){
-resetPhoto();
-showPhotoCandidates([{url,source}]);
+resetPhoto();showPhotoCandidates([{url,source}]);
 }
-function extractOFFImages(p){
+function extractOFFImages(p,sourceName='Open Facts'){
 const candidates=[],seen=new Set();
 function add(url,source){
 if(validPhotoURL(url)&&!seen.has(url)){
 seen.add(url);candidates.push({url,source});
 }
 }
-add(p.image_front_url,'Open Food Facts front picture');
-add(p.image_front_small_url,'Open Food Facts front picture');
-add(p.image_url,'Open Food Facts picture');
-add(p.image_small_url,'Open Food Facts picture');
+add(p.image_front_url,sourceName+' front picture');
+add(p.image_front_small_url,sourceName+' front picture');
+add(p.image_url,sourceName+' picture');
+add(p.image_small_url,sourceName+' picture');
 if(p.selected_images){
 for(const side of ['front','ingredients','nutrition']){
 const selection=p.selected_images[side];
@@ -1137,20 +1049,20 @@ if(!selection)continue;
 for(const size of ['display','small','thumb']){
 const versions=selection[size]||{};
 for(const language of ['en','fr','es','de','it'])
-add(versions[language],'Open Food Facts '+side+' picture');
+add(versions[language],sourceName+' '+side+' picture');
 }
 }
 }
 return candidates;
 }
-function displayProductImages(barcode,cloudUrl='',offProduct=null){
+function displayProductImages(barcode,cloudUrl='',offProduct=null,sourceName='Open Facts'){
 resetPhoto();
 const candidates=[];
 if(validPhotoURL(cloudUrl))
 candidates.push({url:cloudUrl,source:'Supabase cloud picture'});
 if(sameBarcode(barcode,COCONUT_BARCODE))
 candidates.push({url:COCONUT_PHOTO,source:'Supabase cloud picture'});
-if(offProduct)candidates.push(...extractOFFImages(offProduct));
+if(offProduct)candidates.push(...extractOFFImages(offProduct,sourceName));
 showPhotoCandidates(candidates);
 }
 const frontInput=$('frontInput');
@@ -1225,6 +1137,7 @@ mayContain:m?clean(m[1]):'',
 foundHeading:!!match
 };
 }
+
 const rules=[
 ['Milk or dairy',/\b(milk|whey|casein|caseinate|lactose|lactalbumin|buttermilk|cheese|yogurt|yoghurt|ghee|milkfat|milk solids|butter oil|milk powder|cream powder)\b/i],
 ['Egg',/\b(egg|eggs|albumen|ovalbumin|egg whites?|egg yolks?)\b/i],
@@ -1236,7 +1149,18 @@ const rules=[
 ['Fish or seafood',/\b(fish|anchov(?:y|ies)|oyster|shrimp|prawn|crab|lobster|fish sauce|fish oil|bonito)\b/i],
 ['Other animal ingredients',/\b(collagen|keratin|lanolin|wool fat)\b/i]
 ];
-function classify(raw){
+
+const NONFOOD_ANIMAL_RULES=[
+['Animal-derived wax or fat',/\b(beeswax|cera alba|lanolin|lanolin alcohol|wool wax|wool fat|tallow|sodium tallowate|potassium tallowate|lard|animal fat|mink oil|emu oil)\b/i],
+['Animal proteins or secretions',/\b(collagen|hydrolyzed collagen|keratin|silk protein|hydrolyzed silk|snail mucin|snail secretion|placenta extract|elastin|gelatin|gelatine)\b/i],
+['Animal colorants or coatings',/\b(carmine|cochineal|carminic acid|ci\s*75470|shellac|e120|e904)\b/i],
+['Milk, honey, or egg derivatives',/\b(milk protein|casein|whey protein|honey|propolis|royal jelly|egg protein|albumen)\b/i],
+['Animal or marine extracts',/\b(fish oil|shark liver oil|squalene from shark|oyster extract|pearl powder|cod liver oil)\b/i]
+];
+
+const NONFOOD_UNCERTAIN=/\b(glycerin|glycerine|glycerol|stearic acid|stearate|glyceryl stearate|sodium stearate|magnesium stearate|palmitic acid|palmitate|oleic acid|oleate|squalene|squalane|cholesterol|lecithin|fatty acids?|soap base|surfactants?|fragrance|parfum|natural flavors?|enzymes?|amino acids?|vitamin d3|cholecalciferol)\b/i;
+
+function classify(raw,category=productCategory){
 const t=splitPackageText(raw).ingredients;
 if(!t)return {
 status:'Needs Verification',
@@ -1244,25 +1168,38 @@ reasons:[],
 explanation:'No readable ingredient list is available.',
 caution:'Photograph or enter the ingredients.'
 };
-const reasons=rules.filter(r=>r[1].test(t)).map(r=>r[0]);
+const isNonfood=category!=='food';
+const applicable=isNonfood?NONFOOD_ANIMAL_RULES:rules;
+const reasons=applicable.filter(r=>r[1].test(t)).map(r=>r[0]);
 const notes=[];
-if(/\b(natural flavo[u]?rs?|mono(?:-|\s)?and(?:-|\s)?diglycerides|glycerin|glycerine|vitamin d3|cholecalciferol|enzymes|rennet|l[.-]?cysteine)\b/i.test(t))
+if(isNonfood&&NONFOOD_UNCERTAIN.test(t))
+notes.push('Some ingredients can have plant, synthetic, or animal origins.');
+if(!isNonfood&&/\b(natural flavo[u]?rs?|mono(?:-|\s)?and(?:-|\s)?diglycerides|glycerin|glycerine|vitamin d3|cholecalciferol|enzymes|rennet|l[.-]?cysteine)\b/i.test(t))
 notes.push('Some ingredients have uncertain plant or animal origins.');
-if(/\bsugar\b/i.test(t)&&!/\borganic (?:cane )?sugar\b/i.test(t))
+if(!isNonfood&&/\bsugar\b/i.test(t)&&!/\borganic (?:cane )?sugar\b/i.test(t))
 notes.push('Generic sugar may have processing-source uncertainty.');
+
+const uncertainNonfood=isNonfood&&NONFOOD_UNCERTAIN.test(t);
+const status=reasons.length?'Not Vegan':
+uncertainNonfood?'Needs Verification':'Vegan';
+
 return {
-status:reasons.length?'Not Vegan':'Vegan',
-reasons:reasons.length?reasons:['No explicitly animal-derived ingredients detected in the supplied text.'],
+status,
+reasons:reasons.length?reasons:
+uncertainNonfood?['One or more ingredient origins need manufacturer verification.']:
+['No explicitly animal-derived ingredients detected in the supplied text.'],
 explanation:reasons.length?'Animal-derived ingredients detected.':
+uncertainNonfood?'Ingredient origin could not be confirmed.':
 'No explicitly animal-derived ingredients found in this ingredient screening.',
-caution:notes.join(' ')+' Ingredient screening is not manufacturer certification.'
+caution:notes.join(' ')+(isNonfood?
+' Animal testing and cruelty-free status have not been verified.':
+' Ingredient screening is not manufacturer certification.')
 };
 }
 function updateAllergens(){
 $('containsText').textContent=allergens.contains?'Contains: '+allergens.contains:'';
 $('mayContainText').textContent=allergens.mayContain?'May contain: '+allergens.mayContain:'';
-$('allergenPanel').style.display=
-allergens.contains||allergens.mayContain?'block':'none';
+$('allergenPanel').style.display=allergens.contains||allergens.mayContain?'block':'none';
 }
 function loadIngredients(text){
 const parsed=splitPackageText(text);
@@ -1314,19 +1251,65 @@ serving_size:serving||null
 };
 }
 
-/* CLOUD PRODUCT LOOKUP */
+/* MULTI-DATABASE PRODUCT LOOKUP */
 
-async function fetchOFF(barcode){
+function detectProductCategory(p,sourceCategory){
+if(sourceCategory==='food'||sourceCategory==='beauty')return sourceCategory;
+const description=clean([
+p.categories,p.categories_tags?.join(' '),p.product_name,p.generic_name
+].filter(Boolean).join(' ')).toLowerCase();
+if(/\b(shampoo|conditioner|cosmetic|makeup|lipstick|lotion|deodorant|toothpaste|skin care|skincare|body wash|perfume|face cream|hair care)\b/.test(description))
+return 'beauty';
+if(/\b(cleaner|cleaning|detergent|bleach|dish soap|laundry|disinfectant|floor polish|fabric softener|household|surface spray)\b/.test(description))
+return 'household';
+return 'other';
+}
+function productIngredients(p){
+return clean(
+p.ingredients_text_en||
+p.ingredients_text||
+p.ingredients_text_with_allergens||
+p.ingredients||
+''
+);
+}
+function productQuality(p){
+const ingredients=productIngredients(p);
+return (ingredients?100:0)+
+(clean(p.product_name)?30:0)+
+(extractOFFImages(p).length?15:0)+
+(clean(p.brands)?10:0);
+}
+async function fetchSource(barcode,source){
 const controller=new AbortController();
 const timeout=setTimeout(()=>controller.abort(),6500);
 try{
 const response=await fetch(
-'https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(barcode)+'.json',
+'https://'+source.host+'/api/v2/product/'+encodeURIComponent(barcode)+'.json',
 {signal:controller.signal}
 );
-if(!response.ok)throw Error('Open Food Facts unavailable');
-return response.json();
+if(!response.ok)throw Error(source.name+' unavailable');
+const data=await response.json();
+if(data.status!==1||!data.product)return null;
+return {
+product:data.product,
+sourceName:source.name,
+category:detectProductCategory(data.product,source.category),
+quality:productQuality(data.product)
+};
 }finally{clearTimeout(timeout)}
+}
+async function fetchAllProducts(barcode){
+const results=await Promise.allSettled(
+PRODUCT_SOURCES.map(source=>fetchSource(barcode,source))
+);
+const found=results.filter(r=>r.status==='fulfilled'&&r.value).map(r=>r.value);
+found.sort((a,b)=>b.quality-a.quality);
+return {
+best:found[0]||null,
+all:found,
+errors:results.filter(r=>r.status==='rejected').map(r=>r.reason?.message||'Lookup failed')
+};
 }
 async function findCloudRecord(barcode,authenticated=false){
 try{
@@ -1377,6 +1360,7 @@ showNutrition(nutritionFromCloud(p));
 currentServingSize=p.serving_size||'';
 displayProductImages($('barcode').value,p.image_url||'');
 photoWasMissing=!p.image_url;
+setCategory('food','Supabase cloud');
 const screened=classify(ingredients);
 if(originalStatus!=='Needs Verification'&&
 screened.status!=='Needs Verification'&&
@@ -1394,19 +1378,20 @@ $('lookupMessage').textContent='No ingredients available. Add ingredients to ver
 }
 $('autoSaveMessage').textContent='Already in Supabase. No save needed.';
 }
-async function automaticCloudSave(barcode,p,serial){
+
+async function automaticCloudSave(barcode,p,serial,category='food',sourceName='Open Facts'){
 const saveSerial=++autoSaveSerial;
 const notice=$('autoSaveMessage');
-if(!p||!p.product_name&&!p.brands&&!p.ingredients_text&&!p.ingredients_text_en){
+if(!p||!p.product_name&&!p.brands&&!productIngredients(p)){
 if(serial===lookupNumber)notice.textContent='No reliable product details to save automatically.';
 return;
 }
 if(serial===lookupNumber)notice.textContent='Automatically saving new product to Supabase…';
 autoSaveBusy=true;
 const name=clean(p.product_name),brand=clean(p.brands);
-const ingredientText=splitPackageText(p.ingredients_text_en||p.ingredients_text||'').ingredients;
-const result=classify(ingredientText);
-const images=extractOFFImages(p);
+const ingredientText=splitPackageText(productIngredients(p)).ingredients;
+const result=classify(ingredientText,category);
+const images=extractOFFImages(p,sourceName);
 const imageUrl=images.find(x=>validPhotoURL(x.url))?.url||
 (sameBarcode(barcode,COCONUT_BARCODE)?COCONUT_PHOTO:null);
 const payload={
@@ -1417,7 +1402,7 @@ ingredients:ingredientText||null,
 vegan_status:result.status,
 vegan_reason:result.reasons.join('; ')||null,
 image_url:imageUrl,
-...nutritionPayload(p.nutriments||{},p.serving_size||'')
+...nutritionPayload(category==='food'?(p.nutriments||{}):{},category==='food'?(p.serving_size||''):'')
 };
 try{
 const existing=await findCloudRecord(barcode);
@@ -1425,8 +1410,7 @@ if(existing.error)throw Error(existing.error);
 if(existing.record){
 if(serial===lookupNumber){
 loadedCloudId=existing.record.id??null;
-cloudRecordExists=true;
-rememberBaseline(existing.record);
+cloudRecordExists=true;rememberBaseline(existing.record);
 notice.textContent='Product already in Supabase. No duplicate save needed.';
 }
 return;
@@ -1457,6 +1441,7 @@ notice.textContent='⚠️ Automatic cloud save failed: '+e.message;
 if(saveSerial===autoSaveSerial)autoSaveBusy=false;
 }
 }
+
 async function lookupProduct(){
 const barcode=$('barcode').value.trim();
 if(!/^\d{8,14}$/.test(barcode)){
@@ -1478,43 +1463,63 @@ $('ingredients').value='';$('confirmed').checked=false;
 ingredientSource='none';allergens={contains:'',mayContain:''};
 updateAllergens();resetPhoto();resetIngredientPhoto();
 showNutrition({});currentServingSize='';
+setCategory('food');
 showProductView();
 const isCurrent=()=>serial===lookupNumber&&
 session===productSession&&barcode===$('barcode').value.trim();
+
 const cloud=await findCloudRecord(barcode,!!currentUser);
 if(!isCurrent())return;
-if(cloud.record){loadCloudRecord(cloud.record);return}
+
+if(cloud.record){
+loadCloudRecord(cloud.record);
+return;
+}
 if(cloud.error){
 $('autoSaveMessage').textContent='⚠️ Cloud check unavailable: '+
 cloud.error+'. Automatic saving is paused to avoid overwriting records.';
 }
-$('lookupMessage').textContent='Checking Open Food Facts…';
+
+$('lookupMessage').textContent='Searching food, beauty and household product databases…';
 try{
-const data=await fetchOFF(barcode);
+const lookup=await fetchAllProducts(barcode);
 if(!isCurrent())return;
-if(data.status!==1||!data.product){
+
+if(!lookup.best){
 setStatus('Needs Verification');
-$('lookupMessage').textContent='Product not found. Enter or photograph ingredients.';
-displayProductImages(barcode);photoWasMissing=true;return;
+$('lookupMessage').textContent='Product not found in available databases. Enter the name or photograph the ingredients.';
+displayProductImages(barcode);
+photoWasMissing=true;
+return;
 }
-const p=data.product;
+
+const found=lookup.best;
+const p=found.product;
+setCategory(found.category,found.sourceName);
 $('productName').value=p.product_name||'';
 displayBrand(p.brands,barcode);
-showNutrition(p.nutriments||{});
-currentServingSize=p.serving_size||'';
-displayProductImages(barcode,'',p);
-photoWasMissing=!extractOFFImages(p).length;
-const ingredients=loadIngredients(p.ingredients_text_en||p.ingredients_text||'');
-originalIngredients=ingredients;ingredientSource='database';
+showNutrition(found.category==='food'?(p.nutriments||{}):{});
+currentServingSize=found.category==='food'?(p.serving_size||''):'';
+displayProductImages(barcode,'',p,found.sourceName);
+photoWasMissing=!extractOFFImages(p,found.sourceName).length;
+
+const ingredients=loadIngredients(productIngredients(p));
+originalIngredients=ingredients;
+ingredientSource='database';
+
 if(ingredients){
-showResult(classify(ingredients));
-$('lookupMessage').textContent='Product found in Open Food Facts.';
+showResult(classify(ingredients,found.category));
+$('lookupMessage').textContent='Product found in '+found.sourceName+'.';
 }else{
 setStatus('Needs Verification');
-$('lookupMessage').textContent='No ingredients found. Take an ingredient picture.';
+$('lookupMessage').textContent='Product found in '+found.sourceName+
+', but no ingredients are available. Take an ingredient picture.';
 }
+
 if(!cloud.error){
-const promise=automaticCloudSave(barcode,p,serial);
+const promise=automaticCloudSave(
+barcode,p,serial,found.category,found.sourceName
+);
 autoSavePromise=promise;
 await promise;
 }
@@ -1536,25 +1541,18 @@ const filename=normalizeBarcode(barcode)+'-'+Date.now()+
 const url=db.url+'/storage/v1/object/product-images/'+encodeURIComponent(filename);
 let token=currentUser?await userToken():null;
 const send=t=>{
-const h={
-'apikey':db.key,
-'Content-Type':'image/jpeg',
-'x-upsert':'false'
-};
+const h={'apikey':db.key,'Content-Type':'image/jpeg','x-upsert':'false'};
 if(t)h.Authorization='Bearer '+t;
 return fetch(url,{method:'POST',headers:h,body:file});
 };
 let response=await send(token);
 if(response.status===401&&currentUser){
-token=await refreshSession();
-response=await send(token);
+token=await refreshSession();response=await send(token);
 }
 if(!response.ok){
 const detail=await responseError(response);
-throw Error(
-'PRODUCT PICTURE UPLOAD rejected by Supabase Storage: '+detail+
-'. Check INSERT permissions on the product-images bucket.'
-);
+throw Error('PRODUCT PICTURE UPLOAD rejected by Supabase Storage: '+detail+
+'. Check INSERT permissions on the product-images bucket.');
 }
 return db.url+'/storage/v1/object/public/product-images/'+encodeURIComponent(filename);
 }
@@ -1590,7 +1588,7 @@ return;
 }
 const parsed=splitPackageText($('ingredients').value);
 $('ingredients').value=parsed.ingredients;
-showResult(classify(parsed.ingredients));
+showResult(classify(parsed.ingredients,productCategory));
 $('result').scrollIntoView({behavior:'smooth',block:'start'});
 };
 
@@ -1607,7 +1605,7 @@ const barcode=$('barcode').value.trim();
 if(!/^\d{8,14}$/.test(barcode)){
 alert('Scan or enter a valid barcode first.');return;
 }
-const freshResult=classify($('ingredients').value);
+const freshResult=classify($('ingredients').value,productCategory);
 if(freshResult.status!==lastResult.status||
 freshResult.reasons.join('|')!==lastResult.reasons.join('|')){
 alert('Ingredients changed. Tap Verify Ingredients again before saving.');
@@ -1654,22 +1652,15 @@ if(value!==null)payload[key]=value;
 }
 
 const baseline=contributionBaseline||{
-ingredients:originalIngredients,
-image_url:'',
-brand:'',
-product_name:'',
-vegan_status:originalStatus
+ingredients:originalIngredients,image_url:'',
+brand:'',product_name:'',vegan_status:originalStatus
 };
-
-const ingredientChanged=
-ingredients!==clean(baseline.ingredients);
-const metadataChanged=
-brand!==clean(baseline.brand)||
+const ingredientChanged=ingredients!==clean(baseline.ingredients);
+const metadataChanged=brand!==clean(baseline.brand)||
 productName!==clean(baseline.product_name);
 const statusChanged=existing?
 normalizeStatus(existing.vegan_status)!==freshResult.status:false;
-const hasContribution=
-newPhoto||ingredientChanged||metadataChanged||statusChanged;
+const hasContribution=newPhoto||ingredientChanged||metadataChanged||statusChanged;
 
 let rewardText='';
 
@@ -1678,14 +1669,11 @@ if(!hasContribution){
 $('saveMessage').textContent='✅ Product already saved. No changes needed.';
 return;
 }
-if(!currentUser){
-throw Error('Sign in to submit changes to an existing product.');
-}
+if(!currentUser)throw Error('Sign in to submit changes to an existing product.');
 
 const existingIngredients=clean(existing.ingredients);
 const missingPhoto=!existing.image_url;
 let type='correction';
-
 if(newPhoto&&missingPhoto)type='product_photo';
 else if(ingredients&&!existingIngredients)type='ingredients';
 
@@ -1693,20 +1681,15 @@ if(newPhoto){
 $('saveMessage').textContent='Uploading contributor picture…';
 uploadedPhoto=await uploadProductPhoto(db,selectedPhotoFile,barcode);
 }
-
 $('saveMessage').textContent='Submitting contribution for administrator review…';
-
 try{
 await submitContribution(
-type,
-barcode,
-uploadedPhoto||null,
+type,barcode,uploadedPhoto||null,
 type==='product_photo'?null:ingredients||null
 );
 }catch(e){
 throw Error('CONTRIBUTION SUBMISSION failed: '+e.message);
 }
-
 databaseSaved=true;
 rewardText=' Contribution pending administrator approval.';
 
@@ -1716,7 +1699,6 @@ releaseSelectedPhoto();
 frontInput.value='';
 $('frontMessage').textContent='Picture submitted for review.';
 }
-
 await loadRewards();
 
 }else{
@@ -1728,37 +1710,21 @@ payload.image_url=uploadedPhoto;
 }else if(!existing?.image_url&&validPhotoURL(currentPhoto)){
 payload.image_url=currentPhoto;
 }
-
-if(session!==productSession){
-throw Error('Product changed while saving.');
-}
+if(session!==productSession)throw Error('Product changed while saving.');
 
 if(existing){
 const patch={};
+if(!isAdmin)throw Error('Existing product edits require administrator approval.');
 
-if(!isAdmin){
-throw Error('Existing product edits require administrator approval.');
-}
-
-if(uploadedPhoto){
-patch.image_url=uploadedPhoto;
-}
-
-if(ingredients!==clean(existing.ingredients)){
-patch.ingredients=ingredients||null;
-}
-if(freshResult.status!==normalizeStatus(existing.vegan_status)){
+if(uploadedPhoto)patch.image_url=uploadedPhoto;
+if(ingredients!==clean(existing.ingredients))patch.ingredients=ingredients||null;
+if(freshResult.status!==normalizeStatus(existing.vegan_status))
 patch.vegan_status=freshResult.status;
-}
-if(patch.ingredients!==undefined||patch.vegan_status!==undefined){
+if(patch.ingredients!==undefined||patch.vegan_status!==undefined)
 patch.vegan_reason=payload.vegan_reason;
-}
-if(brand!==clean(existing.brand)){
-patch.brand=brand||null;
-}
-if(productName!==clean(existing.product_name)){
+if(brand!==clean(existing.brand))patch.brand=brand||null;
+if(productName!==clean(existing.product_name))
 patch.product_name=productName||null;
-}
 
 for(const key of [
 'protein_100g','carb_100g','fat_100g',
@@ -1772,7 +1738,6 @@ patch[key]=payload[key];
 
 if(Object.keys(patch).length){
 $('saveMessage').textContent='Updating product using administrator permissions…';
-
 let saved;
 try{
 saved=await userRequest(
@@ -1784,55 +1749,40 @@ body:JSON.stringify(patch)
 }
 );
 }catch(e){
-throw Error(
-'PRODUCT DATABASE UPDATE rejected by Supabase: '+e.message+
-'. The picture may already be uploaded, but the product record was not updated.'
-);
+throw Error('PRODUCT DATABASE UPDATE rejected by Supabase: '+e.message+
+'. The picture may already be uploaded, but the product record was not updated.');
 }
-
 if(!Array.isArray(saved)||!saved.length){
-throw Error(
-'PRODUCT DATABASE UPDATE was not confirmed. Check administrator UPDATE and SELECT policies.'
-);
+throw Error('PRODUCT DATABASE UPDATE was not confirmed. Check administrator UPDATE and SELECT policies.');
 }
-
 loadedCloudId=saved[0].id;
 rememberBaseline(saved[0]);
-
 }else{
 loadedCloudId=existing.id;
 rememberBaseline(existing);
 }
-
 databaseSaved=true;
 
 }else{
-
 $('saveMessage').textContent='Creating new Supabase product…';
-
 let saved;
 try{
 saved=await (
 currentUser
 ?userRequest('/rest/v1/products',{
-method:'POST',
-headers:{Prefer:'return=representation'},
+method:'POST',headers:{Prefer:'return=representation'},
 body:JSON.stringify(payload)
 })
 :apiRequest('/rest/v1/products',{
-method:'POST',
-headers:{Prefer:'return=representation'},
+method:'POST',headers:{Prefer:'return=representation'},
 body:JSON.stringify(payload)
 })
 );
 }catch(e){
 throw Error('NEW PRODUCT DATABASE INSERT failed: '+e.message);
 }
-
-if(!Array.isArray(saved)||!saved.length){
+if(!Array.isArray(saved)||!saved.length)
 throw Error('Supabase did not confirm the new product.');
-}
-
 loadedCloudId=saved[0].id;
 rememberBaseline(saved[0]);
 databaseSaved=true;
@@ -1844,15 +1794,13 @@ releaseSelectedPhoto();
 frontInput.value='';
 $('frontMessage').textContent='✅ Product picture saved to Supabase.';
 }
-
 originalIngredients=ingredients;
 originalStatus=freshResult.status;
 
 if(isAdmin){
 rewardText=' Administrator save — no reward points.';
 }else if(currentUser&&!existing&&hasContribution){
-const type=newPhoto?'product_photo':
-ingredients?'ingredients':'correction';
+const type=newPhoto?'product_photo':ingredients?'ingredients':'correction';
 try{
 await submitContribution(
 type,barcode,
@@ -1868,20 +1816,16 @@ rewardText=' Product saved. Reward submission failed: '+e.message;
 rewardText=' Sign in before contributing to earn rewards.';
 }
 }
-
 if(databaseSaved){
-$('saveMessage').textContent=
-'✅ Saved or submitted successfully.'+rewardText;
+$('saveMessage').textContent='✅ Saved or submitted successfully.'+rewardText;
 }
-
 }catch(e){
 $('saveMessage').textContent='❌ Save failed: '+e.message;
 }finally{
 savingContribution=false;
 button.disabled=false;
 button.textContent=adminAuthorized?
-'💾 Save Scan — Administrator':
-'💾 Save Scan / Submit Contribution';
+'💾 Save Scan — Administrator':'💾 Save Scan / Submit Contribution';
 }
 };
 
@@ -1961,8 +1905,7 @@ scan();
 if(newStream&&newStream!==stream)
 newStream.getTracks().forEach(t=>t.stop());
 if(session===scannerSession){
-stopCamera();
-alert('Camera error: '+e.message);
+stopCamera();alert('Camera error: '+e.message);
 }
 }
 }
@@ -1988,17 +1931,14 @@ $('ocrMessage').className=error?'warning':'muted';
 }
 function busy(value){
 ocrBusy=value;
-['takePhoto','choosePhoto','readCrop','check'].forEach(id=>{
-$(id).disabled=value;
-});
+['takePhoto','choosePhoto','readCrop','check'].forEach(id=>$(id).disabled=value);
 }
 function progress(value){
 $('ocrProgress').style.display='block';
 $('ocrProgressBar').style.width=Math.max(0,Math.min(100,value))+'%';
 }
 function validOCRSession(session,barcode){
-return session===productSession&&
-barcode===$('barcode').value.trim();
+return session===productSession&&barcode===$('barcode').value.trim();
 }
 function openIngredientCamera(capture){
 if(!$('barcode').value.trim()){
@@ -2007,8 +1947,7 @@ alert('Scan a product first.');return;
 if(ocrBusy)return;
 if(capture)photoInput.setAttribute('capture','environment');
 else photoInput.removeAttribute('capture');
-photoInput.value='';
-photoInput.click();
+photoInput.value='';photoInput.click();
 }
 $('takePhoto').onclick=()=>openIngredientCamera(true);
 $('choosePhoto').onclick=()=>openIngredientCamera(false);
@@ -2033,8 +1972,7 @@ try{
 ocrWorker=await ocrLoadPromise;
 return ocrWorker;
 }catch(e){
-ocrLoadPromise=null;
-throw e;
+ocrLoadPromise=null;throw e;
 }
 }
 function makeCanvas(bitmap,max=2400){
@@ -2049,8 +1987,7 @@ return canvas;
 }
 function enhanceCanvas(source,mode='contrast'){
 const out=document.createElement('canvas');
-out.width=source.width;
-out.height=source.height;
+out.width=source.width;out.height=source.height;
 const c=out.getContext('2d',{willReadFrequently:true});
 c.drawImage(source,0,0);
 const image=c.getImageData(0,0,out.width,out.height);
@@ -2066,13 +2003,9 @@ if(g>high)high=g;
 const range=Math.max(40,high-low);
 for(let i=0,j=0;i<d.length;i+=4,j++){
 let g=(gray[j]-low)*255/range;
-if(mode==='threshold'){
-g=g>145?255:0;
-}else if(mode==='contrast'){
-g=Math.max(0,Math.min(255,(g-128)*1.25+128));
-}else{
-g=Math.max(0,Math.min(255,g));
-}
+if(mode==='threshold')g=g>145?255:0;
+else if(mode==='contrast')g=Math.max(0,Math.min(255,(g-128)*1.25+128));
+else g=Math.max(0,Math.min(255,g));
 d[i]=d[i+1]=d[i+2]=g;
 }
 c.putImageData(image,0,0);
@@ -2096,7 +2029,7 @@ const t=parsed.ingredients;
 const words=t.match(/[A-Za-z]{3,}/g)||[];
 const letters=(t.match(/[A-Za-z]/g)||[]).length;
 const bad=(t.match(/[~$|_=<>^{}\\]/g)||[]).length;
-const meaningful=/\b(water|sugar|salt|oil|flour|starch|protein|acid|extract|flavor|flavour|powder|juice|vitamin|fiber|fibre|lecithin|gum|soy|pea|cocoa|milk|egg|honey|gelatin|corn|rice|wheat|coconut|natural|organic|ingredients?)\b/i.test(t);
+const meaningful=/\b(water|sugar|salt|oil|flour|starch|protein|acid|extract|flavor|flavour|powder|juice|vitamin|fiber|fibre|lecithin|gum|soy|pea|cocoa|milk|egg|honey|gelatin|corn|rice|wheat|coconut|natural|organic|ingredients?|glycerin|stearate|fragrance|sodium|surfactant|alcohol)\b/i.test(t);
 const punctuation=(t.match(/[,;()]/g)||[]).length;
 let score=0;
 score+=Math.min(25,words.length*2);
@@ -2125,8 +2058,7 @@ loadIngredients(parsed.ingredients);
 ingredientSource='ocr';
 ocrRejected=false;
 $('confirmed').checked=false;
-clearResult();
-setStatus('Needs Verification');
+clearResult();setStatus('Needs Verification');
 message('Ingredient text detected. Check every word against the package, correct mistakes, then check the confirmation box.');
 $('ingredients').scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -2136,8 +2068,7 @@ ingredientSource='ocr';
 $('confirmed').checked=false;
 $('ingredients').value='';
 allergens={contains:'',mayContain:''};
-updateAllergens();
-clearResult();
+updateAllergens();clearResult();
 setStatus('Needs Verification');
 message(text,true);
 $('manualCropButton').style.display='block';
@@ -2164,10 +2095,7 @@ if(i===variants.length-1&&!best)throw e;
 continue;
 }
 if(!validOCRSession(session,barcode))return null;
-const candidate=scoreOCR(
-result.data?.text||'',
-Number(result.data?.confidence)||0
-);
+const candidate=scoreOCR(result.data?.text||'',Number(result.data?.confidence)||0);
 if(!best||candidate.score>best.score)best=candidate;
 if(candidate.score>=80&&acceptableOCR(candidate))break;
 }
@@ -2204,11 +2132,8 @@ progress(5);
 const canvas=makeCanvas(photoBitmap,2400);
 const best=await recognizeBest(canvas,session,barcode);
 if(!validOCRSession(session,barcode))return;
-if(acceptableOCR(best)){
-displayOCR(best);
-}else{
-failedOCR('Ingredient text unclear. Try Adjust Ingredient Area Manually, take a clearer picture, or type the ingredients.');
-}
+if(acceptableOCR(best))displayOCR(best);
+else failedOCR('Ingredient text unclear. Try Adjust Ingredient Area Manually, take a clearer picture, or type the ingredients.');
 }catch(e){
 if(validOCRSession(session,barcode))
 failedOCR('Photo reading failed: '+e.message);
@@ -2285,11 +2210,8 @@ out.height=Math.max(1,Math.floor(h*scale));
 out.getContext('2d').drawImage(photoBitmap,x,y,w,h,0,0,out.width,out.height);
 const best=await recognizeBest(out,session,barcode);
 if(!validOCRSession(session,barcode))return;
-if(acceptableOCR(best)){
-displayOCR(best);
-}else{
-failedOCR('Selected text is still unclear. Take a sharper picture or type the complete ingredients.');
-}
+if(acceptableOCR(best))displayOCR(best);
+else failedOCR('Selected text is still unclear. Take a sharper picture or type the complete ingredients.');
 }catch(e){
 if(validOCRSession(session,barcode))
 failedOCR('Reading failed: '+e.message);
@@ -2297,19 +2219,16 @@ failedOCR('Reading failed: '+e.message);
 };
 $('ingredients').addEventListener('input',()=>{
 if(ocrRejected){
-ocrRejected=false;
-ingredientSource='manual';
+ocrRejected=false;ingredientSource='manual';
 }
 if(ingredientSource==='ocr')$('confirmed').checked=false;
 if(lastResult){
-clearResult();
-setStatus('Needs Verification');
+clearResult();setStatus('Needs Verification');
 }
 });
 $('confirmed').addEventListener('change',()=>{
 if(lastResult){
-clearResult();
-setStatus('Needs Verification');
+clearResult();setStatus('Needs Verification');
 }
 });
 
@@ -2357,10 +2276,7 @@ if(ocrWorker)ocrWorker.terminate().catch(()=>{});
 resetProductData();
 toggleManualEntry(false);
 updateAccountMode();
-
-/* Load the public leaderboard even when nobody is signed in. */
 loadMonthlyLeaderboard();
-
 try{
 if(location.hash.includes('access_token=')){
 await handleAuthReturn();
@@ -2371,7 +2287,7 @@ await restoreAuth();
 $('authMessage').textContent='Authentication: '+e.message;
 }
 })();
-
 </script>
 <script src="verified-vegan-phone-scanner.js"></script>
-</body></html>
+</body>
+</html>
