@@ -51,7 +51,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 .rewardBox span{font-size:13px;color:#617469}
 .steps{background:#f1f7f2;border-radius:12px;padding:12px 18px}
 .steps li{margin:9px 0}
-#cameraPanel,#productDetails,#result,#cropPanel,#ingredientPreview,#allergenPanel,#signedInPanel,#myRewards,#passwordPanel,#adminSection{display:none}
+#cameraPanel,#productDetails,#result,#cropPanel,#ingredientPreview,#allergenPanel,#signedInPanel,#myRewards,#passwordPanel,#adminSection,#adminNotice{display:none}
 #frontInput,#photoInput,#brandDisplay{display:none}
 #authSection{border:2px solid #d7e8dc}
 #adminSection{border:2px solid #126c42}
@@ -69,6 +69,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 .adminCard img{display:block;max-width:200px;max-height:220px;object-fit:contain;margin:10px 0}
 .adminCard .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .adminCard p{white-space:pre-wrap}
+#adminNotice{background:#e7f4ea;border-radius:12px;padding:14px;margin:12px 0;font-weight:600}
 </style>
 </head>
 <body>
@@ -112,7 +113,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <p id="productBarcode" class="muted small"></p>
 <p id="lookupMessage" class="muted" aria-live="polite"></p>
 <p id="autoSaveMessage" class="small muted" aria-live="polite"></p>
-<div class="steps">
+<div id="contributionSteps" class="steps">
 <strong>🏆 Contribute Missing Information & Earn Points</strong>
 <ol>
 <li>Scan a product barcode.</li>
@@ -122,6 +123,9 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <li>Earn points after your contribution is approved.</li>
 </ol>
 <p class="small">Regular scans save automatically and do not earn points. Sign in before contributing to earn rewards.</p>
+</div>
+<div id="adminNotice">
+🛡️ Administrator Mode — You can scan, add pictures and correct product information. Your account does not participate in contributor rewards.
 </div>
 <input id="frontInput" type="file" accept="image/*" capture="environment">
 <button id="takeFront">📸 Take Product Picture</button>
@@ -138,8 +142,8 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 
 <section id="authSection">
 <h2>🏆 Community Rewards</h2>
-<p>Help improve Verified Vegan and earn points for approved contributions.</p>
-<p class="muted">Scanning is free without signing in. Accounts are only for rewards.</p>
+<p id="rewardsIntro">Help improve Verified Vegan and earn points for approved contributions.</p>
+<p id="rewardsDescription" class="muted">Scanning is free without signing in. Accounts are only for rewards.</p>
 <div id="signedOutPanel">
 <h3>Create Account or Log In</h3>
 <label for="authEmail">Email address</label>
@@ -260,7 +264,7 @@ let autoSaveBusy=false,autoSavePromise=null,autoSaveSerial=0;
 let cloudRecordExists=false,contributionBaseline=null;
 let productSession=0,savingContribution=false;
 let adminAuthorized=false,adminBusy=false,adminCheckSerial=0;
-let adminReviewSignature=null;
+let adminAccessChecking=false;
 
 function readJSON(key,fallback){
 try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}
@@ -432,35 +436,57 @@ const text=await response.text();
 return text?JSON.parse(text):null;
 }
 
-/* ACCOUNTS */
+/* ACCOUNTS AND ADMINISTRATOR MODE */
+
+function updateAccountMode(){
+const signedIn=!!currentUser;
+const admin=signedIn&&adminAuthorized;
+$('signedOutPanel').style.display=signedIn?'none':'block';
+$('signedInPanel').style.display=signedIn?'block':'none';
+$('myRewards').style.display=signedIn&&!admin?'block':'none';
+$('adminSection').style.display=admin?'block':'none';
+$('refreshRewards').style.display=admin?'none':'block';
+$('contributionSteps').style.display=admin?'none':'block';
+$('adminNotice').style.display=admin?'block':'none';
+$('authSection').querySelector('h2').textContent=
+admin?'🛡️ Administrator Account':'🏆 Community Rewards';
+$('rewardsIntro').textContent=admin?
+'Manage Verified Vegan and review community contributions.':
+'Help improve Verified Vegan and earn points for approved contributions.';
+$('rewardsDescription').textContent=admin?
+'Administrator accounts do not earn points or participate in rewards.':
+'Scanning is free without signing in. Accounts are only for rewards.';
+$('welcomeUser').textContent=signedIn?
+'Signed in: '+(currentUser.email||'Contributor')+
+(admin?' — Administrator':''):'';
+$('save').textContent=admin?
+'💾 Save Scan — Administrator':'💾 Save Scan / Submit Contribution';
+if(!signedIn){
+$('earnedPoints').textContent='0';
+$('pendingPoints').textContent='0';
+$('contributionHistory').replaceChildren();
+$('adminPending').replaceChildren();
+}
+}
 
 function saveSession(session){
+const oldId=currentUser?.id||null;
 authSession=session;
 try{
 if(session)localStorage.setItem(AUTHKEY,JSON.stringify(session));
 else localStorage.removeItem(AUTHKEY);
 }catch(e){}
 currentUser=session?.user||null;
-updateAuthUI();
-}
-function updateAuthUI(){
-const signedIn=!!currentUser;
-$('signedOutPanel').style.display=signedIn?'none':'block';
-$('signedInPanel').style.display=signedIn?'block':'none';
-$('myRewards').style.display=signedIn?'block':'none';
-$('welcomeUser').textContent=signedIn?'Signed in: '+(currentUser.email||'Contributor'):'';
-if(!signedIn){
-$('earnedPoints').textContent='0';
-$('pendingPoints').textContent='0';
-$('contributionHistory').replaceChildren();
+const newId=currentUser?.id||null;
+if(oldId!==newId){
 adminAuthorized=false;
 ++adminCheckSerial;
-$('adminSection').style.display='none';
 $('adminPending').replaceChildren();
-}else{
-checkAdminAccess();
 }
+updateAccountMode();
+if(newId&&oldId!==newId)checkAdminAccess();
 }
+
 async function authCall(endpoint,body){
 const db=requireDB();
 const response=await fetch(db.url+'/auth/v1/'+endpoint,{
@@ -483,8 +509,7 @@ try{
 const data=await authCall('signup?redirect_to='+encodeURIComponent(authRedirect()),{email,password});
 if(data.access_token){
 saveSession(data);
-try{await ensureProfile()}catch(e){}
-await loadRewards();
+await initializeSignedInAccount();
 $('authMessage').textContent='Account created and signed in.';
 }else $('authMessage').textContent='Check your email to confirm your account, then log in.';
 }catch(e){$('authMessage').textContent='Sign up failed: '+e.message}
@@ -497,8 +522,7 @@ email:$('authEmail').value.trim(),
 password:$('authPassword').value
 });
 saveSession(data);
-try{await ensureProfile()}catch(e){}
-await loadRewards();
+await initializeSignedInAccount();
 $('authMessage').textContent='Signed in successfully.';
 }catch(e){$('authMessage').textContent='Log in failed: '+e.message}
 };
@@ -555,7 +579,7 @@ throw Error('Session expired. Please log in again.');
 return authRefreshPromise;
 }
 async function userToken(){
-if(!authSession?.access_token||!currentUser)throw Error('Log in to earn points.');
+if(!authSession?.access_token||!currentUser)throw Error('Please log in.');
 const expiry=authSession.expires_at||
 (authSession.expires_in&&authSession._saved_at?
 authSession._saved_at+authSession.expires_in:null);
@@ -578,8 +602,9 @@ if(response.status===204)return null;
 const text=await response.text();
 return text?JSON.parse(text):null;
 }
+
 async function ensureProfile(){
-if(!currentUser)return;
+if(!currentUser||adminAuthorized)return;
 const id=currentUser.id;
 const rows=await userRequest(
 '/rest/v1/vv_profiles?user_id=eq.'+encodeURIComponent(id)+'&select=user_id'
@@ -591,20 +616,33 @@ body:JSON.stringify({user_id:id,show_on_leaderboard:false})
 });
 }
 }
-async function loadRewards(){
+
+async function initializeSignedInAccount(){
 if(!currentUser)return;
+await checkAdminAccess();
+if(adminAuthorized)return;
+try{await ensureProfile()}catch(e){
+console.warn('Profile setup:',e.message);
+}
+await loadRewards();
+}
+
+async function loadRewards(){
+if(!currentUser||adminAuthorized)return;
 $('rewardMessage').textContent='Loading rewards…';
 try{
 const id=currentUser.id;
 const totals=await userRequest(
 '/rest/v1/vv_my_rewards?user_id=eq.'+encodeURIComponent(id)+'&select=*'
 );
+if(adminAuthorized)return;
 $('earnedPoints').textContent=totals[0]?.earned_points??0;
 $('pendingPoints').textContent=totals[0]?.pending_points??0;
 const contributions=await userRequest(
 '/rest/v1/vv_contributions?user_id=eq.'+encodeURIComponent(id)+
 '&select=barcode,contribution_type,points,status,created_at&order=created_at.desc&limit=30'
 );
+if(adminAuthorized)return;
 const box=$('contributionHistory');
 box.replaceChildren();
 if(!contributions.length)box.textContent='No contributions yet.';
@@ -616,7 +654,9 @@ div.textContent=String(c.contribution_type||'Contribution').replace(/_/g,' ')+
 box.append(div);
 });
 $('rewardMessage').textContent='Points are awarded after verification.';
-}catch(e){$('rewardMessage').textContent='Rewards unavailable: '+e.message}
+}catch(e){
+if(!adminAuthorized)$('rewardMessage').textContent='Rewards unavailable: '+e.message;
+}
 }
 $('refreshRewards').onclick=loadRewards;
 
@@ -631,10 +671,10 @@ if(!response.ok)throw Error('Session invalid');
 currentUser=await response.json();
 authSession.user=currentUser;
 saveSession(authSession);
-await loadRewards();
+await initializeSignedInAccount();
 }catch(e){
 saveSession(null);
-$('authMessage').textContent='Please log in to access rewards.';
+$('authMessage').textContent='Please log in to access your account.';
 }
 }
 
@@ -644,26 +684,42 @@ async function checkAdminAccess(){
 const userId=currentUser?.id;
 const serial=++adminCheckSerial;
 adminAuthorized=false;
-$('adminSection').style.display='none';
-if(!userId)return;
+adminAccessChecking=!!userId;
+updateAccountMode();
+if(!userId)return false;
 try{
 const rows=await userRequest(
 '/rest/v1/vv_admins?user_id=eq.'+
 encodeURIComponent(userId)+'&select=user_id&limit=1'
 );
-if(serial!==adminCheckSerial||currentUser?.id!==userId)return;
+if(serial!==adminCheckSerial||currentUser?.id!==userId)return false;
 adminAuthorized=Array.isArray(rows)&&rows.some(r=>r.user_id===userId);
-if(adminAuthorized){
-$('adminSection').style.display='block';
-await loadAdminPending();
-}
+updateAccountMode();
+if(adminAuthorized)await loadAdminPending();
+return adminAuthorized;
 }catch(e){
 if(serial===adminCheckSerial){
 adminAuthorized=false;
-$('adminSection').style.display='none';
-console.warn('Administrator access unavailable:',e.message);
+updateAccountMode();
+$('authMessage').textContent=
+'Administrator check unavailable: '+e.message;
+}
+return false;
+}finally{
+if(serial===adminCheckSerial)adminAccessChecking=false;
 }
 }
+
+async function confirmAccountMode(){
+if(!currentUser)return false;
+if(adminAccessChecking){
+for(let i=0;i<30&&adminAccessChecking;i++){
+await new Promise(resolve=>setTimeout(resolve,100));
+}
+}
+if(!adminAccessChecking)await checkAdminAccess();
+if(adminAccessChecking)throw Error('Administrator verification is still loading. Try again.');
+return adminAuthorized;
 }
 
 function adminText(parent,tag,value){
@@ -686,13 +742,14 @@ const rows=await userRequest(
 );
 if(!currentUser||currentUser.id!==userId||!adminAuthorized)return;
 if(!Array.isArray(rows))throw Error('Unexpected contribution response.');
-if(!rows.length){
-$('adminMessage').textContent='✅ No pending contributions.';
+const reviewable=rows.filter(c=>c.user_id!==userId);
+if(!reviewable.length){
+$('adminMessage').textContent='✅ No contributions from other users awaiting review.';
 return;
 }
 $('adminMessage').textContent=
-rows.length+' pending contribution(s) awaiting review.';
-for(const c of rows){
+reviewable.length+' pending contribution(s) awaiting review.';
+for(const c of reviewable){
 const card=document.createElement('div');
 card.className='adminCard';
 adminText(card,'h3',String(c.contribution_type||'Contribution').replace(/_/g,' '));
@@ -731,6 +788,10 @@ $('adminMessage').textContent='Unable to load reviews: '+e.message;
 
 async function reviewContribution(contribution,approve){
 if(adminBusy||!adminAuthorized||!currentUser)return;
+if(contribution.user_id===currentUser.id){
+$('adminMessage').textContent='Administrators cannot approve their own contributions.';
+return;
+}
 if(contribution.id===undefined||contribution.id===null){
 $('adminMessage').textContent='This contribution has no review ID.';
 return;
@@ -742,29 +803,24 @@ if(!confirm('Are you sure you want to '+action+
 adminBusy=true;
 $('refreshAdmin').disabled=true;
 $('adminMessage').textContent='Submitting administrator decision…';
+let decisionMessage='';
 try{
-/*
-The review RPC must accept these parameter names.
-If the installed function uses different parameter names,
-Supabase will return an error instead of silently approving.
-*/
-const result=await userRequest('/rest/v1/rpc/vv_review_contribution',{
+await userRequest('/rest/v1/rpc/vv_review_contribution',{
 method:'POST',
 body:JSON.stringify({
 p_id:contribution.id,
 p_approve:approve
 })
 });
-if(result===false)throw Error('The review function did not approve this action.');
-$('adminMessage').textContent=approve?
+decisionMessage=approve?
 '✅ Contribution approved.':'Contribution rejected.';
 }catch(e){
-$('adminMessage').textContent='Review failed: '+e.message;
+decisionMessage='Review failed: '+e.message;
 }finally{
 adminBusy=false;
 $('refreshAdmin').disabled=false;
 await loadAdminPending();
-if(currentUser)await loadRewards();
+$('adminMessage').textContent=decisionMessage+' '+$('adminMessage').textContent;
 }
 }
 $('refreshAdmin').onclick=loadAdminPending;
@@ -1244,6 +1300,10 @@ if(!response.ok)throw Error(await responseError(response));
 return db.url+'/storage/v1/object/public/product-images/'+encodeURIComponent(filename);
 }
 async function submitContribution(type,barcode,imageUrl,ingredients){
+if(!currentUser)throw Error('Sign in to earn contributor rewards.');
+if(await confirmAccountMode()){
+throw Error('Administrator accounts cannot submit reward contributions.');
+}
 const description=type==='product_photo'?
 'Contributed missing product packaging picture':
 type==='ingredients'?'Contributed missing ingredient list':
@@ -1297,6 +1357,7 @@ savingContribution=true;button.disabled=true;
 button.textContent='Saving to cloud…';
 $('saveMessage').textContent='Checking cloud record…';
 try{
+const isAdmin=currentUser?await confirmAccountMode():false;
 if(autoSavePromise)await autoSavePromise;
 if(session!==productSession)throw Error('Product changed. Save cancelled.');
 const record={
@@ -1337,6 +1398,30 @@ vegan_reason:record.decision_reasons.join('; ')
 Object.entries(nutritionPayload()).forEach(([key,value])=>{
 if(value!==null)payload[key]=value;
 });
+
+const existingIngredients=clean(existing?.ingredients);
+const proposedIngredients=clean(record.ingredient_text);
+const changingVerifiedIngredients=!!existing&&!!existingIngredients&&
+proposedIngredients!==existingIngredients;
+const changingVerifiedStatus=!!existing&&
+normalizeStatus(existing.vegan_status)!=='Needs Verification'&&
+record.vegan_result!==normalizeStatus(existing.vegan_status);
+
+/*
+Administrator corrections go through the existing products
+database permissions. They do not generate reward submissions.
+If Supabase denies the edit, the app reports the error rather
+than claiming that the correction was saved.
+*/
+if(existing&&(changingVerifiedIngredients||changingVerifiedStatus)&&!isAdmin){
+if(!currentUser)throw Error(
+'Sign in to submit a correction for review. Existing verified data was not changed.'
+);
+await submitContribution('correction',barcode,null,record.ingredient_text);
+rewardText=' Correction submitted for review. Points pending approval.';
+cloudSaved=true;
+await loadRewards();
+}else{
 if(newPhoto){
 uploadedPhoto=await uploadProductPhoto(db,selectedPhotoFile,barcode);
 payload.image_url=uploadedPhoto;
@@ -1346,33 +1431,26 @@ payload.image_url=currentPhoto;
 if(session!==productSession)throw Error('Product changed. Save cancelled.');
 
 if(existing){
-const existingIngredients=clean(existing.ingredients);
-const proposedIngredients=clean(record.ingredient_text);
-const existingImage=clean(existing.image_url);
-const changingVerifiedIngredients=!!existingIngredients&&
-proposedIngredients!==existingIngredients;
-const changingVerifiedStatus=
-normalizeStatus(existing.vegan_status)!=='Needs Verification'&&
-record.vegan_result!==normalizeStatus(existing.vegan_status);
-
-if(changingVerifiedIngredients||changingVerifiedStatus){
-if(!currentUser)throw Error(
-'Sign in to submit a correction for review. Existing verified data was not changed.'
-);
-await submitContribution('correction',barcode,uploadedPhoto||null,record.ingredient_text);
-rewardText=' Correction submitted for review. Points pending approval.';
-cloudSaved=true;
-await loadRewards();
-}else{
 const patch={};
-if(!existingIngredients&&proposedIngredients){
+if(isAdmin&&(changingVerifiedIngredients||changingVerifiedStatus)){
+patch.ingredients=proposedIngredients||null;
+patch.vegan_status=record.vegan_result;
+patch.vegan_reason=payload.vegan_reason;
+}else if(!existingIngredients&&proposedIngredients){
 patch.ingredients=proposedIngredients;
 patch.vegan_status=record.vegan_result;
 patch.vegan_reason=payload.vegan_reason;
 }
-if(!existingImage&&payload.image_url)patch.image_url=payload.image_url;
+if(!existing.image_url&&payload.image_url)patch.image_url=payload.image_url;
+if(isAdmin){
+if(payload.brand!==clean(existing.brand))patch.brand=payload.brand;
+if(payload.product_name!==clean(existing.product_name))
+patch.product_name=payload.product_name;
+}else{
 if(!existing.brand&&payload.brand)patch.brand=payload.brand;
-if(!existing.product_name&&payload.product_name)patch.product_name=payload.product_name;
+if(!existing.product_name&&payload.product_name)
+patch.product_name=payload.product_name;
+}
 for(const key of [
 'protein_100g','carb_100g','fat_100g',
 'sugar_100g','fiber_100g','salt_100g','serving_size'
@@ -1386,17 +1464,21 @@ const saved=await apiRequest('/rest/v1/products?id=eq.'+encodeURIComponent(id),{
 method:'PATCH',headers:{Prefer:'return=representation'},
 body:JSON.stringify(patch)
 });
-if(saved?.[0])loadedCloudId=saved[0].id;
+if(!saved?.length)throw Error(
+'Database did not confirm the update. Check Supabase product permissions.'
+);
+loadedCloudId=saved[0].id;
 }
 cloudSaved=true;
-}
 }else{
 const saved=await apiRequest('/rest/v1/products',{
 method:'POST',headers:{Prefer:'return=representation'},
 body:JSON.stringify(payload)
 });
-if(saved?.[0])loadedCloudId=saved[0].id;
+if(!saved?.length)throw Error('Database did not confirm the new product.');
+loadedCloudId=saved[0].id;
 cloudSaved=true;
+}
 }
 
 if(cloudSaved&&newPhoto&&uploadedPhoto){
@@ -1404,7 +1486,7 @@ showPhoto(uploadedPhoto,'Supabase cloud picture');
 releaseSelectedPhoto();frontInput.value='';
 $('frontMessage').textContent='Picture uploaded to Supabase.';
 }
-if(cloudSaved&&currentUser&&!rewardText){
+if(cloudSaved&&currentUser&&!isAdmin&&!rewardText){
 let type=null;
 if(photoContribution)type='product_photo';
 else if(newIngredients)type='ingredients';
@@ -1421,16 +1503,21 @@ await loadRewards();
 }
 if(!currentUser&&hasContribution)
 rewardText+=' Sign in before contributing to earn rewards.';
+if(isAdmin)rewardText=' Administrator save — no reward points.';
 if(cloudSaved){
 originalIngredients=record.ingredient_text;
+const refreshed=await findCloudRecord(barcode);
+if(refreshed.record)rememberBaseline(refreshed.record);
 }
-$('saveMessage').textContent='✅ Saved to Supabase cloud.'+rewardText;
+$('saveMessage').textContent=
+(cloudSaved?'✅ Saved to Supabase cloud.':'Save not confirmed.')+rewardText;
 }catch(e){
 $('saveMessage').textContent='❌ Save failed: '+e.message;
 }finally{
 savingContribution=false;
 button.disabled=false;
-button.textContent='💾 Save Scan / Submit Contribution';
+button.textContent=adminAuthorized?
+'💾 Save Scan — Administrator':'💾 Save Scan / Submit Contribution';
 }
 };
 
@@ -1896,8 +1983,7 @@ $('passwordPanel').style.display='block';
 $('authMessage').textContent='Enter your new password below.';
 return;
 }
-try{await ensureProfile()}catch(e){}
-await loadRewards();
+await initializeSignedInAccount();
 $('authMessage').textContent='Email confirmed. You are signed in!';
 }
 
@@ -1916,6 +2002,7 @@ if(ocrWorker)ocrWorker.terminate().catch(()=>{});
 (async()=>{
 resetProductData();
 toggleManualEntry(false);
+updateAccountMode();
 try{
 if(location.hash.includes('access_token=')){
 await handleAuthReturn();
