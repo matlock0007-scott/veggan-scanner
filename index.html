@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -70,6 +69,9 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 .adminCard .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .adminCard p{white-space:pre-wrap}
 #adminNotice{background:#e7f4ea;border-radius:12px;padding:14px;margin:12px 0;font-weight:600}
+#contactSupport{text-align:center}
+#contactSupport a{color:#126c42;font-weight:700;overflow-wrap:anywhere}
+#contactSupport .copyright{font-size:13px;color:#617469;margin-top:20px}
 </style>
 </head>
 <body>
@@ -231,12 +233,21 @@ Hold the camera straight, fill the picture with the ingredient label, avoid glar
 <button id="save">💾 Save Scan / Submit Contribution</button>
 <p id="saveMessage" class="muted" aria-live="polite"></p>
 </section>
+
+<section id="contactSupport">
+<h2>✉️ Contact & Support</h2>
+<p>Have a question, suggestion, or product correction? We're here to help!</p>
+<p>Email us at<br>
+<a href="mailto:verifiedveganhelp@gmail.com">verifiedveganhelp@gmail.com</a>
+</p>
+<p>Your feedback helps us make Verified Vegan more accurate, reliable, and useful for everyone.</p>
+<p class="copyright">© 2026 Verified Vegan. Helping animals, one product at a time. 🌱</p>
+</section>
+
 </main>
 
 <script>
 'use strict';
-
-/* VERIFIED VEGAN — COMPLETE APPLICATION */
 
 const SUPABASE_URL='https://bluaqqfcsjudoiaxkbjn.supabase.co';
 const SUPABASE_KEY='sb_publishable_ed4oFchBc40deLLF5Ws9CQ_MVz_sxog';
@@ -409,7 +420,7 @@ $('barcode').addEventListener('keydown',e=>{
 if(e.key==='Enter'){e.preventDefault();lookupProduct()}
 });
 
-/* SUPABASE REQUESTS — AUTHENTICATED ADMIN SUPPORT */
+/* SUPABASE REQUESTS */
 
 function headers(db,token=null){
 const h={'apikey':db.key,'Content-Type':'application/json'};
@@ -1251,7 +1262,7 @@ displayProductImages(barcode);photoWasMissing=true;
 }
 $('lookup').onclick=lookupProduct;
 
-/* STORAGE UPLOAD — AUTHENTICATED AND STAGE-SPECIFIC ERRORS */
+/* STORAGE UPLOAD */
 
 async function uploadProductPhoto(db,file,barcode){
 if(!file)throw Error('No product picture selected.');
@@ -1318,7 +1329,7 @@ showResult(classify(parsed.ingredients));
 $('result').scrollIntoView({behavior:'smooth',block:'start'});
 };
 
-/* COMPLETE SAVE SCAN — ADMINISTRATOR PICTURE REPLACEMENT */
+/* SAVE SCAN */
 
 $('save').onclick=async()=>{
 if(savingContribution)return;
@@ -1397,12 +1408,6 @@ newPhoto||ingredientChanged||metadataChanged||statusChanged;
 
 let rewardText='';
 
-/*
-Existing products:
-Regular contributors submit proposed changes for review.
-Only an authorized administrator directly updates records.
-*/
-
 if(existing&&!isAdmin){
 if(!hasContribution){
 $('saveMessage').textContent='✅ Product already saved. No changes needed.';
@@ -1451,12 +1456,6 @@ await loadRewards();
 
 }else{
 
-/*
-Upload the picture first.
-Storage failure is reported separately from database failure.
-Do not discard the selected photo if either operation fails.
-*/
-
 if(newPhoto){
 $('saveMessage').textContent='Uploading picture to Supabase Storage…';
 uploadedPhoto=await uploadProductPhoto(db,selectedPhotoFile,barcode);
@@ -1476,7 +1475,6 @@ if(!isAdmin){
 throw Error('Existing product edits require administrator approval.');
 }
 
-/* Administrator may replace existing pictures. */
 if(uploadedPhoto){
 patch.image_url=uploadedPhoto;
 }
@@ -1544,12 +1542,6 @@ rememberBaseline(existing);
 databaseSaved=true;
 
 }else{
-
-/*
-New products:
-Use authenticated insertion when signed in.
-Otherwise use the existing public insertion policy.
-*/
 
 $('saveMessage').textContent='Creating new Supabase product…';
 
