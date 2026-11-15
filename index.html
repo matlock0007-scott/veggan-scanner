@@ -72,6 +72,44 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 #contactSupport{text-align:center}
 #contactSupport a{color:#126c42;font-weight:700;overflow-wrap:anywhere}
 #contactSupport .copyright{font-size:13px;color:#617469;margin-top:20px}
+
+/* MONTHLY LEADERBOARD */
+#leaderboardSection{border:2px solid #d7e8dc}
+.leaderboardHeading{text-align:center}
+.leaderboardHeading h2{font-size:23px}
+#leaderboardMonth{font-weight:700;color:#126c42}
+#leaderboardList{margin:15px 0}
+.leaderboardEntry{
+display:grid;
+grid-template-columns:55px minmax(0,1fr) auto;
+align-items:center;
+gap:10px;
+padding:15px 10px;
+border-radius:12px;
+margin:9px 0;
+background:#f1f7f2;
+border:1px solid #d7e8dc
+}
+.leaderboardEntry.first{background:#fff6d8;border-color:#e6cf78}
+.leaderboardEntry.second{background:#f0f2f5;border-color:#d4d8df}
+.leaderboardEntry.third{background:#f9eee4;border-color:#e7c8a9}
+.leaderboardMedal{font-size:29px;text-align:center}
+.leaderboardPerson{min-width:0;overflow-wrap:anywhere}
+.leaderboardPerson strong{display:block;font-size:16px}
+.leaderboardPerson span{display:block;font-size:12px;color:#617469;margin-top:3px}
+.leaderboardPoints{text-align:right;font-weight:800;color:#126c42;font-size:19px}
+.leaderboardPoints span{display:block;font-size:11px;font-weight:400;color:#617469}
+#leaderboardMessage{text-align:center;overflow-wrap:anywhere}
+.leaderboardSponsor{
+background:#f1f7f2;
+border-radius:12px;
+padding:16px;
+text-align:center;
+margin-top:15px
+}
+.leaderboardSponsor strong{display:block;font-size:18px;color:#126c42}
+.leaderboardSponsor p{font-size:14px;color:#617469;margin-bottom:0}
+#leaderboardUpdated{font-size:12px;text-align:center;color:#617469}
 </style>
 </head>
 <body>
@@ -189,6 +227,33 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <div id="contributionHistory"></div>
 </section>
 
+<!-- PUBLIC MONTHLY LEADERBOARD -->
+<section id="leaderboardSection">
+<div class="leaderboardHeading">
+<h2>🏆 Monthly Leaderboard</h2>
+<p id="leaderboardMonth">Loading current month…</p>
+<p class="muted small">Top 3 Verified Vegan contributors</p>
+</div>
+
+<div id="leaderboardList" aria-live="polite"></div>
+<p id="leaderboardMessage" class="muted" aria-live="polite">Loading leaderboard…</p>
+
+<button id="refreshLeaderboard" class="secondary">
+🔄 Refresh Monthly Leaderboard
+</button>
+<p id="leaderboardUpdated"></p>
+
+<div class="leaderboardSponsor">
+<strong>🎁 Prizes Coming Soon!</strong>
+<p>Monthly prizes are awaiting sponsors. No prizes are currently being awarded or promised.</p>
+<p>Keep helping animals by improving product information. Only approved contributions count toward the rankings.</p>
+</div>
+
+<p class="small muted" style="text-align:center;margin-top:15px">
+Rankings reset for each calendar month. Administrator accounts are excluded. Rankings are provisional until the month ends.
+</p>
+</section>
+
 <section>
 <h2>Ingredients</h2>
 <p>Photograph the ingredients or enter them manually.</p>
@@ -276,6 +341,13 @@ let cloudRecordExists=false,contributionBaseline=null;
 let productSession=0,savingContribution=false;
 let adminAuthorized=false,adminBusy=false,adminCheckSerial=0;
 let adminAccessChecking=false;
+
+/* MONTHLY LEADERBOARD STATE */
+
+let leaderboardLoading=false;
+let leaderboardRequestSerial=0;
+let leaderboardLastMonth='';
+let leaderboardRefreshTime=0;
 
 function readJSON(key,fallback){
 try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}
@@ -445,6 +517,187 @@ if(response.status===204)return null;
 const text=await response.text();
 return text?JSON.parse(text):null;
 }
+
+/* MONTHLY LEADERBOARD */
+
+function leaderboardMonthKey(date=new Date()){
+const year=date.getFullYear();
+const month=String(date.getMonth()+1).padStart(2,'0');
+return year+'-'+month+'-01';
+}
+
+function leaderboardMonthName(date=new Date()){
+return date.toLocaleDateString('en-US',{
+month:'long',
+year:'numeric'
+});
+}
+
+function makeLeaderboardElement(tag,className,textValue){
+const element=document.createElement(tag);
+if(className)element.className=className;
+if(textValue!==undefined)element.textContent=String(textValue);
+return element;
+}
+
+function displayLeaderboard(rows){
+const list=$('leaderboardList');
+list.replaceChildren();
+
+if(!Array.isArray(rows)||rows.length===0){
+$('leaderboardMessage').textContent=
+'No approved contributions yet this month. Be the first to help!';
+return;
+}
+
+const topThree=rows
+.filter(row=>row&&Number.isFinite(Number(row.approved_points)))
+.sort((a,b)=>{
+const points=Number(b.approved_points)-Number(a.approved_points);
+if(points!==0)return points;
+const contributions=
+Number(b.approved_contributions)-Number(a.approved_contributions);
+if(contributions!==0)return contributions;
+return Number(a.rank_number)-Number(b.rank_number);
+})
+.slice(0,3);
+
+if(!topThree.length){
+$('leaderboardMessage').textContent=
+'No approved contributions yet this month.';
+return;
+}
+
+const medals=['🥇','🥈','🥉'];
+const classes=['first','second','third'];
+
+topThree.forEach((entry,index)=>{
+const card=makeLeaderboardElement(
+'div','leaderboardEntry '+classes[index]
+);
+
+const medal=makeLeaderboardElement(
+'div','leaderboardMedal',medals[index]
+);
+
+const person=makeLeaderboardElement('div','leaderboardPerson');
+const name=makeLeaderboardElement(
+'strong','',
+clean(entry.contributor_name)||'Vegan Contributor'
+);
+
+const contributionCount=Math.max(
+0,Number(entry.approved_contributions)||0
+);
+
+const detail=makeLeaderboardElement(
+'span','',
+contributionCount+' approved contribution'+
+(contributionCount===1?'':'s')
+);
+
+person.append(name,detail);
+
+const points=makeLeaderboardElement('div','leaderboardPoints');
+const approvedPoints=Math.max(
+0,Number(entry.approved_points)||0
+);
+
+const pointValue=makeLeaderboardElement(
+'div','',approvedPoints.toLocaleString()
+);
+const pointLabel=makeLeaderboardElement('span','','points');
+
+points.append(pointValue,pointLabel);
+card.append(medal,person,points);
+list.append(card);
+});
+
+$('leaderboardMessage').textContent=
+'Current standings based on approved contributions.';
+}
+
+async function loadMonthlyLeaderboard(){
+if(leaderboardLoading)return;
+
+leaderboardLoading=true;
+const request=++leaderboardRequestSerial;
+const button=$('refreshLeaderboard');
+button.disabled=true;
+
+const monthKey=leaderboardMonthKey();
+leaderboardLastMonth=monthKey;
+
+$('leaderboardMonth').textContent=leaderboardMonthName();
+$('leaderboardMessage').textContent='Loading approved monthly points…';
+
+try{
+const rows=await apiRequest(
+'/rest/v1/rpc/vv_monthly_leaderboard',
+{
+method:'POST',
+body:JSON.stringify({p_month:monthKey})
+}
+);
+
+if(request!==leaderboardRequestSerial)return;
+
+if(!Array.isArray(rows)){
+throw Error('Unexpected leaderboard response from Supabase.');
+}
+
+displayLeaderboard(rows);
+
+leaderboardRefreshTime=Date.now();
+
+$('leaderboardUpdated').textContent=
+'Last updated: '+new Date(leaderboardRefreshTime)
+.toLocaleString('en-US',{
+month:'short',
+day:'numeric',
+hour:'numeric',
+minute:'2-digit'
+});
+
+}catch(e){
+if(request!==leaderboardRequestSerial)return;
+
+$('leaderboardList').replaceChildren();
+
+$('leaderboardMessage').textContent=
+'Leaderboard unavailable: '+e.message;
+
+$('leaderboardUpdated').textContent=
+'Unable to refresh rankings. Try again.';
+}finally{
+if(request===leaderboardRequestSerial){
+leaderboardLoading=false;
+button.disabled=false;
+}
+}
+}
+
+$('refreshLeaderboard').onclick=loadMonthlyLeaderboard;
+
+function refreshLeaderboardAfterReview(){
+loadMonthlyLeaderboard().catch(e=>{
+console.warn('Leaderboard refresh:',e.message);
+});
+}
+
+document.addEventListener('visibilitychange',()=>{
+if(document.visibilityState!=='visible')return;
+
+const monthChanged=
+leaderboardLastMonth!==leaderboardMonthKey();
+
+const stale=
+Date.now()-leaderboardRefreshTime>5*60*1000;
+
+if(monthChanged||stale){
+loadMonthlyLeaderboard();
+}
+});
 
 /* AUTHENTICATION */
 
@@ -662,7 +915,10 @@ $('rewardMessage').textContent='Points are awarded after verification.';
 if(!adminAuthorized)$('rewardMessage').textContent='Rewards unavailable: '+e.message;
 }
 }
-$('refreshRewards').onclick=loadRewards;
+$('refreshRewards').onclick=async()=>{
+await loadRewards();
+await loadMonthlyLeaderboard();
+};
 async function restoreAuth(){
 const saved=readJSON(AUTHKEY,null);
 if(!saved?.access_token)return;
@@ -793,18 +1049,21 @@ adminBusy=true;
 $('refreshAdmin').disabled=true;
 $('adminMessage').textContent='Submitting administrator decision…';
 let decisionMessage='';
+let reviewSucceeded=false;
 try{
 await userRequest('/rest/v1/rpc/vv_review_contribution',{
 method:'POST',
 body:JSON.stringify({p_id:contribution.id,p_approve:approve})
 });
 decisionMessage=approve?'✅ Contribution approved.':'Contribution rejected.';
+reviewSucceeded=true;
 }catch(e){decisionMessage='Review failed: '+e.message}
 finally{
 adminBusy=false;
 $('refreshAdmin').disabled=false;
 await loadAdminPending();
 $('adminMessage').textContent=decisionMessage+' '+$('adminMessage').textContent;
+if(reviewSucceeded)refreshLeaderboardAfterReview();
 }
 }
 $('refreshAdmin').onclick=loadAdminPending;
@@ -2087,18 +2346,26 @@ const preview=$('ingredientPreview');
 if(preview.src.startsWith('blob:'))URL.revokeObjectURL(preview.src);
 if(ocrWorker)ocrWorker.terminate().catch(()=>{});
 });
+
 (async()=>{
 resetProductData();
 toggleManualEntry(false);
 updateAccountMode();
+
+/* Load the public leaderboard even when nobody is signed in. */
+loadMonthlyLeaderboard();
+
 try{
 if(location.hash.includes('access_token=')){
 await handleAuthReturn();
 }else{
 await restoreAuth();
 }
-}catch(e){$('authMessage').textContent='Authentication: '+e.message}
+}catch(e){
+$('authMessage').textContent='Authentication: '+e.message;
+}
 })();
+
 </script>
 </body>
 </html>
