@@ -72,6 +72,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 </header>
 <main>
 
+<!-- FIRST: BARCODE SCANNER -->
 <section id="scannerSection">
 <h2>📷 Scan a Barcode</h2>
 <button id="startCamera">Start Barcode Scanner</button>
@@ -85,6 +86,43 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <p id="lookupMessage" class="muted"></p>
 </section>
 
+<!-- SECOND: PRODUCT DETAILS -->
+<section id="productDetails">
+<h2>Product Details</h2>
+<div id="brandDisplay"></div>
+<div class="productTop">
+<div class="photoBox">
+<img id="productPhoto" alt="Product packaging" hidden>
+<span id="photoPlaceholder">Product picture appears here</span>
+<span id="photoSource"></span>
+</div>
+<div id="productStatus" class="pending" aria-live="polite">Scan a product</div>
+</div>
+<div class="steps">
+<strong>📸 Missing a Product Picture? Earn Points!</strong>
+<ol>
+<li>Scan the product barcode.</li>
+<li>Tap <strong>Take Product Picture</strong>.</li>
+<li>Photograph the front of the package.</li>
+<li>Tap <strong>Save Scan</strong>.</li>
+<li>Earn 10 points after your picture is approved!</li>
+</ol>
+<p class="small">Sign in for rewards. Product scanning remains free.</p>
+</div>
+<input id="frontInput" type="file" accept="image/*" capture="environment">
+<button id="takeFront">📸 Take Product Picture</button>
+<button id="chooseFront" class="secondary">Choose Product Picture From Gallery</button>
+<p id="frontMessage" class="muted">Add a product picture if needed.</p>
+<p id="photoMessage"></p>
+<label for="productName">Product name</label>
+<input id="productName" placeholder="Product name">
+<label for="brand">Brand</label>
+<input id="brand" placeholder="Brand">
+<h2>Nutrition Facts</h2>
+<div id="nutrition" class="muted">Nutrition information appears here when available.</div>
+</section>
+
+<!-- THIRD: COMMUNITY REWARDS -->
 <section id="authSection">
 <h2>🏆 Community Rewards</h2>
 <p>Help improve Verified Vegan and earn points for approved contributions.</p>
@@ -129,41 +167,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <div id="contributionHistory"></div>
 </section>
 
-<section>
-<h2>Product Details</h2>
-<div id="brandDisplay"></div>
-<div class="productTop">
-<div class="photoBox">
-<img id="productPhoto" alt="Product packaging" hidden>
-<span id="photoPlaceholder">Product picture appears here</span>
-<span id="photoSource"></span>
-</div>
-<div id="productStatus" class="pending" aria-live="polite">Scan a product</div>
-</div>
-<div class="steps">
-<strong>📸 Missing a Product Picture? Earn Points!</strong>
-<ol>
-<li>Scan the product barcode.</li>
-<li>Tap <strong>Take Product Picture</strong>.</li>
-<li>Photograph the front of the package.</li>
-<li>Tap <strong>Save Scan</strong>.</li>
-<li>Earn 10 points after your picture is approved!</li>
-</ol>
-<p class="small">Sign in for rewards. Product scanning remains free.</p>
-</div>
-<input id="frontInput" type="file" accept="image/*" capture="environment">
-<button id="takeFront">📸 Take Product Picture</button>
-<button id="chooseFront" class="secondary">Choose Product Picture From Gallery</button>
-<p id="frontMessage" class="muted">Add a product picture if needed.</p>
-<p id="photoMessage"></p>
-<label for="productName">Product name</label>
-<input id="productName" placeholder="Product name">
-<label for="brand">Brand</label>
-<input id="brand" placeholder="Brand">
-<h2>Nutrition Facts</h2>
-<div id="nutrition" class="muted">Nutrition information appears here when available.</div>
-</section>
-
+<!-- FOURTH: INGREDIENTS -->
 <section>
 <h2>Ingredients</h2>
 <p>Take a clear picture of the ingredient list, or enter the ingredients manually.</p>
@@ -194,6 +198,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <button id="check">🌱 Verify Ingredients</button>
 </section>
 
+<!-- FIFTH: VERIFICATION AND SAVE -->
 <section id="result">
 <h2>Verification Details</h2>
 <p id="explanation"></p>
@@ -204,6 +209,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <p id="saveMessage" class="muted" aria-live="polite"></p>
 </section>
 
+<!-- SIXTH: DATABASE AND HISTORY -->
 <section>
 <h2>Cloud Database Connection</h2>
 <p class="muted">Use your Supabase URL and public anon/publishable key. Never use a secret or service-role key.</p>
