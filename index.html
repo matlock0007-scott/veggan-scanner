@@ -1142,7 +1142,7 @@ carb_100g:numericValue(n.carbohydrates_100g),
 fat_100g:numericValue(n.fat_100g),
 sugar_100g:numericValue(n.sugars_100g),
 fiber_100g:numericValue(n.fiber_100g),
-salt_100g:numericValue(n.salt_100g),
+salt_100g:numericValue(n.fiber_100g),
 serving_size:serving||null
 };
 }
@@ -1408,19 +1408,34 @@ normalizeStatus(existing.vegan_status)!=='Needs Verification'&&
 record.vegan_result!==normalizeStatus(existing.vegan_status);
 
 /*
-Administrator corrections go through the existing products
-database permissions. They do not generate reward submissions.
-If Supabase denies the edit, the app reports the error rather
-than claiming that the correction was saved.
+SECURITY:
+Administrator updates use userRequest(), which sends the
+signed-in Supabase access token. Supabase must also have
+an administrator-only UPDATE policy on public.products.
 */
-if(existing&&(changingVerifiedIngredients||changingVerifiedStatus)&&!isAdmin){
-if(!currentUser)throw Error(
-'Sign in to submit a correction for review. Existing verified data was not changed.'
+if(existing&&!isAdmin){
+if(!currentUser&&
+(changingVerifiedIngredients||changingVerifiedStatus||newPhoto)){
+throw Error('Sign in to submit changes to an existing product.');
+}
+if(currentUser&&hasContribution){
+let type=photoContribution?'product_photo':
+newIngredients?'ingredients':'correction';
+if(newPhoto){
+uploadedPhoto=await uploadProductPhoto(db,selectedPhotoFile,barcode);
+}
+await submitContribution(
+type,barcode,
+uploadedPhoto||null,
+record.ingredient_text||null
 );
-await submitContribution('correction',barcode,null,record.ingredient_text);
-rewardText=' Correction submitted for review. Points pending approval.';
+rewardText=' Contribution submitted for review. Points pending approval.';
 cloudSaved=true;
 await loadRewards();
+}else{
+rewardText=' No changes to save.';
+cloudSaved=true;
+}
 }else{
 if(newPhoto){
 uploadedPhoto=await uploadProductPhoto(db,selectedPhotoFile,barcode);
@@ -1432,21 +1447,27 @@ if(session!==productSession)throw Error('Product changed. Save cancelled.');
 
 if(existing){
 const patch={};
-if(isAdmin&&(changingVerifiedIngredients||changingVerifiedStatus)){
+if(isAdmin){
+if(proposedIngredients!==existingIngredients){
 patch.ingredients=proposedIngredients||null;
+}
+if(record.vegan_result!==normalizeStatus(existing.vegan_status)){
 patch.vegan_status=record.vegan_result;
+}
+if(patch.ingredients!==undefined||patch.vegan_status!==undefined){
 patch.vegan_reason=payload.vegan_reason;
-}else if(!existingIngredients&&proposedIngredients){
+}
+if(payload.brand!==clean(existing.brand))patch.brand=payload.brand;
+if(payload.product_name!==clean(existing.product_name))
+patch.product_name=payload.product_name;
+if(uploadedPhoto)patch.image_url=uploadedPhoto;
+}else{
+if(!existingIngredients&&proposedIngredients){
 patch.ingredients=proposedIngredients;
 patch.vegan_status=record.vegan_result;
 patch.vegan_reason=payload.vegan_reason;
 }
 if(!existing.image_url&&payload.image_url)patch.image_url=payload.image_url;
-if(isAdmin){
-if(payload.brand!==clean(existing.brand))patch.brand=payload.brand;
-if(payload.product_name!==clean(existing.product_name))
-patch.product_name=payload.product_name;
-}else{
 if(!existing.brand&&payload.brand)patch.brand=payload.brand;
 if(!existing.product_name&&payload.product_name)
 patch.product_name=payload.product_name;
@@ -1460,12 +1481,17 @@ if(payload[key]!==undefined&&payload[key]!==null)patch[key]=payload[key];
 }
 }
 if(Object.keys(patch).length){
-const saved=await apiRequest('/rest/v1/products?id=eq.'+encodeURIComponent(id),{
-method:'PATCH',headers:{Prefer:'return=representation'},
+if(!isAdmin)throw Error('Existing product edits require administrator approval.');
+const saved=await userRequest(
+'/rest/v1/products?id=eq.'+encodeURIComponent(id),
+{
+method:'PATCH',
+headers:{Prefer:'return=representation'},
 body:JSON.stringify(patch)
-});
+}
+);
 if(!saved?.length)throw Error(
-'Database did not confirm the update. Check Supabase product permissions.'
+'Database did not confirm the administrator update. Verify the Supabase administrator UPDATE policy.'
 );
 loadedCloudId=saved[0].id;
 }
@@ -1481,12 +1507,12 @@ cloudSaved=true;
 }
 }
 
-if(cloudSaved&&newPhoto&&uploadedPhoto){
+if(cloudSaved&&newPhoto&&uploadedPhoto&&isAdmin){
 showPhoto(uploadedPhoto,'Supabase cloud picture');
 releaseSelectedPhoto();frontInput.value='';
 $('frontMessage').textContent='Picture uploaded to Supabase.';
 }
-if(cloudSaved&&currentUser&&!isAdmin&&!rewardText){
+if(cloudSaved&&currentUser&&!isAdmin&&!existing&&!rewardText){
 let type=null;
 if(photoContribution)type='product_photo';
 else if(newIngredients)type='ingredients';
@@ -1504,13 +1530,13 @@ await loadRewards();
 if(!currentUser&&hasContribution)
 rewardText+=' Sign in before contributing to earn rewards.';
 if(isAdmin)rewardText=' Administrator save — no reward points.';
-if(cloudSaved){
+if(cloudSaved&&(!existing||isAdmin)){
 originalIngredients=record.ingredient_text;
 const refreshed=await findCloudRecord(barcode);
 if(refreshed.record)rememberBaseline(refreshed.record);
 }
 $('saveMessage').textContent=
-(cloudSaved?'✅ Saved to Supabase cloud.':'Save not confirmed.')+rewardText;
+(cloudSaved?'✅ Saved or submitted successfully.':'Save not confirmed.')+rewardText;
 }catch(e){
 $('saveMessage').textContent='❌ Save failed: '+e.message;
 }finally{
