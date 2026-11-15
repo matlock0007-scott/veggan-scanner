@@ -99,21 +99,24 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 </div>
 <p id="productBarcode" class="muted small"></p>
 <p id="lookupMessage" class="muted" aria-live="polite"></p>
+<p id="autoSaveMessage" class="small muted" aria-live="polite"></p>
+
 <div class="steps">
-<strong>📸 Missing a Product Picture? Earn Points!</strong>
+<strong>🏆 Contribute Missing Information & Earn Points</strong>
 <ol>
-<li>Scan the product barcode.</li>
-<li>Tap <strong>Take Product Picture</strong>.</li>
-<li>Photograph the front of the package.</li>
-<li>Tap <strong>Save Scan</strong>.</li>
+<li>Scan a product barcode.</li>
+<li>If the picture is missing, tap <strong>Take Product Picture</strong>.</li>
+<li>Or add missing ingredients or correct information.</li>
+<li>Tap <strong>Save Scan</strong> to submit your contribution.</li>
 <li>Earn points after your contribution is approved.</li>
 </ol>
-<p class="small">Sign in for rewards. Scanning remains free.</p>
+<p class="small">Regular scans save automatically and do not earn points. Sign in before contributing to earn rewards.</p>
 </div>
+
 <input id="frontInput" type="file" accept="image/*" capture="environment">
 <button id="takeFront">📸 Take Product Picture</button>
 <button id="chooseFront" class="secondary">Choose Product Picture From Gallery</button>
-<p id="frontMessage" class="muted">Photos are uploaded to Supabase when you save.</p>
+<p id="frontMessage" class="muted">Contributed photos upload to Supabase when you save.</p>
 <label for="productName">Product name</label>
 <input id="productName" placeholder="Product name">
 <label for="brand">Brand</label>
@@ -197,7 +200,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <h3>Reasons</h3>
 <ul id="reasons"></ul>
 <p id="caution" class="muted"></p>
-<button id="save">💾 Save Scan to Cloud</button>
+<button id="save">💾 Save Scan / Submit Contribution</button>
 <p id="saveMessage" class="muted" aria-live="polite"></p>
 </section>
 
@@ -215,7 +218,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 
 <section>
 <h2>Recent Cloud Products</h2>
-<p class="muted">Loaded from Supabase, not saved as a permanent history on your phone.</p>
+<p class="muted">Loaded from Supabase, not permanently saved on your phone.</p>
 <button id="refreshHistory" class="secondary">Refresh Cloud History</button>
 <div id="history"></div>
 <button id="export" class="secondary">Export Cloud Products as JSON</button>
@@ -251,9 +254,13 @@ let currentUser=null,authSession=null,authRefreshPromise=null;
 let originalIngredients='',originalStatus='',photoWasMissing=false;
 let cloudHistory=[];
 let recoveryMode=false;
+let autoSaveBusy=false;
+let autoSavePromise=null;
+let autoSaveSerial=0;
+let cloudRecordExists=false;
+let contributionBaseline=null;
 
-/* REMOVE OLD PERMANENT PHONE PHOTO AND SCAN DATA.
-   CLOUD SETTINGS AND LOGIN SESSION ARE RETAINED. */
+/* REMOVE OLD PERMANENT PHONE SCAN AND PHOTO DATA */
 
 function removeOldDeviceData(){
 try{
@@ -333,16 +340,19 @@ $('scannerSection').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function showScannerView(){
 ++lookupNumber;
+++autoSaveSerial;
 stopCamera();
 $('scannerView').style.display='block';
 $('productDetails').style.display='none';
 $('scannerSection').scrollIntoView({behavior:'smooth',block:'start'});
 }
+
 $('scanAnother').onclick=()=>{
 $('barcode').value='';
 $('lookupMessage').textContent='';
+$('autoSaveMessage').textContent='';
 $('productBarcode').textContent='';
-$('frontMessage').textContent='Photos are uploaded to Supabase when you save.';
+$('frontMessage').textContent='Contributed photos upload to Supabase when you save.';
 $('saveMessage').textContent='';
 $('ingredients').value='';
 $('confirmed').checked=false;
@@ -352,6 +362,8 @@ allergens={contains:'',mayContain:''};
 updateAllergens();
 ingredientSource='none';
 loadedCloudId=null;
+cloudRecordExists=false;
+contributionBaseline=null;
 originalIngredients='';
 originalStatus='';
 photoWasMissing=false;
@@ -364,7 +376,7 @@ setStatus('Scan a product');
 showScannerView();
 };
 
-/* SUPABASE */
+/* SUPABASE CONNECTION */
 
 function headers(db,token=null){
 return {
@@ -693,7 +705,7 @@ $('authMessage').textContent='Please log in to access rewards.';
 }
 }
 
-/* PRODUCT PICTURES — NO PERMANENT DEVICE COPIES */
+/* PRODUCT PICTURES */
 
 function validPhotoURL(url){
 return typeof url==='string'&&/^https:\/\//i.test(url);
@@ -844,7 +856,7 @@ selectedPhotoFile=new File([blob],'product.jpg',{type:'image/jpeg'});
 selectedPhotoURL=URL.createObjectURL(blob);
 showPhoto(selectedPhotoURL,'Temporary preview — not yet uploaded');
 $('frontMessage').textContent=
-'Picture ready. Tap Save Scan to upload it to Supabase. It is not permanently stored by the app on your phone.';
+'Picture ready. Tap Save Scan to submit it to Supabase.';
 }catch(e){
 $('frontMessage').textContent=e.message;
 }
@@ -1035,8 +1047,20 @@ return {record:null,error:e.message};
 }
 }
 
+function rememberBaseline(p){
+contributionBaseline={
+ingredients:clean(p.ingredients),
+image_url:p.image_url||'',
+brand:clean(p.brand),
+product_name:clean(p.product_name),
+vegan_status:normalizeStatus(p.vegan_status)
+};
+}
+
 function loadCloudRecord(p){
 loadedCloudId=p.id??null;
+cloudRecordExists=true;
+rememberBaseline(p);
 $('productName').value=p.product_name||'';
 displayBrand(p.brand,$('barcode').value);
 const ingredients=loadIngredients(p.ingredients||'');
@@ -1065,6 +1089,127 @@ $('lookupMessage').textContent='Product loaded from Supabase.';
 setStatus('Needs Verification');
 $('lookupMessage').textContent='No ingredients available. Add ingredients to verify.';
 }
+$('autoSaveMessage').textContent='Already in Supabase. No save needed.';
+}
+
+/* AUTOMATIC CLOUD SAVING
+   Only inserts new products. Never updates existing records.
+   No rewards are awarded for automatic scans.
+   Images from Open Food Facts are stored as cloud URL references.
+   No image files are permanently stored on the phone.
+*/
+
+function numericValue(value){
+if(value===undefined||value===null||value==='')return null;
+const n=Number(value);
+return Number.isFinite(n)?n:null;
+}
+
+function nutritionPayload(n=currentNutrition,serving=currentServingSize){
+return {
+protein_100g:numericValue(n.proteins_100g),
+carb_100g:numericValue(n.carbohydrates_100g),
+fat_100g:numericValue(n.fat_100g),
+sugar_100g:numericValue(n.sugars_100g),
+fiber_100g:numericValue(n.fiber_100g),
+salt_100g:numericValue(n.salt_100g),
+serving_size:serving||null
+};
+}
+
+async function automaticCloudSave(barcode,p,serial){
+const saveSerial=++autoSaveSerial;
+const notice=$('autoSaveMessage');
+
+if(!p||!p.product_name&&!p.brands&&!p.ingredients_text&&!p.ingredients_text_en){
+notice.textContent='No reliable product details to save automatically.';
+return;
+}
+
+if(!dbConfig().url||!dbConfig().key){
+notice.textContent='Automatic cloud save unavailable: connect Supabase.';
+return;
+}
+
+notice.textContent='Automatically saving new product to Supabase…';
+autoSaveBusy=true;
+
+const name=clean(p.product_name);
+const brand=clean(p.brands);
+const ingredientText=splitPackageText(
+p.ingredients_text_en||p.ingredients_text||''
+).ingredients;
+
+const result=classify(ingredientText);
+const images=extractOFFImages(p);
+const imageUrl=images.find(x=>validPhotoURL(x.url))?.url||
+(sameBarcode(barcode,COCONUT_BARCODE)?COCONUT_PHOTO:null);
+
+const payload={
+barcode,
+brand:sameBarcode(barcode,COCONUT_BARCODE)?COCONUT_BRAND:(brand||null),
+product_name:name||null,
+ingredients:ingredientText||null,
+vegan_status:result.status,
+vegan_reason:result.reasons.join('; ')||null,
+image_url:imageUrl,
+...nutritionPayload(p.nutriments||{},p.serving_size||'')
+};
+
+try{
+/* Check again immediately before inserting. */
+const existing=await findCloudRecord(barcode);
+if(existing.error)throw Error(existing.error);
+
+if(existing.record){
+if(serial===lookupNumber){
+loadedCloudId=existing.record.id??null;
+cloudRecordExists=true;
+rememberBaseline(existing.record);
+notice.textContent='Product already in Supabase. No duplicate save needed.';
+}
+return;
+}
+
+/* Do not overwrite. A unique barcode constraint in Supabase
+   is recommended to prevent simultaneous duplicate inserts. */
+const saved=await apiRequest('/rest/v1/products',{
+method:'POST',
+headers:{Prefer:'return=representation'},
+body:JSON.stringify(payload)
+});
+
+if(serial!==lookupNumber)return;
+
+if(saved?.[0]){
+loadedCloudId=saved[0].id??null;
+cloudRecordExists=true;
+rememberBaseline(saved[0]);
+}
+
+notice.textContent='✅ Automatically saved to Supabase cloud. No Save Scan needed.';
+$('dbMessage').textContent='Automatic product save successful.';
+await loadCloudHistory();
+
+}catch(e){
+if(serial!==lookupNumber)return;
+
+const conflict=/409|duplicate|unique constraint/i.test(e.message);
+if(conflict){
+notice.textContent='Product already exists in Supabase.';
+const found=await findCloudRecord(barcode);
+if(found.record&&serial===lookupNumber){
+loadedCloudId=found.record.id??null;
+cloudRecordExists=true;
+rememberBaseline(found.record);
+}
+}else{
+notice.textContent='⚠️ Automatic cloud save failed: '+e.message;
+$('dbMessage').textContent='Automatic save failed: '+e.message;
+}
+}finally{
+autoSaveBusy=false;
+}
 }
 
 async function lookupProduct(){
@@ -1073,9 +1218,12 @@ if(!/^\d{8,14}$/.test(barcode)){
 alert('Enter a valid 8–14 digit barcode.');
 return;
 }
+
 showProductView();
 const serial=++lookupNumber;
 loadedCloudId=null;
+cloudRecordExists=false;
+contributionBaseline=null;
 releaseSelectedPhoto();
 originalIngredients='';
 originalStatus='';
@@ -1083,8 +1231,9 @@ photoWasMissing=false;
 clearResult();
 setStatus('Looking up…');
 $('lookupMessage').textContent='Checking Supabase…';
+$('autoSaveMessage').textContent='';
 $('saveMessage').textContent='';
-$('frontMessage').textContent='Photos are uploaded to Supabase when you save.';
+$('frontMessage').textContent='Contributed photos upload to Supabase when you save.';
 $('productName').value='';
 displayBrand('',barcode);
 $('ingredients').value='';
@@ -1104,7 +1253,14 @@ loadCloudRecord(cloud.record);
 return;
 }
 
+if(cloud.error){
+$('autoSaveMessage').textContent=
+'⚠️ Cloud check unavailable: '+cloud.error+
+'. Automatic saving is paused to avoid overwriting records.';
+}
+
 $('lookupMessage').textContent='Checking Open Food Facts…';
+
 try{
 const data=await fetchOFF(barcode);
 if(serial!==lookupNumber)return;
@@ -1117,6 +1273,7 @@ displayProductImages(barcode);
 photoWasMissing=true;
 return;
 }
+
 const p=data.product;
 $('productName').value=p.product_name||'';
 displayBrand(p.brands,barcode);
@@ -1134,12 +1291,19 @@ ingredientSource='database';
 if(ingredients){
 showResult(classify(ingredients));
 $('lookupMessage').textContent=
-'Product found in Open Food Facts. Review ingredients.';
+'Product found in Open Food Facts.';
 }else{
 setStatus('Needs Verification');
 $('lookupMessage').textContent=
 'No ingredients found. Take an ingredient picture.';
 }
+
+/* Automatically save only after a successful cloud check. */
+if(!cloud.error){
+autoSavePromise=automaticCloudSave(barcode,p,serial);
+await autoSavePromise;
+}
+
 }catch(e){
 if(serial!==lookupNumber)return;
 setStatus('Needs Verification');
@@ -1148,27 +1312,10 @@ displayProductImages(barcode);
 photoWasMissing=true;
 }
 }
+
 $('lookup').onclick=lookupProduct;
 
-/* CLOUD SAVING */
-
-function numericValue(value){
-if(value===undefined||value===null||value==='')return null;
-const n=Number(value);
-return Number.isFinite(n)?n:null;
-}
-function nutritionPayload(){
-const n=currentNutrition||{};
-return {
-protein_100g:numericValue(n.proteins_100g),
-carb_100g:numericValue(n.carbohydrates_100g),
-fat_100g:numericValue(n.fat_100g),
-sugar_100g:numericValue(n.sugars_100g),
-fiber_100g:numericValue(n.fiber_100g),
-salt_100g:numericValue(n.salt_100g),
-serving_size:currentServingSize||null
-};
-}
+/* CONTRIBUTION PHOTO UPLOAD */
 
 async function uploadProductPhoto(db,file,barcode){
 const filename=normalizeBarcode(barcode)+'-'+Date.now()+'.jpg';
@@ -1196,6 +1343,7 @@ const description=type==='product_photo'?
 type==='ingredients'?
 'Contributed missing ingredient list':
 'Submitted corrected product information';
+
 return userRequest('/rest/v1/rpc/vv_submit_contribution',{
 method:'POST',
 body:JSON.stringify({
@@ -1220,6 +1368,8 @@ showResult(classify(parsed.ingredients));
 $('result').scrollIntoView({behavior:'smooth',block:'start'});
 };
 
+/* MANUAL SAVE IS FOR CONTRIBUTIONS AND CORRECTIONS */
+
 $('save').onclick=async()=>{
 if(!lastResult){
 alert('Verify ingredients first.');
@@ -1229,11 +1379,21 @@ if(ingredientSource==='ocr'&&!$('confirmed').checked){
 alert('Confirm the ingredient list before saving.');
 return;
 }
+
 const barcode=$('barcode').value.trim();
 if(!/^\d{8,14}$/.test(barcode)){
 alert('Scan or enter a valid barcode first.');
 return;
 }
+
+const button=$('save');
+button.disabled=true;
+button.textContent='Saving to cloud…';
+$('saveMessage').textContent='Checking cloud record…';
+
+try{
+if(autoSavePromise)await autoSavePromise;
+}catch(e){}
 
 const record={
 barcode,
@@ -1245,33 +1405,39 @@ decision_reasons:lastResult.reasons
 };
 
 const newPhoto=!!selectedPhotoFile;
-const ingredientChanged=!!record.ingredient_text&&
-record.ingredient_text!==originalIngredients;
-const newIngredients=ingredientChanged&&!originalIngredients;
-const correction=ingredientChanged&&!!originalIngredients;
+const baseline=contributionBaseline||{
+ingredients:originalIngredients,
+image_url:'',
+brand:'',
+product_name:'',
+vegan_status:originalStatus
+};
 
-const button=$('save');
-button.disabled=true;
-button.textContent='Saving to cloud…';
-$('saveMessage').textContent='Saving to Supabase…';
+const ingredientChanged=
+!!record.ingredient_text&&
+clean(record.ingredient_text)!==clean(baseline.ingredients);
 
-let cloudSaved=false;
+const newIngredients=ingredientChanged&&!clean(baseline.ingredients);
+const correction=ingredientChanged&&!!clean(baseline.ingredients);
+const photoContribution=newPhoto&&!baseline.image_url;
+const metadataChanged=
+record.brand!==clean(baseline.brand)||
+record.product_name!==clean(baseline.product_name);
+
+const hasContribution=
+newPhoto||ingredientChanged||metadataChanged;
+
 let uploadedPhoto='';
 let rewardText='';
+let cloudSaved=false;
 
 try{
 const db=requireDB();
-let id=loadedCloudId;
-let existingRecord=null;
-
-if(id===null){
 const found=await findCloudRecord(barcode);
 if(found.error)throw Error(found.error);
-if(found.record){
-id=found.record.id??null;
-existingRecord=found.record;
-}
-}
+
+let existing=found.record;
+let id=existing?.id??null;
 
 const payload={
 barcode,
@@ -1289,51 +1455,113 @@ if(value!==null)payload[key]=value;
 if(newPhoto){
 uploadedPhoto=await uploadProductPhoto(db,selectedPhotoFile,barcode);
 payload.image_url=uploadedPhoto;
-}else if(validPhotoURL(currentPhoto)&&
-!existingRecord?.image_url){
+}else if(!existing?.image_url&&validPhotoURL(currentPhoto)){
 payload.image_url=currentPhoto;
 }
 
-const updating=id!==null;
+/* Existing records must not be silently overwritten.
+   Changes are submitted as contributions when signed in.
+   For a missing ingredient or picture, the new data is
+   saved to the product record only when appropriate.
+   Corrections to existing verified data require review. */
+
+if(existing){
+const existingIngredients=clean(existing.ingredients);
+const proposedIngredients=clean(record.ingredient_text);
+const existingImage=clean(existing.image_url);
+
+const changingVerifiedIngredients=
+!!existingIngredients&&
+proposedIngredients!==existingIngredients;
+
+const changingVerifiedStatus=
+normalizeStatus(existing.vegan_status)!=='Needs Verification'&&
+record.vegan_result!==normalizeStatus(existing.vegan_status);
+
+if(changingVerifiedIngredients||changingVerifiedStatus){
+if(!currentUser){
+throw Error(
+'Sign in to submit a correction for review. Existing verified data was not changed.'
+);
+}
+if(newPhoto&&uploadedPhoto){
+/* Uploaded photo is a pending contribution, not a
+   replacement for an existing approved image. */
+}
+await submitContribution(
+'correction',
+barcode,
+uploadedPhoto||null,
+record.ingredient_text
+);
+rewardText=' Correction submitted for review. Points pending approval.';
+cloudSaved=true;
+await loadRewards();
+}else{
+const patch={};
+
+if(!existingIngredients&&proposedIngredients){
+patch.ingredients=proposedIngredients;
+patch.vegan_status=record.vegan_result;
+patch.vegan_reason=payload.vegan_reason;
+}
+
+if(!existingImage&&payload.image_url){
+patch.image_url=payload.image_url;
+}
+
+if(!existing.brand&&payload.brand)patch.brand=payload.brand;
+if(!existing.product_name&&payload.product_name){
+patch.product_name=payload.product_name;
+}
+
+for(const key of [
+'protein_100g','carb_100g','fat_100g',
+'sugar_100g','fiber_100g','salt_100g','serving_size'
+]){
+if(existing[key]===null||existing[key]===undefined){
+if(payload[key]!==undefined&&payload[key]!==null){
+patch[key]=payload[key];
+}
+}
+}
+
+if(Object.keys(patch).length){
 const saved=await apiRequest(
-updating?
-'/rest/v1/products?id=eq.'+encodeURIComponent(id):
-'/rest/v1/products',{
-method:updating?'PATCH':'POST',
+'/rest/v1/products?id=eq.'+encodeURIComponent(id),{
+method:'PATCH',
 headers:{Prefer:'return=representation'},
-body:JSON.stringify(payload)
+body:JSON.stringify(patch)
 }
 );
+if(saved?.[0])loadedCloudId=saved[0].id;
+}
 
-if(saved?.[0]?.id!==undefined)loadedCloudId=saved[0].id;
 cloudSaved=true;
-originalIngredients=record.ingredient_text;
+}
+}else{
+const saved=await apiRequest('/rest/v1/products',{
+method:'POST',
+headers:{Prefer:'return=representation'},
+body:JSON.stringify(payload)
+});
+if(saved?.[0])loadedCloudId=saved[0].id;
+cloudSaved=true;
+}
 
-if(uploadedPhoto){
+if(cloudSaved&&newPhoto&&uploadedPhoto){
 showPhoto(uploadedPhoto,'Supabase cloud picture');
 releaseSelectedPhoto();
 frontInput.value='';
 $('frontMessage').textContent='Picture uploaded to Supabase.';
 }
 
-$('dbMessage').textContent='Product saved to Supabase.';
-await loadCloudHistory();
-
-}catch(e){
-$('dbMessage').textContent='Cloud save failed: '+e.message;
-$('saveMessage').textContent=
-'❌ Not saved to Supabase. '+e.message+
-' Please keep this page open and try again.';
-button.disabled=false;
-button.textContent='💾 Save Scan to Cloud';
-return;
-}
-
-if(currentUser&&cloudSaved){
+if(cloudSaved&&currentUser&&!rewardText){
 let type=null;
-if(newPhoto&&photoWasMissing)type='product_photo';
+
+if(photoContribution)type='product_photo';
 else if(newIngredients)type='ingredients';
-else if(correction)type='correction';
+else if(correction||metadataChanged)type='correction';
 
 if(type){
 try{
@@ -1348,16 +1576,29 @@ await loadRewards();
 rewardText=' Reward submission failed: '+e.message;
 }
 }
-}else if(!currentUser&&(newPhoto||newIngredients||correction)){
-rewardText=' Sign in before contributing to earn rewards.';
+}
+
+if(!currentUser&&hasContribution){
+rewardText+=' Sign in before contributing to earn rewards.';
+}
+
+if(cloudSaved){
+originalIngredients=record.ingredient_text;
+$('dbMessage').textContent='Product saved to Supabase.';
+await loadCloudHistory();
 }
 
 $('saveMessage').textContent=
-'✅ Saved to Supabase cloud. No permanent scan or picture copy was saved by this app on your phone.'+
-rewardText;
+'✅ Saved to Supabase cloud.'+rewardText;
 
+}catch(e){
+$('dbMessage').textContent='Cloud save failed: '+e.message;
+$('saveMessage').textContent=
+'❌ Save failed: '+e.message;
+}finally{
 button.disabled=false;
-button.textContent='💾 Save Scan to Cloud';
+button.textContent='💾 Save Scan / Submit Contribution';
+}
 };
 
 /* CLOUD HISTORY — NO LOCAL SCAN DATABASE */
