@@ -1,6 +1,6 @@
 
 <!doctype html>
-<html lang="en"> 
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -136,7 +136,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 
 <section>
 <h2>Cloud database connection</h2>
-<p>Use your existing Supabase products table and a public anon or publishable key.</p>
+<p>Use your existing Supabase products table and a public anon or publishable key. Never enter a secret or service-role key.</p>
 <label for="supabaseUrl">Supabase Project URL</label>
 <input id="supabaseUrl" type="url">
 <label for="supabaseKey">Supabase public key</label>
@@ -164,8 +164,11 @@ const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
 
 const COCONUT_BARCODE='850030458001';
 const COCONUT_BRAND='Madly Hadley';
-const COCONUT_PHOTO=
-'https://bluaqqfcsjudoiaxkbjn.supabase.co/storage/v1/object/public/product-images/PXL_20261115_031846467.MP.jpg';
+const COCONUT_PHOTO='https://bluaqqfcsjudoiaxkbjn.supabase.co/storage/v1/object/public/product-images/PXL_20261115_031846467.MP.jpg';
+
+const IMAGE_TIMEOUT=4500;
+const SEARCH_TIMEOUT=6500;
+const MAX_IMAGE_CANDIDATES=12;
 
 let stream=null,scanActive=false,lastResult=null;
 let photoBitmap=null,ocrWorker=null,ocrBusy=false;
@@ -179,6 +182,12 @@ let lastLookupSource='';
 let currentImageCandidates=[];
 let imageCandidateIndex=0;
 let imageLookupSerial=0;
+let photoTimer=null;
+let photoSearchTimer=null;
+let photoSearchController=null;
+let photoSearchFinished=false;
+let photoBusy=false;
+let imageCache=new Map();
 
 function readJSON(key,fallback){
 try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}
@@ -187,6 +196,7 @@ catch{return fallback}
 function getScans(){return readJSON(KEY,[])}
 function getPhotos(){return readJSON(PHOTO_KEY,{})}
 function dbConfig(){return readJSON(DBKEY,{})}
+
 function normalizeBarcode(v){
 return String(v??'').replace(/\D/g,'').replace(/^0+(?=\d)/,'');
 }
@@ -242,15 +252,17 @@ $('caution').textContent=result.caution||'';
 $('result').style.display='block';
 }
 
-/* PRODUCT IMAGE SYSTEM
-   1. Saved Supabase picture
-   2. Saved device picture
+/* PRODUCT PHOTO SYSTEM
+   Priorities:
+   1. Supabase picture
+   2. Previously contributed device picture
    3. Open Food Facts front picture
    4. Other Open Food Facts pictures
-   5. User contribution
+   5. Manual contribution
 
-   Every candidate is tested. A broken image
-   does not prevent trying the next one.
+   Every picture has a timeout.
+   Every search has a timeout.
+   Old searches cannot overwrite newer scans.
 */
 
 function photoIdentity(){
@@ -261,8 +273,7 @@ $('productName').value.trim().toLowerCase());
 
 function savedPhotoForBarcode(barcode){
 const photos=getPhotos();
-const direct=photos[barcode];
-if(direct)return direct;
+if(photos[barcode])return photos[barcode];
 const match=Object.keys(photos).find(k=>sameBarcode(k,barcode));
 return match?photos[match]:'';
 }
@@ -293,9 +304,28 @@ catch{}
 }
 }
 
+function validPhotoURL(url){
+return typeof url==='string'&&
+(/^https:\/\//i.test(url)||/^data:image\//i.test(url));
+}
+
+function cancelPhotoWork(){
+clearTimeout(photoTimer);
+clearTimeout(photoSearchTimer);
+photoTimer=null;
+photoSearchTimer=null;
+if(photoSearchController){
+photoSearchController.abort();
+photoSearchController=null;
+}
+}
+
 function resetPhoto(){
 ++photoRequest;
 ++imageLookupSerial;
+cancelPhotoWork();
+photoBusy=false;
+photoSearchFinished=false;
 currentPhoto='';
 currentImageCandidates=[];
 imageCandidateIndex=0;
@@ -305,72 +335,120 @@ img.onerror=null;
 img.hidden=true;
 img.removeAttribute('src');
 $('photoPlaceholder').style.display='block';
+$('photoPlaceholder').textContent='Product picture appears here';
 $('photoSource').textContent='';
 $('photoMessage').textContent='';
-}
-
-function validPhotoURL(url){
-return typeof url==='string'&&
-(/^https:\/\//i.test(url)||/^data:image\//i.test(url));
 }
 
 function addImageCandidate(url,source){
 if(!validPhotoURL(url))return;
 if(currentImageCandidates.some(x=>x.url===url))return;
+if(currentImageCandidates.length>=MAX_IMAGE_CANDIDATES)return;
 currentImageCandidates.push({url,source});
+}
+
+function photoFailureMessage(){
+photoBusy=false;
+$('productPhoto').hidden=true;
+$('photoPlaceholder').style.display='block';
+$('photoPlaceholder').textContent='No product picture available';
+$('photoSource').textContent='Automatic picture search completed';
+$('photoMessage').textContent=
+'No usable picture was found. You can contribute one for future scans.';
+currentPhoto='';
 }
 
 function tryNextImage(request){
 if(request!==photoRequest)return;
+if(currentPhoto)return;
+
+clearTimeout(photoTimer);
+photoTimer=null;
+
 const img=$('productPhoto');
 
 if(imageCandidateIndex>=currentImageCandidates.length){
-img.hidden=true;
-$('photoPlaceholder').style.display='block';
-$('photoSource').textContent='No usable product picture found';
-$('photoMessage').textContent=
-'You can contribute a product picture and save it for future scans.';
-currentPhoto='';
+photoBusy=false;
+if(photoSearchFinished){
+photoFailureMessage();
+}else{
+$('photoPlaceholder').textContent='Searching product pictures…';
+$('photoSource').textContent='Checking additional sources';
+}
 return;
 }
 
+photoBusy=true;
 const candidate=currentImageCandidates[imageCandidateIndex++];
+let settled=false;
+
 img.onload=null;
 img.onerror=null;
 img.hidden=true;
-$('photoSource').textContent='Checking '+candidate.source+'…';
+
+$('photoPlaceholder').textContent='Loading product picture…';
+$('photoSource').textContent='Checking '+candidate.source;
+
+function fail(){
+if(settled||request!==photoRequest)return;
+settled=true;
+clearTimeout(photoTimer);
+photoTimer=null;
+img.onload=null;
+img.onerror=null;
+tryNextImage(request);
+}
 
 img.onload=()=>{
-if(request!==photoRequest)return;
+if(settled||request!==photoRequest)return;
+
+if(img.naturalWidth<20||img.naturalHeight<20){
+fail();
+return;
+}
+
+settled=true;
+clearTimeout(photoTimer);
+photoTimer=null;
+
 img.hidden=false;
 $('photoPlaceholder').style.display='none';
 $('photoSource').textContent=candidate.source;
 $('photoMessage').textContent='';
 currentPhoto=candidate.url;
+photoBusy=false;
+
+imageCache.set(photoIdentity(),candidate.url);
 };
 
-img.onerror=()=>{
-if(request!==photoRequest)return;
-tryNextImage(request);
-};
+img.onerror=fail;
 
+photoTimer=setTimeout(fail,IMAGE_TIMEOUT);
 img.src=candidate.url;
 }
 
-function startImageCandidates(candidates){
-const request=++photoRequest;
-currentPhoto='';
-currentImageCandidates=[];
-imageCandidateIndex=0;
+function appendImageCandidates(candidates){
+if(currentPhoto)return;
+const oldLength=currentImageCandidates.length;
 
-for(const c of candidates){
-addImageCandidate(c.url,c.source);
+for(const candidate of candidates){
+addImageCandidate(candidate.url,candidate.source);
 }
-tryNextImage(request);
+
+if(!photoBusy&&currentImageCandidates.length>oldLength){
+tryNextImage(photoRequest);
+}
 }
 
 function showPhoto(url,source=''){
-startImageCandidates(url?[{url,source}]:[]);
+resetPhoto();
+photoSearchFinished=true;
+if(validPhotoURL(url)){
+addImageCandidate(url,source);
+tryNextImage(photoRequest);
+}else{
+photoFailureMessage();
+}
 }
 
 function localPhotoCandidate(barcode){
@@ -414,22 +492,72 @@ add(versions[language],'Open Food Facts '+side+' picture');
 return candidates;
 }
 
-async function fetchOFF(barcode,signal){
-const response=await fetch(
-'https://world.openfoodfacts.org/api/v2/product/'+
-encodeURIComponent(barcode)+'.json',
-{cache:'no-store',signal}
-);
-if(!response.ok)throw Error('Open Food Facts unavailable');
-return response.json();
+async function fetchWithTimeout(url,ms=SEARCH_TIMEOUT,signal=null){
+const controller=new AbortController();
+const timeout=setTimeout(()=>controller.abort(),ms);
+let abortListener=null;
+
+if(signal){
+if(signal.aborted)controller.abort();
+else{
+abortListener=()=>controller.abort();
+signal.addEventListener('abort',abortListener,{once:true});
+}
 }
 
-async function findBestProductImages(barcode,cloudUrl='',offProduct=null,serial=lookupNumber){
-const imageSerial=++imageLookupSerial;
+try{
+const response=await fetch(url,{
+cache:'no-store',
+signal:controller.signal,
+headers:{Accept:'application/json'}
+});
+if(!response.ok)throw Error('HTTP '+response.status);
+return await response.json();
+}finally{
+clearTimeout(timeout);
+if(signal&&abortListener){
+signal.removeEventListener('abort',abortListener);
+}
+}
+}
+
+async function fetchOFF(barcode,signal=null){
+return fetchWithTimeout(
+'https://world.openfoodfacts.org/api/v2/product/'+
+encodeURIComponent(barcode)+'.json',
+SEARCH_TIMEOUT,signal
+);
+}
+
+function offBarcodeVariants(barcode){
+const raw=String(barcode).replace(/\D/g,'');
+const variants=new Set([raw]);
+
+if(raw.length===12)variants.add('0'+raw);
+if(raw.length===13&&raw.startsWith('0')){
+variants.add(raw.slice(1));
+}
+
+return [...variants];
+}
+
+async function findBestProductImages(
+barcode,cloudUrl='',offProduct=null,serial=lookupNumber
+){
+resetPhoto();
+
+const request=photoRequest;
+const imageSerial=imageLookupSerial;
+const controller=new AbortController();
+photoSearchController=controller;
+
 const candidates=[];
 
 if(validPhotoURL(cloudUrl)){
-candidates.push({url:cloudUrl,source:'Supabase product picture'});
+candidates.push({
+url:cloudUrl,
+source:'Supabase product picture'
+});
 }
 
 const local=localPhotoCandidate(barcode);
@@ -442,45 +570,74 @@ if(offProduct){
 candidates.push(...extractOFFImages(offProduct));
 }
 
-if(serial!==lookupNumber||imageSerial!==imageLookupSerial)return;
-
-if(candidates.length){
-startImageCandidates(candidates);
-}else{
-resetPhoto();
-$('photoSource').textContent='Searching product pictures…';
+const cached=imageCache.get(photoIdentity());
+if(cached){
+candidates.push({
+url:cached,
+source:'Previously found product picture'
+});
 }
 
-if(!offProduct){
-try{
-const data=await fetchOFF(barcode);
-if(serial!==lookupNumber||imageSerial!==imageLookupSerial)return;
-if(data.status===1&&data.product){
-const extra=extractOFFImages(data.product);
-const existing=currentImageCandidates.slice();
-const all=[...candidates,...extra];
-const currentIsVisible=!$('productPhoto').hidden;
+appendImageCandidates(candidates);
 
-if(currentIsVisible){
-/* Keep a working picture instead of replacing it. */
+if(!currentImageCandidates.length){
+$('photoPlaceholder').textContent='Searching product pictures…';
+$('photoSource').textContent='Checking Open Food Facts';
+}
+
+function stillCurrent(){
+return serial===lookupNumber&&
+request===photoRequest&&
+imageSerial===imageLookupSerial;
+}
+
+if(offProduct){
+photoSearchFinished=true;
+if(!photoBusy&&!currentPhoto){
+tryNextImage(request);
+}
 return;
 }
 
-if(extra.length){
-startImageCandidates(all);
-}else if(!existing.length){
-$('photoSource').textContent='No product picture found';
-$('photoMessage').textContent=
-'Take a product picture to help future users.';
+const variants=offBarcodeVariants(barcode);
+
+photoSearchTimer=setTimeout(()=>{
+if(!stillCurrent())return;
+controller.abort();
+photoSearchFinished=true;
+if(!photoBusy&&!currentPhoto){
+tryNextImage(request);
 }
-}
+},SEARCH_TIMEOUT*variants.length+500);
+
+try{
+for(const code of variants){
+if(!stillCurrent()||currentPhoto)break;
+
+let data;
+try{
+data=await fetchOFF(code,controller.signal);
 }catch(e){
-if(serial!==lookupNumber||imageSerial!==imageLookupSerial)return;
-if(!currentImageCandidates.length){
-$('photoSource').textContent='Picture search unavailable';
-$('photoMessage').textContent=
-'You can add a product picture manually.';
+if(controller.signal.aborted)break;
+continue;
 }
+
+if(!stillCurrent())return;
+
+if(data.status===1&&data.product){
+appendImageCandidates(extractOFFImages(data.product));
+}
+}
+}finally{
+if(!stillCurrent())return;
+
+clearTimeout(photoSearchTimer);
+photoSearchTimer=null;
+photoSearchFinished=true;
+photoSearchController=null;
+
+if(!photoBusy&&!currentPhoto){
+tryNextImage(request);
 }
 }
 }
@@ -492,6 +649,7 @@ frontInput.setAttribute('capture','environment');
 frontInput.value='';
 frontInput.click();
 };
+
 $('chooseFront').onclick=()=>{
 frontInput.removeAttribute('capture');
 frontInput.value='';
@@ -501,21 +659,29 @@ frontInput.click();
 frontInput.onchange=async()=>{
 const file=frontInput.files?.[0];
 if(!file)return;
+
 try{
 const bitmap=await createImageBitmap(file);
 const canvas=document.createElement('canvas');
 const scale=Math.min(1,900/Math.max(bitmap.width,bitmap.height));
+
 canvas.width=Math.max(1,Math.round(bitmap.width*scale));
 canvas.height=Math.max(1,Math.round(bitmap.height*scale));
-canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+
+canvas.getContext('2d').drawImage(
+bitmap,0,0,canvas.width,canvas.height
+);
 bitmap.close();
 
 const url=canvas.toDataURL('image/jpeg',.75);
+
 selectedPhotoFile=file;
 photoChanged=true;
-++imageLookupSerial;
+
 showPhoto(url,'Your new product picture');
+
 const saved=saveProductPhoto(url);
+
 $('frontMessage').textContent=saved?
 'Picture saved on this device. Save Scan to upload it to Supabase.':
 'Picture selected. Save Scan to upload it to Supabase.';
@@ -542,6 +708,7 @@ function splitPackageText(raw){
 const source=String(raw||'').replace(/\r/g,'\n');
 const heading=/\bingredients?\s*[:\-]?\s*/i;
 const match=heading.exec(source);
+
 let text=match?source.slice(match.index+match[0].length):source;
 let end=text.length;
 
@@ -579,6 +746,7 @@ const rules=[
 
 function classify(raw){
 const t=splitPackageText(raw).ingredients;
+
 if(!t)return {
 status:'Needs Verification',
 reasons:[],
@@ -592,6 +760,7 @@ const notes=[];
 if(/\b(natural flavo[u]?rs?|mono(?:-|\s)?and(?:-|\s)?diglycerides|glycerin|glycerine|vitamin d3|cholecalciferol|enzymes|rennet|l[.-]?cysteine)\b/i.test(t)){
 notes.push('Some ingredients have uncertain plant or animal origins.');
 }
+
 if(/\bsugar\b/i.test(t)&&!/\borganic (?:cane )?sugar\b/i.test(t)){
 notes.push('Generic sugar may have processing-source uncertainty.');
 }
@@ -610,8 +779,10 @@ caution:notes.join(' ')+' Ingredient screening is not manufacturer certification
 function updateAllergens(){
 $('containsText').textContent=allergens.contains?
 'Contains: '+allergens.contains:'';
+
 $('mayContainText').textContent=allergens.mayContain?
 'May contain: '+allergens.mayContain:'';
+
 $('allergenPanel').style.display=
 allergens.contains||allergens.mayContain?'block':'none';
 }
@@ -628,7 +799,9 @@ return parsed.ingredients;
 }
 
 function showNutrition(n){
-currentNutrition=n||{};
+n=n||{};
+currentNutrition=n;
+
 const fields=[
 ['Calories',n['energy-kcal_100g'],'kcal'],
 ['Protein',n.proteins_100g,'g'],
@@ -638,10 +811,12 @@ const fields=[
 ['Fiber',n.fiber_100g,'g'],
 ['Salt',n.salt_100g,'g']
 ];
+
 const values=fields.filter(x=>
 x[1]!==null&&x[1]!==undefined&&
 x[1]!==''&&Number.isFinite(Number(x[1]))
 );
+
 $('nutrition').textContent=values.length?
 'Per 100 g: '+values.map(x=>
 x[0]+': '+Number(x[1]).toFixed(1)+' '+x[2]
@@ -664,28 +839,35 @@ function renderHistory(){
 const box=$('history');
 box.replaceChildren();
 const scans=getScans();
+
 if(!scans.length){
 box.textContent='No saved scans yet.';
 return;
 }
+
 scans.slice(0,20).forEach(s=>{
 const d=document.createElement('div');
 d.className='entry';
+
 const photo=s.local_photo_key&&getPhotos()[s.local_photo_key];
+
 if(photo){
 const img=document.createElement('img');
 img.src=photo;
 img.alt='Product picture';
 d.append(img);
 }
+
 const b=document.createElement('strong');
 b.textContent=(s.product_name||'Unnamed product')+
 ' — '+normalizeStatus(s.vegan_result||s.vegan_status);
+
 const p=document.createElement('div');
 p.className='muted';
 p.textContent=resolveBrand(s.brand,s.barcode)+
 ' • '+(s.barcode||'')+
 ' • '+(s.created_at||'');
+
 d.append(b,p);
 box.append(d);
 });
@@ -718,10 +900,12 @@ return 'HTTP '+response.status+': '+text.slice(0,300);
 $('connectDb').onclick=()=>{
 const url=$('supabaseUrl').value.trim().replace(/\/+$/,'');
 const key=$('supabaseKey').value.trim();
+
 if(!/^https:\/\/[\w.-]+\.supabase\.co$/.test(url)||!key){
 $('dbMessage').textContent='Enter a valid Supabase URL and public key.';
 return;
 }
+
 try{
 localStorage.setItem(DBKEY,JSON.stringify({url,key}));
 $('dbMessage').textContent='Connection settings saved.';
@@ -732,17 +916,22 @@ $('dbMessage').textContent=e.message;
 
 $('testDb').onclick=async()=>{
 const db=dbConfig();
+
 if(!db.url||!db.key){
 $('dbMessage').textContent='Save connection settings first.';
 return;
 }
+
 $('dbMessage').textContent='Testing Supabase connection…';
+
 try{
 const r=await fetch(
 db.url+'/rest/v1/products?select=id&limit=1',
 {headers:headers(db),cache:'no-store'}
 );
+
 if(!r.ok)throw Error(await responseError(r));
+
 $('dbMessage').textContent=
 'Supabase connection successful. Products table is readable.';
 }catch(e){
@@ -758,6 +947,7 @@ function loadLocalRecord(s,serial){
 lastLookupSource='local';
 $('productName').value=s.product_name||'';
 displayBrand(s.brand,$('barcode').value);
+
 const text=s.ingredient_text||s.ingredients||'';
 loadIngredients(text);
 ingredientSource='database';
@@ -781,7 +971,7 @@ explanation:'Previously saved product classification.',
 caution:screened.caution
 });
 $('lookupMessage').textContent=
-'Product loaded from saved device history. No matching Supabase record was found.';
+'Product loaded from saved device history.';
 }else{
 setStatus('Needs Verification');
 $('lookupMessage').textContent=
@@ -794,11 +984,13 @@ void findBestProductImages($('barcode').value,'',null,serial);
 function loadCloudRecord(p,serial){
 lastLookupSource='cloud';
 loadedCloudId=p.id??null;
+
 $('productName').value=p.product_name||'';
 displayBrand(p.brand,$('barcode').value);
 
 const ingredients=loadIngredients(p.ingredients||'');
 ingredientSource='database';
+
 showNutrition(nutritionFromCloud(p));
 currentServingSize=p.serving_size||'';
 
@@ -843,6 +1035,7 @@ $('lookupMessage').textContent=
 
 async function findCloudRecord(barcode){
 const db=dbConfig();
+
 if(!db.url||!db.key)return {
 record:null,error:'Cloud connection not configured.'
 };
@@ -859,12 +1052,16 @@ let records=[];
 
 for(const code of variants){
 if(!code)continue;
+
 const url=db.url+'/rest/v1/products?barcode=eq.'+
 encodeURIComponent(code)+'&select=*&limit=100';
+
 const r=await fetch(url,{
 headers:headers(db),cache:'no-store'
 });
+
 if(!r.ok)throw Error(await responseError(r));
+
 const rows=await r.json();
 records.push(...rows);
 if(rows.length)break;
@@ -877,7 +1074,9 @@ const r=await fetch(
 db.url+'/rest/v1/products?select=*&limit=1000',
 {headers:headers(db),cache:'no-store'}
 );
+
 if(!r.ok)throw Error(await responseError(r));
+
 records=await r.json();
 matches=records.filter(p=>sameBarcode(p.barcode,barcode));
 }
@@ -888,6 +1087,7 @@ const score=p=>
 (clean(p.ingredients)?5:0)+
 (clean(p.image_url)?3:0)+
 (clean(p.product_name)?1:0);
+
 return score(b)-score(a);
 });
 
@@ -906,17 +1106,21 @@ return;
 }
 
 const serial=++lookupNumber;
+
 loadedCloudId=null;
 lastLookupSource='';
 selectedPhotoFile=null;
 photoChanged=false;
+
 clearResult();
 setStatus('Looking up…');
+
 $('lookupMessage').textContent='Checking Supabase first…';
 $('productName').value='';
 displayBrand('',barcode);
 $('ingredients').value='';
 $('confirmed').checked=false;
+
 ingredientSource='none';
 allergens={contains:'',mayContain:''};
 updateAllergens();
@@ -933,11 +1137,11 @@ return;
 }
 
 const local=localMatch(barcode);
+
 if(local){
 loadLocalRecord(local,serial);
 if(cloud.error){
-$('lookupMessage').textContent+=
-' Cloud issue: '+cloud.error;
+$('lookupMessage').textContent+=' Cloud issue: '+cloud.error;
 }
 return;
 }
@@ -954,12 +1158,14 @@ if(data.status!==1||!data.product){
 setStatus('Needs Verification');
 $('lookupMessage').textContent=
 'Product not found. Enter or photograph ingredients.';
+
 void findBestProductImages(barcode,'',null,serial);
 return;
 }
 
 const p=data.product;
 lastLookupSource='openfoodfacts';
+
 $('productName').value=p.product_name||'';
 displayBrand(p.brands,barcode);
 
@@ -971,6 +1177,7 @@ void findBestProductImages(barcode,'',p,serial);
 const ingredients=loadIngredients(
 p.ingredients_text_en||p.ingredients_text||''
 );
+
 ingredientSource='database';
 
 if(ingredients){
@@ -984,8 +1191,10 @@ $('lookupMessage').textContent=
 }
 }catch(e){
 if(serial!==lookupNumber)return;
+
 setStatus('Needs Verification');
 $('lookupMessage').textContent='Lookup failed: '+e.message;
+
 void findBestProductImages(barcode,'',null,serial);
 }
 }
@@ -1015,21 +1224,31 @@ serving_size:currentServingSize||null
 
 $('check').onclick=()=>{
 if(ocrBusy)return;
+
 if(ingredientSource==='ocr'&&!$('confirmed').checked){
 alert('Check the complete ingredient list against the package first.');
 return;
 }
+
 const parsed=splitPackageText($('ingredients').value);
 $('ingredients').value=parsed.ingredients;
+
 showResult(classify(parsed.ingredients));
-$('result').scrollIntoView({behavior:'smooth',block:'start'});
+
+$('result').scrollIntoView({
+behavior:'smooth',
+block:'start'
+});
 };
 
 async function uploadProductPhoto(db,file,barcode){
 const safeBarcode=normalizeBarcode(barcode)||'product';
+
 const extension=(file.type==='image/png')?'png':
 (file.type==='image/webp')?'webp':'jpg';
+
 const filename=safeBarcode+'-'+Date.now()+'.'+extension;
+
 const url=db.url+'/storage/v1/object/product-images/'+
 encodeURIComponent(filename);
 
@@ -1043,7 +1262,9 @@ headers:{
 },
 body:file
 });
+
 if(!r.ok)throw Error(await responseError(r));
+
 return db.url+'/storage/v1/object/public/product-images/'+
 encodeURIComponent(filename);
 }
@@ -1074,8 +1295,11 @@ record.local_photo_key=photoIdentity();
 try{
 const scans=getScans();
 const existing=scans.findIndex(s=>
-sameBarcode(s.barcode,record.barcode));
+sameBarcode(s.barcode,record.barcode)
+);
+
 if(existing>=0)scans.splice(existing,1);
+
 scans.unshift(record);
 localStorage.setItem(KEY,JSON.stringify(scans.slice(0,500)));
 renderHistory();
@@ -1084,6 +1308,7 @@ $('dbMessage').textContent='Local save failed: '+e.message;
 }
 
 const db=dbConfig();
+
 if(!db.url||!db.key){
 $('dbMessage').textContent=
 'Scan saved locally. Supabase is not connected.';
@@ -1109,21 +1334,32 @@ button.textContent='Saving to Supabase…';
 
 try{
 let id=loadedCloudId;
+let existingRecord=null;
+
 if(id===null&&record.barcode){
 const found=await findCloudRecord(record.barcode);
+
 if(found.error)throw Error(found.error);
-if(found.record)id=found.record.id??null;
+
+if(found.record){
+id=found.record.id??null;
+existingRecord=found.record;
+}
 }
 
 if(selectedPhotoFile&&photoChanged){
 payload.image_url=await uploadProductPhoto(
 db,selectedPhotoFile,record.barcode
 );
-}else if(/^https:\/\//i.test(currentPhoto)){
+}else if(
+/^https:\/\//i.test(currentPhoto)&&
+(!existingRecord?.image_url||photoChanged)
+){
 payload.image_url=currentPhoto;
 }
 
 const updating=id!==null;
+
 const url=updating?
 db.url+'/rest/v1/products?id=eq.'+encodeURIComponent(id):
 db.url+'/rest/v1/products';
@@ -1136,18 +1372,26 @@ headers:{
 },
 body:JSON.stringify(payload)
 });
+
 if(!response.ok)throw Error(await responseError(response));
 
 const saved=await response.json();
-if(saved[0]?.id!==undefined)loadedCloudId=saved[0].id;
+
+if(saved[0]?.id!==undefined){
+loadedCloudId=saved[0].id;
+}
 
 if(payload.image_url){
-showPhoto(payload.image_url,'Supabase product picture');
+showPhoto(payload.image_url,'Saved product picture');
+
+if(/^https:\/\//i.test(payload.image_url)){
 removeOldPhotoForBarcode(record.barcode);
+}
 }
 
 selectedPhotoFile=null;
 photoChanged=false;
+
 $('dbMessage').textContent=
 'Product saved successfully to Supabase and local history.';
 }catch(e){
@@ -1165,11 +1409,14 @@ const blob=new Blob(
 [JSON.stringify(getScans(),null,2)],
 {type:'application/json'}
 );
+
 const url=URL.createObjectURL(blob);
 const a=document.createElement('a');
+
 a.href=url;
 a.download='verified-vegan-scans.json';
 a.click();
+
 setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
 
@@ -1177,10 +1424,12 @@ setTimeout(()=>URL.revokeObjectURL(url),1000);
 
 function stopCamera(){
 scanActive=false;
+
 if(stream){
 stream.getTracks().forEach(t=>t.stop());
 stream=null;
 }
+
 $('video').srcObject=null;
 $('cameraPanel').style.display='none';
 }
@@ -1192,27 +1441,33 @@ if(!navigator.mediaDevices?.getUserMedia){
 alert('Camera permission or HTTPS is required.');
 return;
 }
+
 if(!('BarcodeDetector' in window)){
 alert('Barcode detection is unavailable in this browser. Enter the barcode manually.');
 return;
 }
+
 try{
 const detector=new BarcodeDetector({
 formats:['ean_13','ean_8','upc_a','upc_e']
 });
+
 stream=await navigator.mediaDevices.getUserMedia({
 video:{facingMode:{ideal:'environment'}},
 audio:false
 });
+
 $('video').srcObject=stream;
 $('cameraPanel').style.display='block';
 scanActive=true;
 
 async function scan(){
 if(!scanActive)return;
+
 try{
 if($('video').readyState>=2){
 const hits=await detector.detect($('video'));
+
 if(hits.length){
 $('barcode').value=hits[0].rawValue;
 stopCamera();
@@ -1221,8 +1476,10 @@ return;
 }
 }
 }catch(e){}
+
 if(scanActive)setTimeout(scan,250);
 }
+
 scan();
 }catch(e){
 stopCamera();
@@ -1255,6 +1512,7 @@ $('ocrMessage').className=error?'warning':'muted';
 
 function busy(value){
 ocrBusy=value;
+
 ['takePhoto','choosePhoto','readCrop','check'].forEach(id=>{
 $(id).disabled=value;
 });
@@ -1264,42 +1522,61 @@ async function getWorker(){
 if(!window.Tesseract){
 await new Promise((resolve,reject)=>{
 const script=document.createElement('script');
+
 script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
 script.onload=resolve;
 script.onerror=()=>reject(Error('Text reader failed to load'));
+
 document.head.append(script);
 });
 }
-if(!ocrWorker)ocrWorker=await Tesseract.createWorker('eng');
+
+if(!ocrWorker){
+ocrWorker=await Tesseract.createWorker('eng');
+}
+
 return ocrWorker;
 }
 
 function makeCanvas(bitmap,max=1800){
 const scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));
 const canvas=document.createElement('canvas');
+
 canvas.width=Math.max(1,Math.round(bitmap.width*scale));
 canvas.height=Math.max(1,Math.round(bitmap.height*scale));
-canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+
+canvas.getContext('2d').drawImage(
+bitmap,0,0,canvas.width,canvas.height
+);
+
 return canvas;
 }
 
 function readableIngredients(parsed,confidence=0){
 const words=parsed.ingredients.match(/[A-Za-z]{3,}/g)||[];
 const junk=(parsed.ingredients.match(/[~$|_=<>]/g)||[]).length;
+
 if(words.length<6)return false;
 if(junk>Math.max(2,words.length*.15))return false;
 if(!parsed.foundHeading&&confidence<65)return false;
+
 return true;
 }
 
 function displayOCR(parsed){
 loadIngredients(parsed.ingredients);
 ingredientSource='ocr';
+
 $('confirmed').checked=false;
 clearResult();
 setStatus('Needs Verification');
+
 message('Ingredients detected. Check and correct every word before verifying.');
-$('ingredients').scrollIntoView({behavior:'smooth',block:'center'});
+
+$('ingredients').scrollIntoView({
+behavior:'smooth',
+block:'center'
+});
 }
 
 function failedOCR(text){
@@ -1307,6 +1584,7 @@ ingredientSource='ocr';
 $('confirmed').checked=false;
 clearResult();
 setStatus('Needs Verification');
+
 message(text,true);
 $('manualCropButton').style.display='block';
 }
@@ -1319,24 +1597,30 @@ return worker.recognize(canvas);
 photoInput.onchange=async()=>{
 const file=photoInput.files?.[0];
 if(!file||ocrBusy)return;
+
 try{
 if(photoBitmap)photoBitmap.close();
 photoBitmap=await createImageBitmap(file);
 
 const canvas=makeCanvas(photoBitmap,1800);
 const small=makeCanvas(photoBitmap,1000);
+
 cropCanvas.width=small.width;
 cropCanvas.height=small.height;
+
 ctx.drawImage(small,0,0);
+
 cropRect=null;
 
 $('cropPanel').style.display='none';
 $('manualCropButton').style.display='block';
 
 const preview=$('ingredientPreview');
+
 if(preview.src.startsWith('blob:')){
 URL.revokeObjectURL(preview.src);
 }
+
 preview.src=URL.createObjectURL(file);
 preview.style.display='block';
 
@@ -1361,21 +1645,30 @@ busy(false);
 $('manualCropButton').onclick=()=>{
 $('cropPanel').style.display='block';
 drawCrop();
-$('cropPanel').scrollIntoView({behavior:'smooth',block:'start'});
+
+$('cropPanel').scrollIntoView({
+behavior:'smooth',
+block:'start'
+});
 };
 
 function drawCrop(){
 if(!photoBitmap)return;
+
 const w=cropCanvas.width;
 const h=cropCanvas.height;
+
 ctx.clearRect(0,0,w,h);
 ctx.drawImage(photoBitmap,0,0,w,h);
+
 if(cropRect){
 ctx.fillStyle='rgba(0,0,0,.4)';
+
 ctx.fillRect(0,0,w,cropRect.y);
 ctx.fillRect(0,cropRect.y+cropRect.h,w,h-cropRect.y-cropRect.h);
 ctx.fillRect(0,cropRect.y,cropRect.x,cropRect.h);
 ctx.fillRect(cropRect.x+cropRect.w,cropRect.y,w-cropRect.x-cropRect.w,cropRect.h);
+
 ctx.strokeStyle='#00e676';
 ctx.lineWidth=4;
 ctx.strokeRect(cropRect.x,cropRect.y,cropRect.w,cropRect.h);
@@ -1384,6 +1677,7 @@ ctx.strokeRect(cropRect.x,cropRect.y,cropRect.w,cropRect.h);
 
 function point(e){
 const r=cropCanvas.getBoundingClientRect();
+
 return {
 x:Math.max(0,Math.min(cropCanvas.width,
 (e.clientX-r.left)*cropCanvas.width/r.width)),
@@ -1394,21 +1688,32 @@ y:Math.max(0,Math.min(cropCanvas.height,
 
 cropCanvas.addEventListener('pointerdown',e=>{
 if(!photoBitmap)return;
+
 cropCanvas.setPointerCapture(e.pointerId);
 dragStart=point(e);
-cropRect={x:dragStart.x,y:dragStart.y,w:0,h:0};
+
+cropRect={
+x:dragStart.x,
+y:dragStart.y,
+w:0,
+h:0
+};
+
 drawCrop();
 });
 
 cropCanvas.addEventListener('pointermove',e=>{
 if(!dragStart)return;
+
 const p=point(e);
+
 cropRect={
 x:Math.min(dragStart.x,p.x),
 y:Math.min(dragStart.y,p.y),
 w:Math.abs(p.x-dragStart.x),
 h:Math.abs(p.y-dragStart.y)
 };
+
 drawCrop();
 });
 
@@ -1422,13 +1727,21 @@ drawCrop();
 
 $('readCrop').onclick=async()=>{
 if(ocrBusy||!photoBitmap)return;
+
 busy(true);
 message('Reading selected ingredient area…');
+
 try{
 const sx=photoBitmap.width/cropCanvas.width;
 const sy=photoBitmap.height/cropCanvas.height;
+
 const r=cropRect&&cropRect.w>10&&cropRect.h>10?
-cropRect:{x:0,y:0,w:cropCanvas.width,h:cropCanvas.height};
+cropRect:{
+x:0,
+y:0,
+w:cropCanvas.width,
+h:cropCanvas.height
+};
 
 const x=Math.floor(r.x*sx);
 const y=Math.floor(r.y*sy);
@@ -1437,8 +1750,10 @@ const h=Math.max(1,Math.floor(r.h*sy));
 
 const out=document.createElement('canvas');
 const scale=Math.min(2,3200/Math.max(w,h));
+
 out.width=Math.max(1,Math.floor(w*scale));
 out.height=Math.max(1,Math.floor(h*scale));
+
 out.getContext('2d').drawImage(
 photoBitmap,x,y,w,h,0,0,out.width,out.height
 );
@@ -1459,7 +1774,10 @@ busy(false);
 };
 
 $('ingredients').addEventListener('input',()=>{
-if(ingredientSource==='ocr')$('confirmed').checked=false;
+if(ingredientSource==='ocr'){
+$('confirmed').checked=false;
+}
+
 if(lastResult){
 clearResult();
 setStatus('Needs Verification');
@@ -1475,7 +1793,11 @@ setStatus('Needs Verification');
 
 window.addEventListener('pagehide',()=>{
 stopCamera();
-if(ocrWorker)ocrWorker.terminate().catch(()=>{});
+cancelPhotoWork();
+
+if(ocrWorker){
+ocrWorker.terminate().catch(()=>{});
+}
 });
 
 renderHistory();
