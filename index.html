@@ -236,7 +236,7 @@ Hold the camera straight, fill the picture with the ingredient label, avoid glar
 <script>
 'use strict';
 
-/* VERIFIED VEGAN SUPABASE CONNECTION */
+/* VERIFIED VEGAN — COMPLETE APPLICATION */
 
 const SUPABASE_URL='https://bluaqqfcsjudoiaxkbjn.supabase.co';
 const SUPABASE_KEY='sb_publishable_ed4oFchBc40deLLF5Ws9CQ_MVz_sxog';
@@ -271,6 +271,11 @@ try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}
 catch{return fallback}
 }
 function dbConfig(){return {url:SUPABASE_URL,key:SUPABASE_KEY}}
+function requireDB(){
+const db=dbConfig();
+if(!db.url||!db.key)throw Error('Supabase configuration missing.');
+return db;
+}
 function releaseSelectedPhoto(){
 if(selectedPhotoURL)URL.revokeObjectURL(selectedPhotoURL);
 selectedPhotoURL='';selectedPhotoFile=null;
@@ -391,7 +396,6 @@ if(savingContribution){alert('Please wait until your cloud save finishes.');retu
 stopCamera();resetProductData();showScannerView();
 await startBarcodeCamera();
 };
-
 function toggleManualEntry(forceOpen){
 const panel=$('manualEntry');
 const open=typeof forceOpen==='boolean'?forceOpen:panel.style.display!=='block';
@@ -405,7 +409,7 @@ $('barcode').addEventListener('keydown',e=>{
 if(e.key==='Enter'){e.preventDefault();lookupProduct()}
 });
 
-/* SUPABASE REQUESTS */
+/* SUPABASE REQUESTS — AUTHENTICATED ADMIN SUPPORT */
 
 function headers(db,token=null){
 const h={'apikey':db.key,'Content-Type':'application/json'};
@@ -419,11 +423,6 @@ const e=JSON.parse(text);
 return 'HTTP '+response.status+': '+(e.msg||e.message||e.error_description||e.details||text);
 }catch{return 'HTTP '+response.status+': '+text.slice(0,300)}
 }
-function requireDB(){
-const db=dbConfig();
-if(!db.url||!db.key)throw Error('Supabase configuration missing.');
-return db;
-}
 async function apiRequest(path,options={}){
 const db=requireDB();
 const response=await fetch(db.url+path,{
@@ -436,7 +435,7 @@ const text=await response.text();
 return text?JSON.parse(text):null;
 }
 
-/* ACCOUNTS AND ADMINISTRATOR MODE */
+/* AUTHENTICATION */
 
 function updateAccountMode(){
 const signedIn=!!currentUser;
@@ -486,7 +485,6 @@ $('adminPending').replaceChildren();
 updateAccountMode();
 if(newId&&oldId!==newId)checkAdminAccess();
 }
-
 async function authCall(endpoint,body){
 const db=requireDB();
 const response=await fetch(db.url+'/auth/v1/'+endpoint,{
@@ -602,7 +600,6 @@ if(response.status===204)return null;
 const text=await response.text();
 return text?JSON.parse(text):null;
 }
-
 async function ensureProfile(){
 if(!currentUser||adminAuthorized)return;
 const id=currentUser.id;
@@ -616,17 +613,13 @@ body:JSON.stringify({user_id:id,show_on_leaderboard:false})
 });
 }
 }
-
 async function initializeSignedInAccount(){
 if(!currentUser)return;
 await checkAdminAccess();
 if(adminAuthorized)return;
-try{await ensureProfile()}catch(e){
-console.warn('Profile setup:',e.message);
-}
+try{await ensureProfile()}catch(e){console.warn('Profile setup:',e.message)}
 await loadRewards();
 }
-
 async function loadRewards(){
 if(!currentUser||adminAuthorized)return;
 $('rewardMessage').textContent='Loading rewards…';
@@ -659,7 +652,6 @@ if(!adminAuthorized)$('rewardMessage').textContent='Rewards unavailable: '+e.mes
 }
 }
 $('refreshRewards').onclick=loadRewards;
-
 async function restoreAuth(){
 const saved=readJSON(AUTHKEY,null);
 if(!saved?.access_token)return;
@@ -678,7 +670,7 @@ $('authMessage').textContent='Please log in to access your account.';
 }
 }
 
-/* ADMINISTRATOR REVIEW DASHBOARD */
+/* ADMINISTRATOR ACCESS AND REVIEWS */
 
 async function checkAdminAccess(){
 const userId=currentUser?.id;
@@ -701,15 +693,13 @@ return adminAuthorized;
 if(serial===adminCheckSerial){
 adminAuthorized=false;
 updateAccountMode();
-$('authMessage').textContent=
-'Administrator check unavailable: '+e.message;
+$('authMessage').textContent='Administrator check unavailable: '+e.message;
 }
 return false;
 }finally{
 if(serial===adminCheckSerial)adminAccessChecking=false;
 }
 }
-
 async function confirmAccountMode(){
 if(!currentUser)return false;
 if(adminAccessChecking){
@@ -721,14 +711,12 @@ if(!adminAccessChecking)await checkAdminAccess();
 if(adminAccessChecking)throw Error('Administrator verification is still loading. Try again.');
 return adminAuthorized;
 }
-
 function adminText(parent,tag,value){
 const element=document.createElement(tag);
 element.textContent=String(value??'');
 parent.append(element);
 return element;
 }
-
 async function loadAdminPending(){
 if(!currentUser||!adminAuthorized||adminBusy)return;
 const userId=currentUser.id;
@@ -747,8 +735,7 @@ if(!reviewable.length){
 $('adminMessage').textContent='✅ No contributions from other users awaiting review.';
 return;
 }
-$('adminMessage').textContent=
-reviewable.length+' pending contribution(s) awaiting review.';
+$('adminMessage').textContent=reviewable.length+' pending contribution(s) awaiting review.';
 for(const c of reviewable){
 const card=document.createElement('div');
 card.className='adminCard';
@@ -763,29 +750,21 @@ if(c.description)adminText(card,'p','Description: '+c.description);
 if(c.ingredients)adminText(card,'p','Ingredients: '+c.ingredients);
 if(c.image_url&&/^https:\/\//i.test(c.image_url)){
 const img=document.createElement('img');
-img.src=c.image_url;
-img.alt='Submitted product picture';
-img.loading='lazy';
-card.append(img);
+img.src=c.image_url;img.alt='Submitted product picture';
+img.loading='lazy';card.append(img);
 }
 const actions=document.createElement('div');
 actions.className='actions';
 const approve=document.createElement('button');
 approve.textContent='✅ Approve';
 const reject=document.createElement('button');
-reject.className='danger';
-reject.textContent='❌ Reject';
+reject.className='danger';reject.textContent='❌ Reject';
 approve.onclick=()=>reviewContribution(c,true);
 reject.onclick=()=>reviewContribution(c,false);
-actions.append(approve,reject);
-card.append(actions);
-box.append(card);
+actions.append(approve,reject);card.append(actions);box.append(card);
 }
-}catch(e){
-$('adminMessage').textContent='Unable to load reviews: '+e.message;
+}catch(e){$('adminMessage').textContent='Unable to load reviews: '+e.message}
 }
-}
-
 async function reviewContribution(contribution,approve){
 if(adminBusy||!adminAuthorized||!currentUser)return;
 if(contribution.user_id===currentUser.id){
@@ -799,7 +778,6 @@ return;
 const action=approve?'approve':'reject';
 if(!confirm('Are you sure you want to '+action+
 ' this contribution for barcode '+contribution.barcode+'?'))return;
-
 adminBusy=true;
 $('refreshAdmin').disabled=true;
 $('adminMessage').textContent='Submitting administrator decision…';
@@ -807,16 +785,11 @@ let decisionMessage='';
 try{
 await userRequest('/rest/v1/rpc/vv_review_contribution',{
 method:'POST',
-body:JSON.stringify({
-p_id:contribution.id,
-p_approve:approve
-})
+body:JSON.stringify({p_id:contribution.id,p_approve:approve})
 });
-decisionMessage=approve?
-'✅ Contribution approved.':'Contribution rejected.';
-}catch(e){
-decisionMessage='Review failed: '+e.message;
-}finally{
+decisionMessage=approve?'✅ Contribution approved.':'Contribution rejected.';
+}catch(e){decisionMessage='Review failed: '+e.message}
+finally{
 adminBusy=false;
 $('refreshAdmin').disabled=false;
 await loadAdminPending();
@@ -825,7 +798,7 @@ $('adminMessage').textContent=decisionMessage+' '+$('adminMessage').textContent;
 }
 $('refreshAdmin').onclick=loadAdminPending;
 
-/* PRODUCT PHOTOS */
+/* PRODUCT PICTURES */
 
 function validPhotoURL(url){return typeof url==='string'&&/^https:\/\//i.test(url)}
 function showPhotoCandidates(candidates){
@@ -904,7 +877,6 @@ candidates.push({url:COCONUT_PHOTO,source:'Supabase cloud picture'});
 if(offProduct)candidates.push(...extractOFFImages(offProduct));
 showPhotoCandidates(candidates);
 }
-
 const frontInput=$('frontInput');
 $('takeFront').onclick=()=>{
 if(!$('barcode').value.trim()){alert('Scan a product first.');return}
@@ -977,7 +949,6 @@ mayContain:m?clean(m[1]):'',
 foundHeading:!!match
 };
 }
-
 const rules=[
 ['Milk or dairy',/\b(milk|whey|casein|caseinate|lactose|lactalbumin|buttermilk|cheese|yogurt|yoghurt|ghee|milkfat|milk solids|butter oil|milk powder|cream powder)\b/i],
 ['Egg',/\b(egg|eggs|albumen|ovalbumin|egg whites?|egg yolks?)\b/i],
@@ -1050,6 +1021,22 @@ fiber_100g:p.fiber_100g,
 salt_100g:p.salt_100g
 };
 }
+function numericValue(value){
+if(value===undefined||value===null||value==='')return null;
+const n=Number(value);
+return Number.isFinite(n)?n:null;
+}
+function nutritionPayload(n=currentNutrition,serving=currentServingSize){
+return {
+protein_100g:numericValue(n.proteins_100g),
+carb_100g:numericValue(n.carbohydrates_100g),
+fat_100g:numericValue(n.fat_100g),
+sugar_100g:numericValue(n.sugars_100g),
+fiber_100g:numericValue(n.fiber_100g),
+salt_100g:numericValue(n.salt_100g),
+serving_size:serving||null
+};
+}
 
 /* CLOUD PRODUCT LOOKUP */
 
@@ -1065,8 +1052,9 @@ if(!response.ok)throw Error('Open Food Facts unavailable');
 return response.json();
 }finally{clearTimeout(timeout)}
 }
-async function findCloudRecord(barcode){
+async function findCloudRecord(barcode,authenticated=false){
 try{
+const request=authenticated&&currentUser?userRequest:apiRequest;
 const variants=new Set([
 barcode,normalizeBarcode(barcode),
 barcode.padStart(13,'0'),barcode.padStart(14,'0')
@@ -1074,14 +1062,14 @@ barcode.padStart(13,'0'),barcode.padStart(14,'0')
 let records=[];
 for(const code of variants){
 if(!code)continue;
-const rows=await apiRequest('/rest/v1/products?barcode=eq.'+
+const rows=await request('/rest/v1/products?barcode=eq.'+
 encodeURIComponent(code)+'&select=*&limit=100');
 records.push(...rows);
 if(rows.length)break;
 }
 let matches=records.filter(p=>sameBarcode(p.barcode,barcode));
 if(!matches.length){
-records=await apiRequest('/rest/v1/products?select=*&limit=1000');
+records=await request('/rest/v1/products?select=*&limit=1000');
 matches=records.filter(p=>sameBarcode(p.barcode,barcode));
 }
 matches.sort((a,b)=>{
@@ -1130,23 +1118,6 @@ $('lookupMessage').textContent='No ingredients available. Add ingredients to ver
 }
 $('autoSaveMessage').textContent='Already in Supabase. No save needed.';
 }
-function numericValue(value){
-if(value===undefined||value===null||value==='')return null;
-const n=Number(value);
-return Number.isFinite(n)?n:null;
-}
-function nutritionPayload(n=currentNutrition,serving=currentServingSize){
-return {
-protein_100g:numericValue(n.proteins_100g),
-carb_100g:numericValue(n.carbohydrates_100g),
-fat_100g:numericValue(n.fat_100g),
-sugar_100g:numericValue(n.sugars_100g),
-fiber_100g:numericValue(n.fiber_100g),
-salt_100g:numericValue(n.fiber_100g),
-serving_size:serving||null
-};
-}
-
 async function automaticCloudSave(barcode,p,serial){
 const saveSerial=++autoSaveSerial;
 const notice=$('autoSaveMessage');
@@ -1210,7 +1181,6 @@ notice.textContent='⚠️ Automatic cloud save failed: '+e.message;
 if(saveSerial===autoSaveSerial)autoSaveBusy=false;
 }
 }
-
 async function lookupProduct(){
 const barcode=$('barcode').value.trim();
 if(!/^\d{8,14}$/.test(barcode)){
@@ -1235,7 +1205,7 @@ showNutrition({});currentServingSize='';
 showProductView();
 const isCurrent=()=>serial===lookupNumber&&
 session===productSession&&barcode===$('barcode').value.trim();
-const cloud=await findCloudRecord(barcode);
+const cloud=await findCloudRecord(barcode,!!currentUser);
 if(!isCurrent())return;
 if(cloud.record){loadCloudRecord(cloud.record);return}
 if(cloud.error){
@@ -1281,22 +1251,35 @@ displayProductImages(barcode);photoWasMissing=true;
 }
 $('lookup').onclick=lookupProduct;
 
-/* PHOTO UPLOAD AND CONTRIBUTIONS */
+/* STORAGE UPLOAD — AUTHENTICATED AND STAGE-SPECIFIC ERRORS */
 
 async function uploadProductPhoto(db,file,barcode){
-const filename=normalizeBarcode(barcode)+'-'+Date.now()+'.jpg';
+if(!file)throw Error('No product picture selected.');
+const filename=normalizeBarcode(barcode)+'-'+Date.now()+
+'-'+Math.random().toString(36).slice(2,9)+'.jpg';
 const url=db.url+'/storage/v1/object/product-images/'+encodeURIComponent(filename);
-const token=currentUser?await userToken():null;
+let token=currentUser?await userToken():null;
+const send=t=>{
 const h={
 'apikey':db.key,
 'Content-Type':'image/jpeg',
 'x-upsert':'false'
 };
-if(token)h.Authorization='Bearer '+token;
-const response=await fetch(url,{
-method:'POST',headers:h,body:file
-});
-if(!response.ok)throw Error(await responseError(response));
+if(t)h.Authorization='Bearer '+t;
+return fetch(url,{method:'POST',headers:h,body:file});
+};
+let response=await send(token);
+if(response.status===401&&currentUser){
+token=await refreshSession();
+response=await send(token);
+}
+if(!response.ok){
+const detail=await responseError(response);
+throw Error(
+'PRODUCT PICTURE UPLOAD rejected by Supabase Storage: '+detail+
+'. Check INSERT permissions on the product-images bucket.'
+);
+}
 return db.url+'/storage/v1/object/public/product-images/'+encodeURIComponent(filename);
 }
 async function submitContribution(type,barcode,imageUrl,ingredients){
@@ -1317,7 +1300,7 @@ p_image_url:imageUrl||null,p_ingredients:ingredients||null
 });
 }
 
-/* SAVE SCAN */
+/* VERIFY INGREDIENTS */
 
 $('check').onclick=()=>{
 if(ocrBusy)return;
@@ -1334,6 +1317,8 @@ $('ingredients').value=parsed.ingredients;
 showResult(classify(parsed.ingredients));
 $('result').scrollIntoView({behavior:'smooth',block:'start'});
 };
+
+/* COMPLETE SAVE SCAN — ADMINISTRATOR PICTURE REPLACEMENT */
 
 $('save').onclick=async()=>{
 if(savingContribution)return;
@@ -1352,198 +1337,294 @@ freshResult.reasons.join('|')!==lastResult.reasons.join('|')){
 alert('Ingredients changed. Tap Verify Ingredients again before saving.');
 return;
 }
-const session=productSession,button=$('save');
-savingContribution=true;button.disabled=true;
+
+const session=productSession;
+const button=$('save');
+savingContribution=true;
+button.disabled=true;
 button.textContent='Saving to cloud…';
-$('saveMessage').textContent='Checking cloud record…';
+$('saveMessage').textContent='Checking administrator permissions…';
+
+let uploadedPhoto='';
+let databaseSaved=false;
+
 try{
 const isAdmin=currentUser?await confirmAccountMode():false;
 if(autoSavePromise)await autoSavePromise;
 if(session!==productSession)throw Error('Product changed. Save cancelled.');
-const record={
-barcode,
-brand:displayBrand($('brand').value,barcode),
-product_name:$('productName').value.trim(),
-ingredient_text:$('ingredients').value.trim(),
-vegan_result:lastResult.status,
-decision_reasons:lastResult.reasons
-};
-const newPhoto=!!selectedPhotoFile;
-const baseline=contributionBaseline||{
-ingredients:originalIngredients,image_url:'',
-brand:'',product_name:'',vegan_status:originalStatus
-};
-const ingredientChanged=!!record.ingredient_text&&
-clean(record.ingredient_text)!==clean(baseline.ingredients);
-const newIngredients=ingredientChanged&&!clean(baseline.ingredients);
-const correction=ingredientChanged&&!!clean(baseline.ingredients);
-const photoContribution=newPhoto&&!baseline.image_url;
-const metadataChanged=record.brand!==clean(baseline.brand)||
-record.product_name!==clean(baseline.product_name);
-const hasContribution=newPhoto||ingredientChanged||metadataChanged;
-let uploadedPhoto='',rewardText='',cloudSaved=false;
-const db=requireDB();
-const found=await findCloudRecord(barcode);
-if(found.error)throw Error(found.error);
-if(session!==productSession)throw Error('Product changed. Save cancelled.');
-const existing=found.record;
-const id=existing?.id??null;
-const payload={
-barcode,brand:record.brand||null,
-product_name:record.product_name||null,
-ingredients:record.ingredient_text||null,
-vegan_status:record.vegan_result,
-vegan_reason:record.decision_reasons.join('; ')
-};
-Object.entries(nutritionPayload()).forEach(([key,value])=>{
-if(value!==null)payload[key]=value;
-});
 
-const existingIngredients=clean(existing?.ingredients);
-const proposedIngredients=clean(record.ingredient_text);
-const changingVerifiedIngredients=!!existing&&!!existingIngredients&&
-proposedIngredients!==existingIngredients;
-const changingVerifiedStatus=!!existing&&
-normalizeStatus(existing.vegan_status)!=='Needs Verification'&&
-record.vegan_result!==normalizeStatus(existing.vegan_status);
+const db=requireDB();
+const found=await findCloudRecord(barcode,!!currentUser);
+if(found.error)throw Error('Cloud lookup failed: '+found.error);
+if(session!==productSession)throw Error('Product changed. Save cancelled.');
+
+const existing=found.record;
+const ingredients=clean($('ingredients').value);
+const brand=displayBrand($('brand').value,barcode);
+const productName=clean($('productName').value);
+const newPhoto=!!selectedPhotoFile;
+const nutrition=nutritionPayload();
+
+const payload={
+barcode,
+brand:brand||null,
+product_name:productName||null,
+ingredients:ingredients||null,
+vegan_status:freshResult.status,
+vegan_reason:freshResult.reasons.join('; ')
+};
+for(const [key,value] of Object.entries(nutrition)){
+if(value!==null)payload[key]=value;
+}
+
+const baseline=contributionBaseline||{
+ingredients:originalIngredients,
+image_url:'',
+brand:'',
+product_name:'',
+vegan_status:originalStatus
+};
+
+const ingredientChanged=
+ingredients!==clean(baseline.ingredients);
+const metadataChanged=
+brand!==clean(baseline.brand)||
+productName!==clean(baseline.product_name);
+const statusChanged=existing?
+normalizeStatus(existing.vegan_status)!==freshResult.status:false;
+const hasContribution=
+newPhoto||ingredientChanged||metadataChanged||statusChanged;
+
+let rewardText='';
 
 /*
-SECURITY:
-Administrator updates use userRequest(), which sends the
-signed-in Supabase access token. Supabase must also have
-an administrator-only UPDATE policy on public.products.
+Existing products:
+Regular contributors submit proposed changes for review.
+Only an authorized administrator directly updates records.
 */
+
 if(existing&&!isAdmin){
-if(!currentUser&&
-(changingVerifiedIngredients||changingVerifiedStatus||newPhoto)){
+if(!hasContribution){
+$('saveMessage').textContent='✅ Product already saved. No changes needed.';
+return;
+}
+if(!currentUser){
 throw Error('Sign in to submit changes to an existing product.');
 }
-if(currentUser&&hasContribution){
-let type=photoContribution?'product_photo':
-newIngredients?'ingredients':'correction';
+
+const existingIngredients=clean(existing.ingredients);
+const missingPhoto=!existing.image_url;
+let type='correction';
+
+if(newPhoto&&missingPhoto)type='product_photo';
+else if(ingredients&&!existingIngredients)type='ingredients';
+
 if(newPhoto){
+$('saveMessage').textContent='Uploading contributor picture…';
 uploadedPhoto=await uploadProductPhoto(db,selectedPhotoFile,barcode);
 }
+
+$('saveMessage').textContent='Submitting contribution for administrator review…';
+
+try{
 await submitContribution(
-type,barcode,
+type,
+barcode,
 uploadedPhoto||null,
-record.ingredient_text||null
+type==='product_photo'?null:ingredients||null
 );
-rewardText=' Contribution submitted for review. Points pending approval.';
-cloudSaved=true;
-await loadRewards();
-}else{
-rewardText=' No changes to save.';
-cloudSaved=true;
+}catch(e){
+throw Error('CONTRIBUTION SUBMISSION failed: '+e.message);
 }
+
+databaseSaved=true;
+rewardText=' Contribution pending administrator approval.';
+
+if(newPhoto&&uploadedPhoto){
+showPhoto(uploadedPhoto,'Submitted picture — awaiting review');
+releaseSelectedPhoto();
+frontInput.value='';
+$('frontMessage').textContent='Picture submitted for review.';
+}
+
+await loadRewards();
+
 }else{
+
+/*
+Upload the picture first.
+Storage failure is reported separately from database failure.
+Do not discard the selected photo if either operation fails.
+*/
+
 if(newPhoto){
+$('saveMessage').textContent='Uploading picture to Supabase Storage…';
 uploadedPhoto=await uploadProductPhoto(db,selectedPhotoFile,barcode);
 payload.image_url=uploadedPhoto;
 }else if(!existing?.image_url&&validPhotoURL(currentPhoto)){
 payload.image_url=currentPhoto;
 }
-if(session!==productSession)throw Error('Product changed. Save cancelled.');
+
+if(session!==productSession){
+throw Error('Product changed while saving.');
+}
 
 if(existing){
 const patch={};
-if(isAdmin){
-if(proposedIngredients!==existingIngredients){
-patch.ingredients=proposedIngredients||null;
+
+if(!isAdmin){
+throw Error('Existing product edits require administrator approval.');
 }
-if(record.vegan_result!==normalizeStatus(existing.vegan_status)){
-patch.vegan_status=record.vegan_result;
+
+/* Administrator may replace existing pictures. */
+if(uploadedPhoto){
+patch.image_url=uploadedPhoto;
+}
+
+if(ingredients!==clean(existing.ingredients)){
+patch.ingredients=ingredients||null;
+}
+if(freshResult.status!==normalizeStatus(existing.vegan_status)){
+patch.vegan_status=freshResult.status;
 }
 if(patch.ingredients!==undefined||patch.vegan_status!==undefined){
 patch.vegan_reason=payload.vegan_reason;
 }
-if(payload.brand!==clean(existing.brand))patch.brand=payload.brand;
-if(payload.product_name!==clean(existing.product_name))
-patch.product_name=payload.product_name;
-if(uploadedPhoto)patch.image_url=uploadedPhoto;
-}else{
-if(!existingIngredients&&proposedIngredients){
-patch.ingredients=proposedIngredients;
-patch.vegan_status=record.vegan_result;
-patch.vegan_reason=payload.vegan_reason;
+if(brand!==clean(existing.brand)){
+patch.brand=brand||null;
 }
-if(!existing.image_url&&payload.image_url)patch.image_url=payload.image_url;
-if(!existing.brand&&payload.brand)patch.brand=payload.brand;
-if(!existing.product_name&&payload.product_name)
-patch.product_name=payload.product_name;
+if(productName!==clean(existing.product_name)){
+patch.product_name=productName||null;
 }
+
 for(const key of [
 'protein_100g','carb_100g','fat_100g',
 'sugar_100g','fiber_100g','salt_100g','serving_size'
 ]){
-if(existing[key]===null||existing[key]===undefined){
-if(payload[key]!==undefined&&payload[key]!==null)patch[key]=payload[key];
+if(payload[key]!==undefined&&payload[key]!==null&&
+(existing[key]===null||existing[key]===undefined)){
+patch[key]=payload[key];
 }
 }
+
 if(Object.keys(patch).length){
-if(!isAdmin)throw Error('Existing product edits require administrator approval.');
-const saved=await userRequest(
-'/rest/v1/products?id=eq.'+encodeURIComponent(id),
+$('saveMessage').textContent='Updating product using administrator permissions…';
+
+let saved;
+try{
+saved=await userRequest(
+'/rest/v1/products?id=eq.'+encodeURIComponent(existing.id),
 {
 method:'PATCH',
 headers:{Prefer:'return=representation'},
 body:JSON.stringify(patch)
 }
 );
-if(!saved?.length)throw Error(
-'Database did not confirm the administrator update. Verify the Supabase administrator UPDATE policy.'
+}catch(e){
+throw Error(
+'PRODUCT DATABASE UPDATE rejected by Supabase: '+e.message+
+'. The picture may already be uploaded, but the product record was not updated.'
 );
-loadedCloudId=saved[0].id;
 }
-cloudSaved=true;
-}else{
-const saved=await apiRequest('/rest/v1/products',{
-method:'POST',headers:{Prefer:'return=representation'},
-body:JSON.stringify(payload)
-});
-if(!saved?.length)throw Error('Database did not confirm the new product.');
+
+if(!Array.isArray(saved)||!saved.length){
+throw Error(
+'PRODUCT DATABASE UPDATE was not confirmed. Check administrator UPDATE and SELECT policies.'
+);
+}
+
 loadedCloudId=saved[0].id;
-cloudSaved=true;
+rememberBaseline(saved[0]);
+
+}else{
+loadedCloudId=existing.id;
+rememberBaseline(existing);
+}
+
+databaseSaved=true;
+
+}else{
+
+/*
+New products:
+Use authenticated insertion when signed in.
+Otherwise use the existing public insertion policy.
+*/
+
+$('saveMessage').textContent='Creating new Supabase product…';
+
+let saved;
+try{
+saved=await (
+currentUser
+?userRequest('/rest/v1/products',{
+method:'POST',
+headers:{Prefer:'return=representation'},
+body:JSON.stringify(payload)
+})
+:apiRequest('/rest/v1/products',{
+method:'POST',
+headers:{Prefer:'return=representation'},
+body:JSON.stringify(payload)
+})
+);
+}catch(e){
+throw Error('NEW PRODUCT DATABASE INSERT failed: '+e.message);
+}
+
+if(!Array.isArray(saved)||!saved.length){
+throw Error('Supabase did not confirm the new product.');
+}
+
+loadedCloudId=saved[0].id;
+rememberBaseline(saved[0]);
+databaseSaved=true;
+}
+
+if(databaseSaved&&newPhoto&&uploadedPhoto){
+showPhoto(uploadedPhoto,'Supabase cloud picture');
+releaseSelectedPhoto();
+frontInput.value='';
+$('frontMessage').textContent='✅ Product picture saved to Supabase.';
+}
+
+originalIngredients=ingredients;
+originalStatus=freshResult.status;
+
+if(isAdmin){
+rewardText=' Administrator save — no reward points.';
+}else if(currentUser&&!existing&&hasContribution){
+const type=newPhoto?'product_photo':
+ingredients?'ingredients':'correction';
+try{
+await submitContribution(
+type,barcode,
+newPhoto?uploadedPhoto:null,
+type==='product_photo'?null:ingredients||null
+);
+rewardText=' Contribution pending approval.';
+await loadRewards();
+}catch(e){
+rewardText=' Product saved. Reward submission failed: '+e.message;
+}
+}else if(!currentUser&&hasContribution){
+rewardText=' Sign in before contributing to earn rewards.';
 }
 }
 
-if(cloudSaved&&newPhoto&&uploadedPhoto&&isAdmin){
-showPhoto(uploadedPhoto,'Supabase cloud picture');
-releaseSelectedPhoto();frontInput.value='';
-$('frontMessage').textContent='Picture uploaded to Supabase.';
-}
-if(cloudSaved&&currentUser&&!isAdmin&&!existing&&!rewardText){
-let type=null;
-if(photoContribution)type='product_photo';
-else if(newIngredients)type='ingredients';
-else if(correction||metadataChanged)type='correction';
-if(type){
-try{
-await submitContribution(type,barcode,
-type==='product_photo'?uploadedPhoto:null,
-type==='product_photo'?null:record.ingredient_text);
-rewardText=' Contribution submitted. Points pending approval.';
-await loadRewards();
-}catch(e){rewardText=' Reward submission failed: '+e.message}
-}
-}
-if(!currentUser&&hasContribution)
-rewardText+=' Sign in before contributing to earn rewards.';
-if(isAdmin)rewardText=' Administrator save — no reward points.';
-if(cloudSaved&&(!existing||isAdmin)){
-originalIngredients=record.ingredient_text;
-const refreshed=await findCloudRecord(barcode);
-if(refreshed.record)rememberBaseline(refreshed.record);
-}
+if(databaseSaved){
 $('saveMessage').textContent=
-(cloudSaved?'✅ Saved or submitted successfully.':'Save not confirmed.')+rewardText;
+'✅ Saved or submitted successfully.'+rewardText;
+}
+
 }catch(e){
 $('saveMessage').textContent='❌ Save failed: '+e.message;
 }finally{
 savingContribution=false;
 button.disabled=false;
 button.textContent=adminAuthorized?
-'💾 Save Scan — Administrator':'💾 Save Scan / Submit Contribution';
+'💾 Save Scan — Administrator':
+'💾 Save Scan / Submit Contribution';
 }
 };
 
@@ -1638,7 +1719,7 @@ toggleManualEntry(false);
 await startBarcodeCamera();
 };
 
-/* INGREDIENT PHOTO RECOGNITION */
+/* INGREDIENT PHOTO OCR */
 
 const photoInput=$('photoInput');
 const cropCanvas=$('cropCanvas');
@@ -1699,7 +1780,6 @@ ocrLoadPromise=null;
 throw e;
 }
 }
-
 function makeCanvas(bitmap,max=2400){
 const scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));
 const canvas=document.createElement('canvas');
@@ -1710,7 +1790,6 @@ bitmap,0,0,canvas.width,canvas.height
 );
 return canvas;
 }
-
 function enhanceCanvas(source,mode='contrast'){
 const out=document.createElement('canvas');
 out.width=source.width;
@@ -1742,7 +1821,6 @@ d[i]=d[i+1]=d[i+2]=g;
 c.putImageData(image,0,0);
 return out;
 }
-
 function upscaleCanvas(source,max=3200){
 const scale=Math.min(2.2,Math.max(1,max/Math.max(source.width,source.height)));
 if(scale<=1.05)return source;
@@ -1755,7 +1833,6 @@ c.imageSmoothingQuality='high';
 c.drawImage(source,0,0,out.width,out.height);
 return out;
 }
-
 function scoreOCR(text,confidence=0){
 const parsed=splitPackageText(text);
 const t=parsed.ingredients;
@@ -1808,7 +1885,6 @@ setStatus('Needs Verification');
 message(text,true);
 $('manualCropButton').style.display='block';
 }
-
 async function recognizeBest(source,session,barcode){
 const worker=await getWorker();
 const original=upscaleCanvas(source);
@@ -1841,7 +1917,6 @@ if(candidate.score>=80&&acceptableOCR(candidate))break;
 progress(100);
 return best;
 }
-
 photoInput.onchange=async()=>{
 const file=photoInput.files?.[0];
 if(!file||ocrBusy)return;
@@ -1882,7 +1957,6 @@ if(validOCRSession(session,barcode))
 failedOCR('Photo reading failed: '+e.message);
 }finally{busy(false)}
 };
-
 function drawCrop(){
 if(!photoBitmap)return;
 const w=cropCanvas.width,h=cropCanvas.height;
@@ -1932,7 +2006,6 @@ drawCrop();
 cropCanvas.addEventListener('pointerup',()=>dragStart=null);
 cropCanvas.addEventListener('pointercancel',()=>dragStart=null);
 $('resetCrop').onclick=()=>{cropRect=null;drawCrop()};
-
 $('readCrop').onclick=async()=>{
 if(ocrBusy||!photoBitmap)return;
 const session=productSession;
@@ -1965,7 +2038,6 @@ if(validOCRSession(session,barcode))
 failedOCR('Reading failed: '+e.message);
 }finally{busy(false)}
 };
-
 $('ingredients').addEventListener('input',()=>{
 if(ocrRejected){
 ocrRejected=false;
@@ -2012,7 +2084,6 @@ return;
 await initializeSignedInAccount();
 $('authMessage').textContent='Email confirmed. You are signed in!';
 }
-
 window.addEventListener('pagehide',()=>{
 stopCamera();
 releaseSelectedPhoto();
@@ -2024,7 +2095,6 @@ const preview=$('ingredientPreview');
 if(preview.src.startsWith('blob:'))URL.revokeObjectURL(preview.src);
 if(ocrWorker)ocrWorker.terminate().catch(()=>{});
 });
-
 (async()=>{
 resetProductData();
 toggleManualEntry(false);
