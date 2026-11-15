@@ -38,7 +38,6 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 .pending{background:#edf2ee;color:#52675a}
 #nutrition{line-height:1.8}
 .entry{border-bottom:1px solid #ddd;padding:10px 0;overflow-wrap:anywhere}
-.entry img{width:55px;height:55px;object-fit:contain;float:right}
 #cropCanvas{width:100%;height:auto;touch-action:none;border-radius:10px;border:1px solid #a9c2b2}
 #confirmedRow{display:flex;gap:10px;align-items:flex-start;margin:12px 0}
 #confirmedRow input{width:24px;height:24px;flex:none;margin:0}
@@ -52,50 +51,24 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 .rewardBox span{font-size:13px;color:#617469}
 .steps{background:#f1f7f2;border-radius:12px;padding:12px 18px}
 .steps li{margin:9px 0}
-#cameraPanel,#productDetails,#result,#cropPanel,#ingredientPreview,#allergenPanel,#signedInPanel,#myRewards,#passwordPanel{display:none}
+#cameraPanel,#productDetails,#result,#cropPanel,#ingredientPreview,#allergenPanel,#signedInPanel,#myRewards,#passwordPanel,#adminSection{display:none}
 #frontInput,#photoInput,#brandDisplay{display:none}
 #authSection{border:2px solid #d7e8dc}
+#adminSection{border:2px solid #126c42}
 #scannerSection{scroll-margin-top:10px}
-#lookupMessage,#authMessage,#rewardMessage,#saveMessage{overflow-wrap:anywhere}
+#lookupMessage,#authMessage,#rewardMessage,#saveMessage,#adminMessage{overflow-wrap:anywhere}
 #ocrProgress{height:9px;background:#e2eee5;border-radius:20px;overflow:hidden;display:none;margin:10px 0}
 #ocrProgressBar{height:100%;width:0;background:#126c42;transition:width .2s}
 #ocrAdvice{background:#f1f7f2;padding:12px;border-radius:10px;margin:10px 0;font-size:14px}
-
-/* CAMERA-FIRST BARCODE SCANNER */
-#startCamera{
-font-size:21px;
-padding:20px 14px;
-min-height:72px;
-border-radius:15px;
-box-shadow:0 4px 12px #126c4230;
-}
-#manualToggle{
-background:transparent;
-color:#426755;
-border:1px solid #d4e5d8;
-font-size:14px;
-font-weight:600;
-margin-top:15px;
-padding:11px;
-}
-#manualEntry{
-display:none;
-margin-top:10px;
-padding:14px;
-background:#f1f7f2;
-border-radius:12px;
-}
-#scannerHint{
-text-align:center;
-font-size:14px;
-color:#617469;
-margin:12px 0;
-}
-#scannerFeedback{
-text-align:center;
-font-size:14px;
-min-height:20px;
-}
+#startCamera{font-size:21px;padding:20px 14px;min-height:72px;border-radius:15px;box-shadow:0 4px 12px #126c4230}
+#manualToggle{background:transparent;color:#426755;border:1px solid #d4e5d8;font-size:14px;font-weight:600;margin-top:15px;padding:11px}
+#manualEntry{display:none;margin-top:10px;padding:14px;background:#f1f7f2;border-radius:12px}
+#scannerHint{text-align:center;font-size:14px;color:#617469;margin:12px 0}
+#scannerFeedback{text-align:center;font-size:14px;min-height:20px}
+.adminCard{border:1px solid #d7e8dc;border-radius:12px;padding:14px;margin:12px 0;background:#fbfdfb;overflow-wrap:anywhere}
+.adminCard img{display:block;max-width:200px;max-height:220px;object-fit:contain;margin:10px 0}
+.adminCard .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.adminCard p{white-space:pre-wrap}
 </style>
 </head>
 <body>
@@ -116,8 +89,7 @@ min-height:20px;
 <p id="scannerFeedback" class="muted">Hold the barcode inside the camera view.</p>
 <button id="stopCamera" class="secondary">Stop Camera</button>
 </div>
-
-<button id="manualToggle" type="button" aria-expanded="false" aria-controls="manualEntry">Can't Scan? Enter Barcode</button>
+<button id="manualToggle" type="button" aria-expanded="false">Can't Scan? Enter Barcode</button>
 <div id="manualEntry">
 <label for="barcode">Enter UPC / EAN barcode number</label>
 <input id="barcode" inputmode="numeric" autocomplete="off" placeholder="Barcode number">
@@ -191,6 +163,15 @@ min-height:20px;
 <p id="authMessage" class="muted" aria-live="polite"></p>
 </section>
 
+<section id="adminSection">
+<h2>🛡️ Administrator Dashboard</h2>
+<p>Review contributions before awarding points.</p>
+<p class="small muted">Only authorized administrators can access this dashboard. Check submitted evidence before approving.</p>
+<button id="refreshAdmin">🔄 Refresh Pending Reviews</button>
+<p id="adminMessage" class="muted" aria-live="polite"></p>
+<div id="adminPending"></div>
+</section>
+
 <section id="myRewards">
 <h2>🏆 My Rewards</h2>
 <div class="rewardGrid">
@@ -251,22 +232,19 @@ Hold the camera straight, fill the picture with the ingredient label, avoid glar
 <script>
 'use strict';
 
-/* AUTOMATIC SUPABASE CONNECTION */
+/* VERIFIED VEGAN SUPABASE CONNECTION */
 
 const SUPABASE_URL='https://bluaqqfcsjudoiaxkbjn.supabase.co';
 const SUPABASE_KEY='sb_publishable_ed4oFchBc40deLLF5Ws9CQ_MVz_sxog';
+const AUTHKEY='verified-vegan-auth-v1';
 
 const $=id=>document.getElementById(id);
-const AUTHKEY='verified-vegan-auth-v1';
-const DBKEY='verified-vegan-supabase-config-v1';
-
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
 const normalizeBarcode=v=>String(v??'').replace(/\D/g,'').replace(/^0+(?=\d)/,'');
 const sameBarcode=(a,b)=>!!normalizeBarcode(a)&&normalizeBarcode(a)===normalizeBarcode(b);
-
 const COCONUT_BARCODE='850030458001';
 const COCONUT_BRAND='Madly Hadley';
-const COCONUT_PHOTO='https://bluaqqfcsjudoiaxkbjn.supabase.co/storage/v1/object/public/product-images/PXL_20261115_031846467.MP.jpg';
+const COCONUT_PHOTO=SUPABASE_URL+'/storage/v1/object/public/product-images/PXL_20261115_031846467.MP.jpg';
 
 let stream=null,scanActive=false,scannerStarting=false,scannerSession=0;
 let lastResult=null,photoBitmap=null,ocrWorker=null,ocrBusy=false;
@@ -278,22 +256,20 @@ let loadedCloudId=null,lookupNumber=0,photoRequest=0;
 let selectedPhotoFile=null,selectedPhotoURL='';
 let currentUser=null,authSession=null,authRefreshPromise=null;
 let originalIngredients='',originalStatus='',photoWasMissing=false;
-let recoveryMode=false;
 let autoSaveBusy=false,autoSavePromise=null,autoSaveSerial=0;
 let cloudRecordExists=false,contributionBaseline=null;
 let productSession=0,savingContribution=false;
+let adminAuthorized=false,adminBusy=false,adminCheckSerial=0;
+let adminReviewSignature=null;
 
 function readJSON(key,fallback){
 try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}
 catch{return fallback}
 }
-function dbConfig(){
-return {url:SUPABASE_URL,key:SUPABASE_KEY};
-}
+function dbConfig(){return {url:SUPABASE_URL,key:SUPABASE_KEY}}
 function releaseSelectedPhoto(){
 if(selectedPhotoURL)URL.revokeObjectURL(selectedPhotoURL);
-selectedPhotoURL='';
-selectedPhotoFile=null;
+selectedPhotoURL='';selectedPhotoFile=null;
 }
 function displayBrand(brand,barcode){
 let value=clean(brand);
@@ -309,6 +285,7 @@ const value=clean($('brand').value);
 $('brandDisplay').textContent=value?'Brand: '+value:'';
 $('brandDisplay').style.display=value?'block':'none';
 });
+
 function normalizeStatus(value){
 const s=clean(value).toLowerCase().replace(/[_-]/g,' ');
 if(s==='vegan')return 'Vegan';
@@ -344,8 +321,7 @@ $('caution').textContent=result.caution||'';
 $('result').style.display='block';
 }
 function resetPhoto(){
-++photoRequest;
-currentPhoto='';
+++photoRequest;currentPhoto='';
 const img=$('productPhoto');
 img.onload=null;img.onerror=null;img.hidden=true;
 img.removeAttribute('src');
@@ -354,8 +330,7 @@ $('photoPlaceholder').textContent='Product picture appears here';
 $('photoSource').textContent='';
 }
 function resetIngredientPhoto(){
-++ocrSession;
-ocrRejected=false;
+++ocrSession;ocrRejected=false;
 if(photoBitmap){
 try{photoBitmap.close()}catch(e){}
 photoBitmap=null;
@@ -372,16 +347,15 @@ $('ocrMessage').className='muted';
 $('ocrProgress').style.display='none';
 $('ocrProgressBar').style.width='0%';
 cropRect=null;dragStart=null;
-$('cropCanvas').width=1;
-$('cropCanvas').height=1;
+$('cropCanvas').width=1;$('cropCanvas').height=1;
 }
 function resetProductData(){
-++productSession;++lookupNumber;++autoSaveSerial;++photoRequest;
+++productSession;++lookupNumber;++autoSaveSerial;
 loadedCloudId=null;cloudRecordExists=false;
 contributionBaseline=null;originalIngredients='';
 originalStatus='';photoWasMissing=false;
 currentServingSize='';currentNutrition={};
-currentPhoto='';ingredientSource='none';
+ingredientSource='none';
 allergens={contains:'',mayContain:''};
 releaseSelectedPhoto();resetPhoto();resetIngredientPhoto();
 $('barcode').value='';$('productBarcode').textContent='';
@@ -414,37 +388,23 @@ stopCamera();resetProductData();showScannerView();
 await startBarcodeCamera();
 };
 
-/* HIDDEN MANUAL BARCODE BACKUP */
-
 function toggleManualEntry(forceOpen){
 const panel=$('manualEntry');
-const open=typeof forceOpen==='boolean'?
-forceOpen:panel.style.display!=='block';
+const open=typeof forceOpen==='boolean'?forceOpen:panel.style.display!=='block';
 panel.style.display=open?'block':'none';
 $('manualToggle').setAttribute('aria-expanded',String(open));
-$('manualToggle').textContent=open?
-'Hide Manual Barcode Entry':
-"Can't Scan? Enter Barcode";
-if(open){
-stopCamera();
-$('barcode').focus();
-}
+$('manualToggle').textContent=open?'Hide Manual Barcode Entry':"Can't Scan? Enter Barcode";
+if(open){stopCamera();$('barcode').focus()}
 }
 $('manualToggle').onclick=()=>toggleManualEntry();
 $('barcode').addEventListener('keydown',e=>{
-if(e.key==='Enter'){
-e.preventDefault();
-lookupProduct();
-}
+if(e.key==='Enter'){e.preventDefault();lookupProduct()}
 });
 
-/* SUPABASE API: PUBLISHABLE KEY SUPPORT */
+/* SUPABASE REQUESTS */
 
 function headers(db,token=null){
-const h={
-'apikey':db.key,
-'Content-Type':'application/json'
-};
+const h={'apikey':db.key,'Content-Type':'application/json'};
 if(token)h.Authorization='Bearer '+token;
 return h;
 }
@@ -472,7 +432,7 @@ const text=await response.text();
 return text?JSON.parse(text):null;
 }
 
-/* ACCOUNTS AND REWARDS */
+/* ACCOUNTS */
 
 function saveSession(session){
 authSession=session;
@@ -493,6 +453,12 @@ if(!signedIn){
 $('earnedPoints').textContent='0';
 $('pendingPoints').textContent='0';
 $('contributionHistory').replaceChildren();
+adminAuthorized=false;
+++adminCheckSerial;
+$('adminSection').style.display='none';
+$('adminPending').replaceChildren();
+}else{
+checkAdminAccess();
 }
 }
 async function authCall(endpoint,body){
@@ -553,7 +519,6 @@ const response=await fetch(db.url+'/auth/v1/user',{
 method:'PUT',headers:headers(db,token),body:JSON.stringify({password})
 });
 if(!response.ok)throw Error(await responseError(response));
-recoveryMode=false;
 $('passwordPanel').style.display='none';
 $('authMessage').textContent='Password updated.';
 }catch(e){$('authMessage').textContent=e.message}
@@ -658,7 +623,7 @@ $('refreshRewards').onclick=loadRewards;
 async function restoreAuth(){
 const saved=readJSON(AUTHKEY,null);
 if(!saved?.access_token)return;
-authSession=saved;currentUser=saved.user||null;updateAuthUI();
+authSession=saved;currentUser=saved.user||null;
 try{
 const token=await userToken(),db=requireDB();
 const response=await fetch(db.url+'/auth/v1/user',{headers:headers(db,token)});
@@ -673,14 +638,144 @@ $('authMessage').textContent='Please log in to access rewards.';
 }
 }
 
+/* ADMINISTRATOR REVIEW DASHBOARD */
+
+async function checkAdminAccess(){
+const userId=currentUser?.id;
+const serial=++adminCheckSerial;
+adminAuthorized=false;
+$('adminSection').style.display='none';
+if(!userId)return;
+try{
+const rows=await userRequest(
+'/rest/v1/vv_admins?user_id=eq.'+
+encodeURIComponent(userId)+'&select=user_id&limit=1'
+);
+if(serial!==adminCheckSerial||currentUser?.id!==userId)return;
+adminAuthorized=Array.isArray(rows)&&rows.some(r=>r.user_id===userId);
+if(adminAuthorized){
+$('adminSection').style.display='block';
+await loadAdminPending();
+}
+}catch(e){
+if(serial===adminCheckSerial){
+adminAuthorized=false;
+$('adminSection').style.display='none';
+console.warn('Administrator access unavailable:',e.message);
+}
+}
+}
+
+function adminText(parent,tag,value){
+const element=document.createElement(tag);
+element.textContent=String(value??'');
+parent.append(element);
+return element;
+}
+
+async function loadAdminPending(){
+if(!currentUser||!adminAuthorized||adminBusy)return;
+const userId=currentUser.id;
+const box=$('adminPending');
+box.replaceChildren();
+$('adminMessage').textContent='Loading pending contributions…';
+try{
+const rows=await userRequest(
+'/rest/v1/vv_contributions?status=eq.pending'+
+'&select=*&order=created_at.asc&limit=100'
+);
+if(!currentUser||currentUser.id!==userId||!adminAuthorized)return;
+if(!Array.isArray(rows))throw Error('Unexpected contribution response.');
+if(!rows.length){
+$('adminMessage').textContent='✅ No pending contributions.';
+return;
+}
+$('adminMessage').textContent=
+rows.length+' pending contribution(s) awaiting review.';
+for(const c of rows){
+const card=document.createElement('div');
+card.className='adminCard';
+adminText(card,'h3',String(c.contribution_type||'Contribution').replace(/_/g,' '));
+adminText(card,'p','Barcode: '+(c.barcode||'Unknown'));
+adminText(card,'p','Points: '+(c.points??0));
+if(c.created_at){
+const date=new Date(c.created_at);
+if(!isNaN(date.getTime()))adminText(card,'p','Submitted: '+date.toLocaleString());
+}
+if(c.description)adminText(card,'p','Description: '+c.description);
+if(c.ingredients)adminText(card,'p','Ingredients: '+c.ingredients);
+if(c.image_url&&/^https:\/\//i.test(c.image_url)){
+const img=document.createElement('img');
+img.src=c.image_url;
+img.alt='Submitted product picture';
+img.loading='lazy';
+card.append(img);
+}
+const actions=document.createElement('div');
+actions.className='actions';
+const approve=document.createElement('button');
+approve.textContent='✅ Approve';
+const reject=document.createElement('button');
+reject.className='danger';
+reject.textContent='❌ Reject';
+approve.onclick=()=>reviewContribution(c,true);
+reject.onclick=()=>reviewContribution(c,false);
+actions.append(approve,reject);
+card.append(actions);
+box.append(card);
+}
+}catch(e){
+$('adminMessage').textContent='Unable to load reviews: '+e.message;
+}
+}
+
+async function reviewContribution(contribution,approve){
+if(adminBusy||!adminAuthorized||!currentUser)return;
+if(contribution.id===undefined||contribution.id===null){
+$('adminMessage').textContent='This contribution has no review ID.';
+return;
+}
+const action=approve?'approve':'reject';
+if(!confirm('Are you sure you want to '+action+
+' this contribution for barcode '+contribution.barcode+'?'))return;
+
+adminBusy=true;
+$('refreshAdmin').disabled=true;
+$('adminMessage').textContent='Submitting administrator decision…';
+try{
+/*
+The review RPC must accept these parameter names.
+If the installed function uses different parameter names,
+Supabase will return an error instead of silently approving.
+*/
+const result=await userRequest('/rest/v1/rpc/vv_review_contribution',{
+method:'POST',
+body:JSON.stringify({
+p_id:contribution.id,
+p_approve:approve
+})
+});
+if(result===false)throw Error('The review function did not approve this action.');
+$('adminMessage').textContent=approve?
+'✅ Contribution approved.':'Contribution rejected.';
+}catch(e){
+$('adminMessage').textContent='Review failed: '+e.message;
+}finally{
+adminBusy=false;
+$('refreshAdmin').disabled=false;
+await loadAdminPending();
+if(currentUser)await loadRewards();
+}
+}
+$('refreshAdmin').onclick=loadAdminPending;
+
 /* PRODUCT PHOTOS */
 
 function validPhotoURL(url){return typeof url==='string'&&/^https:\/\//i.test(url)}
 function showPhotoCandidates(candidates){
 const request=++photoRequest;
 const img=$('productPhoto');
-let index=0;
-currentPhoto='';
+let index=0;currentPhoto='';
 function next(){
 if(request!==photoRequest)return;
 if(index>=candidates.length){
@@ -805,7 +900,6 @@ const stops=[
 /\b(?:distributed by|manufactured by)\b/i,
 /\b(?:visit us at|www\.)\b/i
 ];
-
 function splitPackageText(raw){
 const source=String(raw||'').replace(/\r/g,'\n');
 const heading=/\bingredients?\s*[:\-]?\s*/i;
@@ -839,7 +933,6 @@ const rules=[
 ['Fish or seafood',/\b(fish|anchov(?:y|ies)|oyster|shrimp|prawn|crab|lobster|fish sauce|fish oil|bonito)\b/i],
 ['Other animal ingredients',/\b(collagen|keratin|lanolin|wool fat)\b/i]
 ];
-
 function classify(raw){
 const t=splitPackageText(raw).ingredients;
 if(!t)return {
@@ -862,7 +955,6 @@ explanation:reasons.length?'Animal-derived ingredients detected.':
 caution:notes.join(' ')+' Ingredient screening is not manufacturer certification.'
 };
 }
-
 function updateAllergens(){
 $('containsText').textContent=allergens.contains?'Contains: '+allergens.contains:'';
 $('mayContainText').textContent=allergens.mayContain?'May contain: '+allergens.mayContain:'';
@@ -1133,7 +1225,7 @@ displayProductImages(barcode);photoWasMissing=true;
 }
 $('lookup').onclick=lookupProduct;
 
-/* PRODUCT PHOTO UPLOAD AND REWARDS */
+/* PHOTO UPLOAD AND CONTRIBUTIONS */
 
 async function uploadProductPhoto(db,file,barcode){
 const filename=normalizeBarcode(barcode)+'-'+Date.now()+'.jpg';
@@ -1146,9 +1238,7 @@ const h={
 };
 if(token)h.Authorization='Bearer '+token;
 const response=await fetch(url,{
-method:'POST',
-headers:h,
-body:file
+method:'POST',headers:h,body:file
 });
 if(!response.ok)throw Error(await responseError(response));
 return db.url+'/storage/v1/object/public/product-images/'+encodeURIComponent(filename);
@@ -1195,6 +1285,12 @@ alert('Confirm the ingredient list before saving.');return;
 const barcode=$('barcode').value.trim();
 if(!/^\d{8,14}$/.test(barcode)){
 alert('Scan or enter a valid barcode first.');return;
+}
+const freshResult=classify($('ingredients').value);
+if(freshResult.status!==lastResult.status||
+freshResult.reasons.join('|')!==lastResult.reasons.join('|')){
+alert('Ingredients changed. Tap Verify Ingredients again before saving.');
+return;
 }
 const session=productSession,button=$('save');
 savingContribution=true;button.disabled=true;
@@ -1357,13 +1453,11 @@ async function startBarcodeCamera(){
 if(scanActive||scannerStarting)return;
 if(!navigator.mediaDevices?.getUserMedia){
 alert('Camera access requires permission and a secure HTTPS connection.');
-toggleManualEntry(true);
-return;
+toggleManualEntry(true);return;
 }
 if(!('BarcodeDetector' in window)){
 alert('Automatic barcode scanning is not supported by this browser. Use the manual barcode option.');
-toggleManualEntry(true);
-return;
+toggleManualEntry(true);return;
 }
 scannerStarting=true;
 const session=++scannerSession;
@@ -1537,7 +1631,7 @@ return out;
 }
 
 function upscaleCanvas(source,max=3200){
-const scale=Math.min(2.2,Math.max(1,3200/Math.max(source.width,source.height)));
+const scale=Math.min(2.2,Math.max(1,max/Math.max(source.width,source.height)));
 if(scale<=1.05)return source;
 const out=document.createElement('canvas');
 out.width=Math.round(source.width*scale);
@@ -1640,8 +1734,7 @@ const file=photoInput.files?.[0];
 if(!file||ocrBusy)return;
 const session=productSession;
 const barcode=$('barcode').value.trim();
-busy(true);
-ocrRejected=false;
+busy(true);ocrRejected=false;
 try{
 if(!file.type.startsWith('image/'))throw Error('Choose an image.');
 if(photoBitmap){
@@ -1650,7 +1743,6 @@ photoBitmap=null;
 }
 photoBitmap=await createImageBitmap(file);
 if(!validOCRSession(session,barcode))return;
-
 const small=makeCanvas(photoBitmap,1100);
 cropCanvas.width=small.width;
 cropCanvas.height=small.height;
@@ -1658,12 +1750,10 @@ ctx.drawImage(small,0,0);
 cropRect=null;
 $('cropPanel').style.display='none';
 $('manualCropButton').style.display='block';
-
 const preview=$('ingredientPreview');
 if(preview.src.startsWith('blob:'))URL.revokeObjectURL(preview.src);
 preview.src=URL.createObjectURL(file);
 preview.style.display='block';
-
 message('Preparing ingredient photograph…');
 progress(5);
 const canvas=makeCanvas(photoBitmap,2400);
@@ -1677,9 +1767,7 @@ failedOCR('Ingredient text unclear. Try Adjust Ingredient Area Manually, take a 
 }catch(e){
 if(validOCRSession(session,barcode))
 failedOCR('Photo reading failed: '+e.message);
-}finally{
-busy(false);
-}
+}finally{busy(false)}
 };
 
 function drawCrop(){
@@ -1804,7 +1892,6 @@ expires_at:Math.floor(Date.now()/1000)+expires,
 user
 });
 if(type==='recovery'){
-recoveryMode=true;
 $('passwordPanel').style.display='block';
 $('authMessage').textContent='Enter your new password below.';
 return;
