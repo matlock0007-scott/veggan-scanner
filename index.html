@@ -60,6 +60,42 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 #ocrProgress{height:9px;background:#e2eee5;border-radius:20px;overflow:hidden;display:none;margin:10px 0}
 #ocrProgressBar{height:100%;width:0;background:#126c42;transition:width .2s}
 #ocrAdvice{background:#f1f7f2;padding:12px;border-radius:10px;margin:10px 0;font-size:14px}
+
+/* CAMERA-FIRST BARCODE SCANNER */
+#startCamera{
+font-size:21px;
+padding:20px 14px;
+min-height:72px;
+border-radius:15px;
+box-shadow:0 4px 12px #126c4230;
+}
+#manualToggle{
+background:transparent;
+color:#426755;
+border:1px solid #d4e5d8;
+font-size:14px;
+font-weight:600;
+margin-top:15px;
+padding:11px;
+}
+#manualEntry{
+display:none;
+margin-top:10px;
+padding:14px;
+background:#f1f7f2;
+border-radius:12px;
+}
+#scannerHint{
+text-align:center;
+font-size:14px;
+color:#617469;
+margin:12px 0;
+}
+#scannerFeedback{
+text-align:center;
+font-size:14px;
+min-height:20px;
+}
 </style>
 </head>
 <body>
@@ -73,14 +109,20 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <section id="scannerSection">
 <div id="scannerView">
 <h2>📷 Scan a Barcode</h2>
-<button id="startCamera">Start Barcode Scanner</button>
+<p id="scannerHint">Point your camera at a product barcode for an instant lookup.</p>
+<button id="startCamera">📷 Scan Barcode</button>
 <div id="cameraPanel">
 <video id="video" autoplay muted playsinline></video>
+<p id="scannerFeedback" class="muted">Hold the barcode inside the camera view.</p>
 <button id="stopCamera" class="secondary">Stop Camera</button>
 </div>
-<label for="barcode">Or enter UPC / EAN</label>
-<input id="barcode" inputmode="numeric" placeholder="Barcode number">
+
+<button id="manualToggle" type="button" aria-expanded="false" aria-controls="manualEntry">Can't Scan? Enter Barcode</button>
+<div id="manualEntry">
+<label for="barcode">Enter UPC / EAN barcode number</label>
+<input id="barcode" inputmode="numeric" autocomplete="off" placeholder="Barcode number">
 <button id="lookup">Look Up Product</button>
+</div>
 </div>
 
 <div id="productDetails">
@@ -371,6 +413,30 @@ if(savingContribution){alert('Please wait until your cloud save finishes.');retu
 stopCamera();resetProductData();showScannerView();
 await startBarcodeCamera();
 };
+
+/* HIDDEN MANUAL BARCODE BACKUP */
+
+function toggleManualEntry(forceOpen){
+const panel=$('manualEntry');
+const open=typeof forceOpen==='boolean'?
+forceOpen:panel.style.display!=='block';
+panel.style.display=open?'block':'none';
+$('manualToggle').setAttribute('aria-expanded',String(open));
+$('manualToggle').textContent=open?
+'Hide Manual Barcode Entry':
+"Can't Scan? Enter Barcode";
+if(open){
+stopCamera();
+$('barcode').focus();
+}
+}
+$('manualToggle').onclick=()=>toggleManualEntry();
+$('barcode').addEventListener('keydown',e=>{
+if(e.key==='Enter'){
+e.preventDefault();
+lookupProduct();
+}
+});
 
 /* SUPABASE API: PUBLISHABLE KEY SUPPORT */
 
@@ -1283,17 +1349,21 @@ try{video.pause()}catch(e){}
 video.srcObject=null;
 $('cameraPanel').style.display='none';
 $('startCamera').disabled=false;
-$('startCamera').textContent='Start Barcode Scanner';
+$('startCamera').textContent='📷 Scan Barcode';
 }
 $('stopCamera').onclick=stopCamera;
 
 async function startBarcodeCamera(){
 if(scanActive||scannerStarting)return;
 if(!navigator.mediaDevices?.getUserMedia){
-alert('Camera permission or HTTPS is required.');return;
+alert('Camera access requires permission and a secure HTTPS connection.');
+toggleManualEntry(true);
+return;
 }
 if(!('BarcodeDetector' in window)){
-alert('Barcode detection unavailable. Enter barcode manually.');return;
+alert('Automatic barcode scanning is not supported by this browser. Use the manual barcode option.');
+toggleManualEntry(true);
+return;
 }
 scannerStarting=true;
 const session=++scannerSession;
@@ -1314,12 +1384,13 @@ stream=newStream;
 const video=$('video');
 video.srcObject=stream;
 $('cameraPanel').style.display='block';
+$('scannerFeedback').textContent='Hold the barcode steady inside the camera view.';
 try{await video.play()}
 catch(e){throw Error('Unable to start camera preview: '+e.message)}
 if(session!==scannerSession)return;
 scannerStarting=false;scanActive=true;
 $('startCamera').disabled=false;
-$('startCamera').textContent='Scanner Running';
+$('startCamera').textContent='📷 Scanner Running';
 
 async function scan(){
 if(!scanActive||session!==scannerSession)return;
@@ -1345,7 +1416,8 @@ scan();
 if(newStream&&newStream!==stream)
 newStream.getTracks().forEach(t=>t.stop());
 if(session===scannerSession){
-stopCamera();alert('Camera error: '+e.message);
+stopCamera();
+alert('Camera error: '+e.message);
 }
 }
 }
@@ -1355,6 +1427,7 @@ alert('Please wait for the cloud save to finish.');return;
 }
 if(scanActive||scannerStarting)return;
 resetProductData();showScannerView();
+toggleManualEntry(false);
 await startBarcodeCamera();
 };
 
@@ -1755,6 +1828,7 @@ if(ocrWorker)ocrWorker.terminate().catch(()=>{});
 
 (async()=>{
 resetProductData();
+toggleManualEntry(false);
 try{
 if(location.hash.includes('access_token=')){
 await handleAuthReturn();
