@@ -62,6 +62,9 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 #frontInput,#photoInput{display:none}
 #brandDisplay{display:none}
 #authSection{border:2px solid #d7e8dc}
+#productDetails{display:none}
+#scannerSection{scroll-margin-top:10px}
+#scanAnother{margin-bottom:14px}
 </style>
 </head>
 <body>
@@ -72,8 +75,10 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 </header>
 <main>
 
-<!-- FIRST: BARCODE SCANNER -->
+<!-- SCANNER AND PRODUCT DETAILS SHARE ONE SPACE -->
 <section id="scannerSection">
+
+<div id="scannerView">
 <h2>📷 Scan a Barcode</h2>
 <button id="startCamera">Start Barcode Scanner</button>
 <div id="cameraPanel">
@@ -83,12 +88,11 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <label for="barcode">Or enter UPC / EAN</label>
 <input id="barcode" inputmode="numeric" placeholder="Barcode number">
 <button id="lookup">Look Up Product</button>
-<p id="lookupMessage" class="muted"></p>
-</section>
+</div>
 
-<!-- SECOND: PRODUCT DETAILS -->
-<section id="productDetails">
+<div id="productDetails">
 <h2>Product Details</h2>
+<button id="scanAnother" class="secondary">📷 Scan Another Product</button>
 <div id="brandDisplay"></div>
 <div class="productTop">
 <div class="photoBox">
@@ -96,8 +100,10 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <span id="photoPlaceholder">Product picture appears here</span>
 <span id="photoSource"></span>
 </div>
-<div id="productStatus" class="pending" aria-live="polite">Scan a product</div>
+<div id="productStatus" class="pending" aria-live="polite">Looking up…</div>
 </div>
+<p id="productBarcode" class="muted small"></p>
+<p id="lookupMessage" class="muted" aria-live="polite"></p>
 <div class="steps">
 <strong>📸 Missing a Product Picture? Earn Points!</strong>
 <ol>
@@ -120,9 +126,11 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <input id="brand" placeholder="Brand">
 <h2>Nutrition Facts</h2>
 <div id="nutrition" class="muted">Nutrition information appears here when available.</div>
+</div>
+
 </section>
 
-<!-- THIRD: COMMUNITY REWARDS -->
+<!-- COMMUNITY REWARDS -->
 <section id="authSection">
 <h2>🏆 Community Rewards</h2>
 <p>Help improve Verified Vegan and earn points for approved contributions.</p>
@@ -167,7 +175,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <div id="contributionHistory"></div>
 </section>
 
-<!-- FOURTH: INGREDIENTS -->
+<!-- INGREDIENTS -->
 <section>
 <h2>Ingredients</h2>
 <p>Take a clear picture of the ingredient list, or enter the ingredients manually.</p>
@@ -198,7 +206,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <button id="check">🌱 Verify Ingredients</button>
 </section>
 
-<!-- FIFTH: VERIFICATION AND SAVE -->
+<!-- VERIFICATION AND SAVE -->
 <section id="result">
 <h2>Verification Details</h2>
 <p id="explanation"></p>
@@ -209,7 +217,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <p id="saveMessage" class="muted" aria-live="polite"></p>
 </section>
 
-<!-- SIXTH: DATABASE AND HISTORY -->
+<!-- DATABASE -->
 <section>
 <h2>Cloud Database Connection</h2>
 <p class="muted">Use your Supabase URL and public anon/publishable key. Never use a secret or service-role key.</p>
@@ -254,6 +262,54 @@ let selectedPhotoFile=null,photoChanged=false;
 let currentUser=null,authSession=null,authRefreshPromise=null;
 let originalIngredients='',originalPhoto='',originalStatus='';
 let photoWasMissing=false,recoveryMode=false;
+
+/* NEW: ONE-SPACE SCANNER / RESULT NAVIGATION */
+
+function showScannerView(){
+++lookupNumber;
+stopCamera();
+$('scannerView').style.display='block';
+$('productDetails').style.display='none';
+$('scannerSection').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function showProductView(){
+stopCamera();
+$('scannerView').style.display='none';
+$('productDetails').style.display='block';
+$('productBarcode').textContent='Barcode: '+$('barcode').value.trim();
+$('scannerSection').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+$('scanAnother').onclick=()=>{
+$('barcode').value='';
+$('lookupMessage').textContent='';
+$('productBarcode').textContent='';
+$('frontMessage').textContent='Add a product picture if needed.';
+$('saveMessage').textContent='';
+$('ingredients').value='';
+$('confirmed').checked=false;
+$('productName').value='';
+displayBrand('','');
+allergens={contains:'',mayContain:''};
+updateAllergens();
+ingredientSource='none';
+loadedCloudId=null;
+selectedPhotoFile=null;
+photoChanged=false;
+originalIngredients='';
+originalPhoto='';
+originalStatus='';
+photoWasMissing=false;
+showNutrition({});
+currentServingSize='';
+resetPhoto();
+clearResult();
+setStatus('Scan a product');
+showScannerView();
+};
+
+/* LOCAL STORAGE */
 
 function readJSON(key,fallback){
 try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}
@@ -990,9 +1046,13 @@ $('lookupMessage').textContent='Add ingredients to verify.';
 async function lookupProduct(){
 const barcode=$('barcode').value.trim();
 if(!/^\d{8,14}$/.test(barcode)){
-$('lookupMessage').textContent='Enter a valid 8–14 digit barcode.';
+alert('Enter a valid 8–14 digit barcode.');
 return;
 }
+
+/* NEW: SWITCH TO PRODUCT DETAILS IN THE SAME SPACE */
+showProductView();
+
 const serial=++lookupNumber;
 loadedCloudId=null;
 selectedPhotoFile=null;
@@ -1133,6 +1193,8 @@ return;
 const parsed=splitPackageText($('ingredients').value);
 $('ingredients').value=parsed.ingredients;
 showResult(classify(parsed.ingredients));
+
+/* KEEP PRODUCT STATUS VISIBLE AT THE TOP */
 $('result').scrollIntoView({behavior:'smooth',block:'start'});
 };
 $('save').onclick=async()=>{
