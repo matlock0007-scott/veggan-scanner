@@ -17,7 +17,7 @@ header p{margin:5px}
 main{max-width:720px;margin:auto;padding:14px}
 section{background:white;border-radius:16px;padding:17px;margin-bottom:15px;box-shadow:0 2px 12px #1232}
 h2{font-size:20px;margin:0 0 12px}
-h3{margin-bottom:8px}
+h3{margin:15px 0 8px}
 input,textarea,button{font:inherit;width:100%;padding:12px;border-radius:10px;margin:5px 0}
 input,textarea{border:1px solid #a9c2b2}
 textarea{min-height:120px}
@@ -41,7 +41,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 .unknown{background:#fff0c5;color:#795000}
 .pending{background:#edf2ee;color:#52675a}
 #nutrition{line-height:1.8}
-.entry{border-bottom:1px solid #ddd;padding:10px 0;min-height:55px;overflow-wrap:anywhere}
+.entry{border-bottom:1px solid #ddd;padding:10px 0;overflow-wrap:anywhere}
 .entry img{width:55px;height:55px;object-fit:contain;float:right}
 #cropCanvas{width:100%;height:auto;touch-action:none;border-radius:10px;border:1px solid #a9c2b2}
 #confirmedRow{display:flex;gap:10px;align-items:flex-start;margin:12px 0}
@@ -50,21 +50,18 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 #ingredientPreview{max-width:100%;max-height:290px;object-fit:contain;margin:12px auto}
 #allergenPanel{background:#f1f5f1;border-radius:10px;padding:12px;margin:12px 0}
 #brandDisplay{font-size:20px;font-weight:800;color:#126c42;margin:10px 0}
-#photoMessage,#photoSource{font-size:13px;color:#617469}
-#dbMessage,#lookupMessage,#authMessage,#rewardMessage,#saveMessage{overflow-wrap:anywhere}
 .rewardGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
 .rewardBox{background:#f1f7f2;border-radius:12px;padding:15px;text-align:center}
 .rewardBox strong{display:block;font-size:27px;color:#126c42}
 .rewardBox span{font-size:13px;color:#617469}
 .steps{background:#f1f7f2;border-radius:12px;padding:12px 18px}
 .steps li{margin:9px 0}
-#cameraPanel,#result,#cropPanel,#ingredientPreview,#allergenPanel,#signedInPanel,#myRewards,#passwordPanel{display:none}
+#cameraPanel,#productDetails,#result,#cropPanel,#ingredientPreview,#allergenPanel,#signedInPanel,#myRewards,#passwordPanel{display:none}
 #frontInput,#photoInput{display:none}
 #brandDisplay{display:none}
 #authSection{border:2px solid #d7e8dc}
-#productDetails{display:none}
 #scannerSection{scroll-margin-top:10px}
-#scanAnother{margin-bottom:14px}
+#dbMessage,#lookupMessage,#authMessage,#rewardMessage,#saveMessage{overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -75,9 +72,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 </header>
 <main>
 
-<!-- SCANNER AND PRODUCT DETAILS SHARE ONE SPACE -->
 <section id="scannerSection">
-
 <div id="scannerView">
 <h2>📷 Scan a Barcode</h2>
 <button id="startCamera">Start Barcode Scanner</button>
@@ -111,15 +106,14 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <li>Tap <strong>Take Product Picture</strong>.</li>
 <li>Photograph the front of the package.</li>
 <li>Tap <strong>Save Scan</strong>.</li>
-<li>Earn 10 points after your picture is approved!</li>
+<li>Earn points after your contribution is approved.</li>
 </ol>
-<p class="small">Sign in for rewards. Product scanning remains free.</p>
+<p class="small">Sign in for rewards. Scanning remains free.</p>
 </div>
 <input id="frontInput" type="file" accept="image/*" capture="environment">
 <button id="takeFront">📸 Take Product Picture</button>
 <button id="chooseFront" class="secondary">Choose Product Picture From Gallery</button>
-<p id="frontMessage" class="muted">Add a product picture if needed.</p>
-<p id="photoMessage"></p>
+<p id="frontMessage" class="muted">Photos are uploaded to Supabase when you save.</p>
 <label for="productName">Product name</label>
 <input id="productName" placeholder="Product name">
 <label for="brand">Brand</label>
@@ -127,14 +121,12 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <h2>Nutrition Facts</h2>
 <div id="nutrition" class="muted">Nutrition information appears here when available.</div>
 </div>
-
 </section>
 
-<!-- COMMUNITY REWARDS -->
 <section id="authSection">
 <h2>🏆 Community Rewards</h2>
 <p>Help improve Verified Vegan and earn points for approved contributions.</p>
-<p class="muted">Scanning is always free. Sign-in is only needed for rewards.</p>
+<p class="muted">Scanning is free without signing in. Accounts are only for rewards.</p>
 <div id="signedOutPanel">
 <h3>Create Account or Log In</h3>
 <label for="authEmail">Email address</label>
@@ -161,24 +153,17 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <section id="myRewards">
 <h2>🏆 My Rewards</h2>
 <div class="rewardGrid">
-<div class="rewardBox">
-<strong id="earnedPoints">0</strong>
-<span>Approved Points</span>
-</div>
-<div class="rewardBox">
-<strong id="pendingPoints">0</strong>
-<span>Pending Points</span>
-</div>
+<div class="rewardBox"><strong id="earnedPoints">0</strong><span>Approved Points</span></div>
+<div class="rewardBox"><strong id="pendingPoints">0</strong><span>Pending Points</span></div>
 </div>
 <p id="rewardMessage" class="muted"></p>
 <h3>Your Contributions</h3>
 <div id="contributionHistory"></div>
 </section>
 
-<!-- INGREDIENTS -->
 <section>
 <h2>Ingredients</h2>
-<p>Take a clear picture of the ingredient list, or enter the ingredients manually.</p>
+<p>Photograph the ingredients or enter them manually.</p>
 <input id="photoInput" type="file" accept="image/*" capture="environment">
 <button id="takePhoto">📸 Take Ingredient Picture</button>
 <button id="choosePhoto" class="secondary">Choose Existing Ingredient Photo</button>
@@ -201,26 +186,24 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 </div>
 <div id="confirmedRow">
 <input id="confirmed" type="checkbox">
-<label for="confirmed">I checked the complete ingredient list against the package and corrected any mistakes.</label>
+<label for="confirmed">I checked the complete ingredient list against the package and corrected mistakes.</label>
 </div>
 <button id="check">🌱 Verify Ingredients</button>
 </section>
 
-<!-- VERIFICATION AND SAVE -->
 <section id="result">
 <h2>Verification Details</h2>
 <p id="explanation"></p>
 <h3>Reasons</h3>
 <ul id="reasons"></ul>
 <p id="caution" class="muted"></p>
-<button id="save">💾 Save Scan</button>
+<button id="save">💾 Save Scan to Cloud</button>
 <p id="saveMessage" class="muted" aria-live="polite"></p>
 </section>
 
-<!-- DATABASE -->
 <section>
 <h2>Cloud Database Connection</h2>
-<p class="muted">Use your Supabase URL and public anon/publishable key. Never use a secret or service-role key.</p>
+<p class="muted">Enter your Supabase project URL and public key. Never enter a service-role or secret key.</p>
 <label for="supabaseUrl">Supabase Project URL</label>
 <input id="supabaseUrl" type="url">
 <label for="supabaseKey">Supabase Public Key</label>
@@ -231,9 +214,11 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 </section>
 
 <section>
-<h2>Recent Saved Scans</h2>
+<h2>Recent Cloud Products</h2>
+<p class="muted">Loaded from Supabase, not saved as a permanent history on your phone.</p>
+<button id="refreshHistory" class="secondary">Refresh Cloud History</button>
 <div id="history"></div>
-<button id="export" class="secondary">Export Scan Data as JSON</button>
+<button id="export" class="secondary">Export Cloud Products as JSON</button>
 </section>
 </main>
 
@@ -241,11 +226,14 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 'use strict';
 
 const $=id=>document.getElementById(id);
-const KEY='verified-vegan-v1';
 const DBKEY='verified-vegan-supabase-config-v1';
-const PHOTO_KEY='verified-vegan-product-photos-v1';
 const AUTHKEY='verified-vegan-auth-v1';
+const OLD_SCAN_KEY='verified-vegan-v1';
+const OLD_PHOTO_KEY='verified-vegan-product-photos-v1';
+
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
+const normalizeBarcode=v=>String(v??'').replace(/\D/g,'').replace(/^0+(?=\d)/,'');
+const sameBarcode=(a,b)=>!!normalizeBarcode(a)&&normalizeBarcode(a)===normalizeBarcode(b);
 
 const COCONUT_BARCODE='850030458001';
 const COCONUT_BRAND='Madly Hadley';
@@ -258,95 +246,59 @@ let ingredientSource='none';
 let allergens={contains:'',mayContain:''};
 let currentPhoto='',currentNutrition={},currentServingSize='';
 let loadedCloudId=null,lookupNumber=0,photoRequest=0;
-let selectedPhotoFile=null,photoChanged=false;
+let selectedPhotoFile=null,selectedPhotoURL='';
 let currentUser=null,authSession=null,authRefreshPromise=null;
-let originalIngredients='',originalPhoto='',originalStatus='';
-let photoWasMissing=false,recoveryMode=false;
+let originalIngredients='',originalStatus='',photoWasMissing=false;
+let cloudHistory=[];
+let recoveryMode=false;
 
-/* NEW: ONE-SPACE SCANNER / RESULT NAVIGATION */
+/* REMOVE OLD PERMANENT PHONE PHOTO AND SCAN DATA.
+   CLOUD SETTINGS AND LOGIN SESSION ARE RETAINED. */
 
-function showScannerView(){
-++lookupNumber;
-stopCamera();
-$('scannerView').style.display='block';
-$('productDetails').style.display='none';
-$('scannerSection').scrollIntoView({behavior:'smooth',block:'start'});
+function removeOldDeviceData(){
+try{
+localStorage.removeItem(OLD_SCAN_KEY);
+localStorage.removeItem(OLD_PHOTO_KEY);
+}catch(e){}
 }
-
-function showProductView(){
-stopCamera();
-$('scannerView').style.display='none';
-$('productDetails').style.display='block';
-$('productBarcode').textContent='Barcode: '+$('barcode').value.trim();
-$('scannerSection').scrollIntoView({behavior:'smooth',block:'start'});
-}
-
-$('scanAnother').onclick=()=>{
-$('barcode').value='';
-$('lookupMessage').textContent='';
-$('productBarcode').textContent='';
-$('frontMessage').textContent='Add a product picture if needed.';
-$('saveMessage').textContent='';
-$('ingredients').value='';
-$('confirmed').checked=false;
-$('productName').value='';
-displayBrand('','');
-allergens={contains:'',mayContain:''};
-updateAllergens();
-ingredientSource='none';
-loadedCloudId=null;
-selectedPhotoFile=null;
-photoChanged=false;
-originalIngredients='';
-originalPhoto='';
-originalStatus='';
-photoWasMissing=false;
-showNutrition({});
-currentServingSize='';
-resetPhoto();
-clearResult();
-setStatus('Scan a product');
-showScannerView();
-};
-
-/* LOCAL STORAGE */
+removeOldDeviceData();
 
 function readJSON(key,fallback){
 try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}
 catch{return fallback}
 }
-function getScans(){return readJSON(KEY,[])}
-function getPhotos(){return readJSON(PHOTO_KEY,{})}
 function dbConfig(){return readJSON(DBKEY,{})}
-function normalizeBarcode(v){
-return String(v??'').replace(/\D/g,'').replace(/^0+(?=\d)/,'');
+
+function releaseSelectedPhoto(){
+if(selectedPhotoURL){
+URL.revokeObjectURL(selectedPhotoURL);
+selectedPhotoURL='';
 }
-function sameBarcode(a,b){
-return !!normalizeBarcode(a)&&normalizeBarcode(a)===normalizeBarcode(b);
+selectedPhotoFile=null;
 }
-function resolveBrand(brand,barcode){
-if(sameBarcode(barcode,COCONUT_BARCODE))return COCONUT_BRAND;
-const v=clean(brand);
-return /^(unknown|unknown brand|n\/a|null|undefined)$/i.test(v)?'':v;
-}
+
 function displayBrand(brand,barcode){
-const value=resolveBrand(brand,barcode);
+let value=clean(brand);
+if(sameBarcode(barcode,COCONUT_BARCODE))value=COCONUT_BRAND;
+if(/^(unknown|unknown brand|n\/a|null|undefined)$/i.test(value))value='';
 $('brand').value=value;
 $('brandDisplay').textContent=value?'Brand: '+value:'';
 $('brandDisplay').style.display=value?'block':'none';
 return value;
 }
 $('brand').addEventListener('input',()=>{
-const v=clean($('brand').value);
-$('brandDisplay').textContent=v?'Brand: '+v:'';
-$('brandDisplay').style.display=v?'block':'none';
+const value=clean($('brand').value);
+$('brandDisplay').textContent=value?'Brand: '+value:'';
+$('brandDisplay').style.display=value?'block':'none';
 });
-function normalizeStatus(v){
-const s=clean(v).toLowerCase().replace(/[_-]/g,' ');
+
+function normalizeStatus(value){
+const s=clean(value).toLowerCase().replace(/[_-]/g,' ');
 if(s==='vegan')return 'Vegan';
 if(s==='not vegan'||s==='non vegan')return 'Not Vegan';
 return 'Needs Verification';
 }
+
 function setStatus(status){
 const e=$('productStatus');
 e.textContent=status;
@@ -372,6 +324,46 @@ $('caution').textContent=result.caution||'';
 $('result').style.display='block';
 }
 
+function showProductView(){
+stopCamera();
+$('scannerView').style.display='none';
+$('productDetails').style.display='block';
+$('productBarcode').textContent='Barcode: '+$('barcode').value.trim();
+$('scannerSection').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function showScannerView(){
+++lookupNumber;
+stopCamera();
+$('scannerView').style.display='block';
+$('productDetails').style.display='none';
+$('scannerSection').scrollIntoView({behavior:'smooth',block:'start'});
+}
+$('scanAnother').onclick=()=>{
+$('barcode').value='';
+$('lookupMessage').textContent='';
+$('productBarcode').textContent='';
+$('frontMessage').textContent='Photos are uploaded to Supabase when you save.';
+$('saveMessage').textContent='';
+$('ingredients').value='';
+$('confirmed').checked=false;
+$('productName').value='';
+displayBrand('','');
+allergens={contains:'',mayContain:''};
+updateAllergens();
+ingredientSource='none';
+loadedCloudId=null;
+originalIngredients='';
+originalStatus='';
+photoWasMissing=false;
+currentServingSize='';
+releaseSelectedPhoto();
+resetPhoto();
+showNutrition({});
+clearResult();
+setStatus('Scan a product');
+showScannerView();
+};
+
 /* SUPABASE */
 
 function headers(db,token=null){
@@ -386,7 +378,9 @@ const text=await response.text();
 try{
 const e=JSON.parse(text);
 return 'HTTP '+response.status+': '+(e.msg||e.message||e.error_description||e.details||text);
-}catch{return 'HTTP '+response.status+': '+text.slice(0,300)}
+}catch{
+return 'HTTP '+response.status+': '+text.slice(0,300);
+}
 }
 function requireDB(){
 const db=dbConfig();
@@ -404,6 +398,7 @@ if(response.status===204)return null;
 const text=await response.text();
 return text?JSON.parse(text):null;
 }
+
 const config=dbConfig();
 $('supabaseUrl').value=config.url||'';
 $('supabaseKey').value=config.key||'';
@@ -419,20 +414,24 @@ try{
 const previous=dbConfig();
 localStorage.setItem(DBKEY,JSON.stringify({url,key}));
 if(previous.url!==url||previous.key!==key){
-localStorage.removeItem(AUTHKEY);
-authSession=null;
-currentUser=null;
-updateAuthUI();
+saveSession(null);
 }
 $('dbMessage').textContent='Connection settings saved.';
-}catch(e){$('dbMessage').textContent=e.message}
+loadCloudHistory();
+}catch(e){
+$('dbMessage').textContent=e.message;
+}
 };
+
 $('testDb').onclick=async()=>{
 $('dbMessage').textContent='Testing Supabase connection…';
 try{
 await apiRequest('/rest/v1/products?select=id&limit=1');
 $('dbMessage').textContent='Supabase connection successful.';
-}catch(e){$('dbMessage').textContent=e.message}
+await loadCloudHistory();
+}catch(e){
+$('dbMessage').textContent=e.message;
+}
 };
 
 /* AUTHENTICATION */
@@ -470,6 +469,7 @@ if(!response.ok)throw Error(await responseError(response));
 return response.json();
 }
 function authRedirect(){return location.origin+location.pathname}
+
 $('signUp').onclick=async()=>{
 const email=$('authEmail').value.trim();
 const password=$('authPassword').value;
@@ -491,8 +491,11 @@ $('authMessage').textContent='Account created and signed in.';
 }else{
 $('authMessage').textContent='Check your email to confirm your account, then log in.';
 }
-}catch(e){$('authMessage').textContent='Sign up failed: '+e.message}
+}catch(e){
+$('authMessage').textContent='Sign up failed: '+e.message;
+}
 };
+
 $('signIn').onclick=async()=>{
 const email=$('authEmail').value.trim();
 const password=$('authPassword').value;
@@ -503,8 +506,11 @@ saveSession(data);
 try{await ensureProfile()}catch(e){}
 await loadRewards();
 $('authMessage').textContent='Signed in successfully.';
-}catch(e){$('authMessage').textContent='Log in failed: '+e.message}
+}catch(e){
+$('authMessage').textContent='Log in failed: '+e.message;
+}
 };
+
 $('resetPassword').onclick=async()=>{
 const email=$('authEmail').value.trim();
 if(!email){
@@ -516,13 +522,16 @@ await authCall(
 'recover?redirect_to='+encodeURIComponent(authRedirect()),
 {email}
 );
-$('authMessage').textContent='If the email is registered, a recovery email will be sent.';
-}catch(e){$('authMessage').textContent=e.message}
+$('authMessage').textContent='If registered, a recovery email will be sent.';
+}catch(e){
+$('authMessage').textContent=e.message;
+}
 };
+
 $('savePassword').onclick=async()=>{
 const password=$('newPassword').value;
 if(password.length<8){
-$('authMessage').textContent='Use a password of at least 8 characters.';
+$('authMessage').textContent='Use at least 8 characters.';
 return;
 }
 try{
@@ -536,16 +545,19 @@ body:JSON.stringify({password})
 if(!response.ok)throw Error(await responseError(response));
 recoveryMode=false;
 $('passwordPanel').style.display='none';
-$('authMessage').textContent='Password updated successfully.';
-}catch(e){$('authMessage').textContent='Password update failed: '+e.message}
+$('authMessage').textContent='Password updated.';
+}catch(e){
+$('authMessage').textContent=e.message;
+}
 };
+
 $('logout').onclick=async()=>{
 try{
-const token=authSession?.access_token;
-if(token){
+if(authSession?.access_token){
 const db=requireDB();
 await fetch(db.url+'/auth/v1/logout',{
-method:'POST',headers:headers(db,token)
+method:'POST',
+headers:headers(db,authSession.access_token)
 });
 }
 }catch(e){}
@@ -553,6 +565,7 @@ saveSession(null);
 $('passwordPanel').style.display='none';
 $('authMessage').textContent='Logged out.';
 };
+
 async function refreshSession(){
 if(!authSession?.refresh_token)throw Error('Please log in again.');
 if(authRefreshPromise)return authRefreshPromise;
@@ -566,19 +579,24 @@ return data.access_token;
 }catch(e){
 saveSession(null);
 throw Error('Session expired. Please log in again.');
-}finally{authRefreshPromise=null}
+}finally{
+authRefreshPromise=null;
+}
 })();
 return authRefreshPromise;
 }
+
 async function userToken(){
-if(!authSession?.access_token||!currentUser)
+if(!authSession?.access_token||!currentUser){
 throw Error('Log in to earn points.');
+}
 const expiry=authSession.expires_at||
 (authSession.expires_in&&authSession._saved_at?
 authSession._saved_at+authSession.expires_in:null);
 if(expiry&&Date.now()/1000>expiry-60)return refreshSession();
 return authSession.access_token;
 }
+
 async function userRequest(path,options={}){
 let token=await userToken();
 const db=requireDB();
@@ -598,20 +616,26 @@ if(response.status===204)return null;
 const text=await response.text();
 return text?JSON.parse(text):null;
 }
+
 async function ensureProfile(){
 if(!currentUser)return;
 const id=currentUser.id;
 const rows=await userRequest(
-'/rest/v1/vv_profiles?user_id=eq.'+encodeURIComponent(id)+'&select=user_id'
+'/rest/v1/vv_profiles?user_id=eq.'+
+encodeURIComponent(id)+'&select=user_id'
 );
 if(!rows.length){
 await userRequest('/rest/v1/vv_profiles',{
 method:'POST',
 headers:{Prefer:'return=minimal'},
-body:JSON.stringify({user_id:id,show_on_leaderboard:false})
+body:JSON.stringify({
+user_id:id,
+show_on_leaderboard:false
+})
 });
 }
 }
+
 async function loadRewards(){
 if(!currentUser)return;
 $('rewardMessage').textContent='Loading rewards…';
@@ -636,8 +660,7 @@ const div=document.createElement('div');
 div.className='entry';
 div.textContent=
 String(c.contribution_type||'Contribution').replace(/_/g,' ')+
-' • '+c.barcode+
-' • '+c.points+' points • '+c.status;
+' • '+c.barcode+' • '+c.points+' points • '+c.status;
 box.append(div);
 });
 $('rewardMessage').textContent='Points are awarded after verification.';
@@ -646,6 +669,7 @@ $('rewardMessage').textContent='Rewards unavailable: '+e.message;
 }
 }
 $('refreshRewards').onclick=loadRewards;
+
 async function restoreAuth(){
 const saved=readJSON(AUTHKEY,null);
 if(!saved?.access_token)return;
@@ -669,32 +693,10 @@ $('authMessage').textContent='Please log in to access rewards.';
 }
 }
 
-/* PRODUCT PICTURES */
+/* PRODUCT PICTURES — NO PERMANENT DEVICE COPIES */
 
-function photoIdentity(){
-return $('barcode').value.trim()||
-($('brand').value.trim().toLowerCase()+'|'+
-$('productName').value.trim().toLowerCase());
-}
-function savedPhotoForBarcode(barcode){
-const photos=getPhotos();
-if(photos[barcode])return photos[barcode];
-const match=Object.keys(photos).find(k=>sameBarcode(k,barcode));
-return match?photos[match]:'';
-}
-function saveProductPhoto(url){
-const key=photoIdentity();
-if(!key||key==='|')return false;
-try{
-const photos=getPhotos();
-photos[key]=url;
-localStorage.setItem(PHOTO_KEY,JSON.stringify(photos));
-return true;
-}catch{return false}
-}
 function validPhotoURL(url){
-return typeof url==='string'&&
-(/^https:\/\//i.test(url)||/^data:image\//i.test(url));
+return typeof url==='string'&&/^https:\/\//i.test(url);
 }
 function resetPhoto(){
 ++photoRequest;
@@ -707,24 +709,31 @@ img.removeAttribute('src');
 $('photoPlaceholder').style.display='block';
 $('photoPlaceholder').textContent='Product picture appears here';
 $('photoSource').textContent='';
-$('photoMessage').textContent='';
 }
+
 function showPhotoCandidates(candidates){
 const request=++photoRequest;
 const img=$('productPhoto');
 let index=0;
 currentPhoto='';
+
 function next(){
 if(request!==photoRequest)return;
 if(index>=candidates.length){
 img.hidden=true;
 $('photoPlaceholder').style.display='block';
 $('photoPlaceholder').textContent='No product picture available';
-$('photoSource').textContent='Automatic picture search completed';
+$('photoSource').textContent='You can contribute a picture';
 return;
 }
-const c=candidates[index++];
-if(!validPhotoURL(c.url)){next();return}
+const candidate=candidates[index++];
+if(!candidate.url||!(
+validPhotoURL(candidate.url)||
+candidate.url.startsWith('blob:')
+)){
+next();
+return;
+}
 let done=false;
 const timer=setTimeout(fail,4500);
 function fail(){
@@ -737,23 +746,28 @@ next();
 }
 img.onload=()=>{
 if(done||request!==photoRequest)return;
-if(img.naturalWidth<20||img.naturalHeight<20){fail();return}
+if(img.naturalWidth<20||img.naturalHeight<20){
+fail();
+return;
+}
 done=true;
 clearTimeout(timer);
 img.hidden=false;
 $('photoPlaceholder').style.display='none';
-$('photoSource').textContent=c.source;
-currentPhoto=c.url;
+$('photoSource').textContent=candidate.source;
+currentPhoto=candidate.url;
 };
 img.onerror=fail;
-img.src=c.url;
+img.src=candidate.url;
 }
 next();
 }
+
 function showPhoto(url,source){
 resetPhoto();
 showPhotoCandidates([{url,source}]);
 }
+
 function extractOFFImages(p){
 const candidates=[],seen=new Set();
 function add(url,source){
@@ -780,18 +794,20 @@ add(versions[language],'Open Food Facts '+side+' picture');
 }
 return candidates;
 }
+
 function displayProductImages(barcode,cloudUrl='',offProduct=null){
 resetPhoto();
 const candidates=[];
-if(cloudUrl)candidates.push({url:cloudUrl,source:'Supabase product picture'});
-const local=savedPhotoForBarcode(barcode);
-if(local)candidates.push({url:local,source:'Saved device picture'});
+if(validPhotoURL(cloudUrl)){
+candidates.push({url:cloudUrl,source:'Supabase cloud picture'});
+}
 if(sameBarcode(barcode,COCONUT_BARCODE)){
-candidates.push({url:COCONUT_PHOTO,source:'Supabase product picture'});
+candidates.push({url:COCONUT_PHOTO,source:'Supabase cloud picture'});
 }
 if(offProduct)candidates.push(...extractOFFImages(offProduct));
 showPhotoCandidates(candidates);
 }
+
 const frontInput=$('frontInput');
 $('takeFront').onclick=()=>{
 frontInput.setAttribute('capture','environment');
@@ -803,26 +819,35 @@ frontInput.removeAttribute('capture');
 frontInput.value='';
 frontInput.click();
 };
+
 frontInput.onchange=async()=>{
 const file=frontInput.files?.[0];
 if(!file)return;
 try{
+if(!file.type.startsWith('image/'))throw Error('Choose an image.');
 const bitmap=await createImageBitmap(file);
 const canvas=document.createElement('canvas');
-const scale=Math.min(1,900/Math.max(bitmap.width,bitmap.height));
+const scale=Math.min(1,1200/Math.max(bitmap.width,bitmap.height));
 canvas.width=Math.max(1,Math.round(bitmap.width*scale));
 canvas.height=Math.max(1,Math.round(bitmap.height*scale));
 canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
 bitmap.close();
-const url=canvas.toDataURL('image/jpeg',.75);
-selectedPhotoFile=file;
-photoChanged=true;
-showPhoto(url,'Your new product picture');
-const saved=saveProductPhoto(url);
-$('frontMessage').textContent=saved?
-'Picture saved on this device. Tap Save Scan to upload it.':
-'Picture selected. Tap Save Scan to save it.';
-}catch(e){$('frontMessage').textContent=e.message}
+
+const blob=await new Promise((resolve,reject)=>{
+canvas.toBlob(
+b=>b?resolve(b):reject(Error('Image conversion failed')),
+'image/jpeg',.78
+);
+});
+releaseSelectedPhoto();
+selectedPhotoFile=new File([blob],'product.jpg',{type:'image/jpeg'});
+selectedPhotoURL=URL.createObjectURL(blob);
+showPhoto(selectedPhotoURL,'Temporary preview — not yet uploaded');
+$('frontMessage').textContent=
+'Picture ready. Tap Save Scan to upload it to Supabase. It is not permanently stored by the app on your phone.';
+}catch(e){
+$('frontMessage').textContent=e.message;
+}
 };
 
 /* INGREDIENT VERIFICATION */
@@ -838,6 +863,7 @@ const stops=[
 /\b(?:distributed by|manufactured by)\b/i,
 /\b(?:visit us at|www\.)\b/i
 ];
+
 function splitPackageText(raw){
 const source=String(raw||'').replace(/\r/g,'\n');
 const heading=/\bingredients?\s*[:\-]?\s*/i;
@@ -860,6 +886,7 @@ mayContain:m?clean(m[1]):'',
 foundHeading:!!match
 };
 }
+
 const rules=[
 ['Milk or dairy',/\b(milk|whey|casein|caseinate|lactose|lactalbumin|buttermilk|cheese|yogurt|yoghurt|ghee|milkfat|milk solids)\b/i],
 ['Egg',/\b(egg|eggs|albumen|ovalbumin|egg whites?|egg yolks?)\b/i],
@@ -871,14 +898,17 @@ const rules=[
 ['Fish or seafood',/\b(fish|anchov(?:y|ies)|oyster|shrimp|prawn|crab|lobster|fish sauce|fish oil|bonito)\b/i],
 ['Other animal ingredients',/\b(collagen|keratin|lanolin|wool fat)\b/i]
 ];
+
 function classify(raw){
 const t=splitPackageText(raw).ingredients;
-if(!t)return {
+if(!t){
+return {
 status:'Needs Verification',
 reasons:[],
 explanation:'No readable ingredient list is available.',
 caution:'Photograph or enter the ingredients.'
 };
+}
 const reasons=rules.filter(r=>r[1].test(t)).map(r=>r[0]);
 const notes=[];
 if(/\b(natural flavo[u]?rs?|mono(?:-|\s)?and(?:-|\s)?diglycerides|glycerin|glycerine|vitamin d3|cholecalciferol|enzymes|rennet|l[.-]?cysteine)\b/i.test(t)){
@@ -897,6 +927,7 @@ explanation:reasons.length?
 caution:notes.join(' ')+' Ingredient screening is not manufacturer certification.'
 };
 }
+
 function updateAllergens(){
 $('containsText').textContent=allergens.contains?
 'Contains: '+allergens.contains:'';
@@ -945,7 +976,7 @@ salt_100g:p.salt_100g
 };
 }
 
-/* PRODUCT LOOKUP */
+/* PRODUCT LOOKUP — SUPABASE FIRST */
 
 async function fetchOFF(barcode){
 const controller=new AbortController();
@@ -958,18 +989,22 @@ encodeURIComponent(barcode)+'.json',
 );
 if(!response.ok)throw Error('Open Food Facts unavailable');
 return response.json();
-}finally{clearTimeout(timeout)}
+}finally{
+clearTimeout(timeout);
 }
-function localMatch(barcode){
-return getScans().find(s=>sameBarcode(s.barcode,barcode));
 }
+
 async function findCloudRecord(barcode){
 const db=dbConfig();
-if(!db.url||!db.key)return {record:null,error:'Cloud not configured'};
+if(!db.url||!db.key){
+return {record:null,error:'Cloud not configured'};
+}
 try{
 const variants=new Set([
-barcode,normalizeBarcode(barcode),
-barcode.padStart(13,'0'),barcode.padStart(14,'0')
+barcode,
+normalizeBarcode(barcode),
+barcode.padStart(13,'0'),
+barcode.padStart(14,'0')
 ]);
 let records=[];
 for(const code of variants){
@@ -995,15 +1030,17 @@ const score=p=>
 return score(b)-score(a);
 });
 return {record:matches[0]||null,error:null};
-}catch(e){return {record:null,error:e.message}}
+}catch(e){
+return {record:null,error:e.message};
 }
+}
+
 function loadCloudRecord(p){
 loadedCloudId=p.id??null;
 $('productName').value=p.product_name||'';
 displayBrand(p.brand,$('barcode').value);
 const ingredients=loadIngredients(p.ingredients||'');
 originalIngredients=ingredients;
-originalPhoto=p.image_url||'';
 originalStatus=normalizeStatus(p.vegan_status);
 ingredientSource='database';
 showNutrition(nutritionFromCloud(p));
@@ -1011,12 +1048,14 @@ currentServingSize=p.serving_size||'';
 displayProductImages($('barcode').value,p.image_url||'');
 photoWasMissing=!p.image_url;
 const screened=classify(ingredients);
+
 if(originalStatus!=='Needs Verification'&&
 screened.status!=='Needs Verification'&&
 screened.status!==originalStatus){
 clearResult();
 setStatus('Needs Verification');
-$('lookupMessage').textContent='Saved classification conflicts with ingredients. Review required.';
+$('lookupMessage').textContent=
+'Saved classification conflicts with ingredients. Review required.';
 return;
 }
 if(ingredients){
@@ -1027,44 +1066,25 @@ setStatus('Needs Verification');
 $('lookupMessage').textContent='No ingredients available. Add ingredients to verify.';
 }
 }
-function loadLocalRecord(s){
-$('productName').value=s.product_name||'';
-displayBrand(s.brand,$('barcode').value);
-originalIngredients=loadIngredients(s.ingredient_text||s.ingredients||'');
-ingredientSource='database';
-showNutrition({});
-displayProductImages($('barcode').value);
-photoWasMissing=!savedPhotoForBarcode($('barcode').value);
-if(originalIngredients){
-showResult(classify(originalIngredients));
-$('lookupMessage').textContent='Product loaded from device history.';
-}else{
-setStatus('Needs Verification');
-$('lookupMessage').textContent='Add ingredients to verify.';
-}
-}
+
 async function lookupProduct(){
 const barcode=$('barcode').value.trim();
 if(!/^\d{8,14}$/.test(barcode)){
 alert('Enter a valid 8–14 digit barcode.');
 return;
 }
-
-/* NEW: SWITCH TO PRODUCT DETAILS IN THE SAME SPACE */
 showProductView();
-
 const serial=++lookupNumber;
 loadedCloudId=null;
-selectedPhotoFile=null;
-photoChanged=false;
+releaseSelectedPhoto();
 originalIngredients='';
-originalPhoto='';
 originalStatus='';
 photoWasMissing=false;
 clearResult();
 setStatus('Looking up…');
 $('lookupMessage').textContent='Checking Supabase…';
 $('saveMessage').textContent='';
+$('frontMessage').textContent='Photos are uploaded to Supabase when you save.';
 $('productName').value='';
 displayBrand('',barcode);
 $('ingredients').value='';
@@ -1075,24 +1095,24 @@ updateAllergens();
 resetPhoto();
 showNutrition({});
 currentServingSize='';
+
 const cloud=await findCloudRecord(barcode);
 if(serial!==lookupNumber)return;
+
 if(cloud.record){
 loadCloudRecord(cloud.record);
 return;
 }
-const local=localMatch(barcode);
-if(local){
-loadLocalRecord(local);
-return;
-}
+
 $('lookupMessage').textContent='Checking Open Food Facts…';
 try{
 const data=await fetchOFF(barcode);
 if(serial!==lookupNumber)return;
+
 if(data.status!==1||!data.product){
 setStatus('Needs Verification');
-$('lookupMessage').textContent='Product not found. Enter or photograph ingredients.';
+$('lookupMessage').textContent=
+'Product not found. Enter or photograph ingredients.';
 displayProductImages(barcode);
 photoWasMissing=true;
 return;
@@ -1104,17 +1124,21 @@ showNutrition(p.nutriments||{});
 currentServingSize=p.serving_size||'';
 displayProductImages(barcode,'',p);
 photoWasMissing=!extractOFFImages(p).length;
+
 const ingredients=loadIngredients(
 p.ingredients_text_en||p.ingredients_text||''
 );
 originalIngredients=ingredients;
 ingredientSource='database';
+
 if(ingredients){
 showResult(classify(ingredients));
-$('lookupMessage').textContent='Product found in Open Food Facts. Review ingredients.';
+$('lookupMessage').textContent=
+'Product found in Open Food Facts. Review ingredients.';
 }else{
 setStatus('Needs Verification');
-$('lookupMessage').textContent='No ingredients found. Take an ingredient picture.';
+$('lookupMessage').textContent=
+'No ingredients found. Take an ingredient picture.';
 }
 }catch(e){
 if(serial!==lookupNumber)return;
@@ -1126,7 +1150,7 @@ photoWasMissing=true;
 }
 $('lookup').onclick=lookupProduct;
 
-/* SAVE PRODUCT AND REWARD */
+/* CLOUD SAVING */
 
 function numericValue(value){
 if(value===undefined||value===null||value==='')return null;
@@ -1145,28 +1169,27 @@ salt_100g:numericValue(n.salt_100g),
 serving_size:currentServingSize||null
 };
 }
+
 async function uploadProductPhoto(db,file,barcode){
-const safeBarcode=normalizeBarcode(barcode)||'product';
-const extension=file.type==='image/png'?'png':
-file.type==='image/webp'?'webp':'jpg';
-const filename=safeBarcode+'-'+Date.now()+'.'+extension;
+const filename=normalizeBarcode(barcode)+'-'+Date.now()+'.jpg';
 const url=db.url+'/storage/v1/object/product-images/'+
 encodeURIComponent(filename);
 const token=currentUser?await userToken():db.key;
-const r=await fetch(url,{
+const response=await fetch(url,{
 method:'POST',
 headers:{
 'apikey':db.key,
 'Authorization':'Bearer '+token,
-'Content-Type':file.type||'image/jpeg',
+'Content-Type':'image/jpeg',
 'x-upsert':'false'
 },
 body:file
 });
-if(!r.ok)throw Error(await responseError(r));
+if(!response.ok)throw Error(await responseError(response));
 return db.url+'/storage/v1/object/public/product-images/'+
 encodeURIComponent(filename);
 }
+
 async function submitContribution(type,barcode,imageUrl,ingredients){
 const description=type==='product_photo'?
 'Contributed missing product packaging picture':
@@ -1184,6 +1207,7 @@ p_ingredients:ingredients||null
 })
 });
 }
+
 $('check').onclick=()=>{
 if(ocrBusy)return;
 if(ingredientSource==='ocr'&&!$('confirmed').checked){
@@ -1193,10 +1217,9 @@ return;
 const parsed=splitPackageText($('ingredients').value);
 $('ingredients').value=parsed.ingredients;
 showResult(classify(parsed.ingredients));
-
-/* KEEP PRODUCT STATUS VISIBLE AT THE TOP */
 $('result').scrollIntoView({behavior:'smooth',block:'start'});
 };
+
 $('save').onclick=async()=>{
 if(!lastResult){
 alert('Verify ingredients first.');
@@ -1211,45 +1234,36 @@ if(!/^\d{8,14}$/.test(barcode)){
 alert('Scan or enter a valid barcode first.');
 return;
 }
+
 const record={
 barcode,
 brand:displayBrand($('brand').value,barcode),
 product_name:$('productName').value.trim(),
 ingredient_text:$('ingredients').value.trim(),
 vegan_result:lastResult.status,
-decision_reasons:lastResult.reasons,
-created_at:new Date().toISOString(),
-contributor:currentUser?.id||'anonymous'
+decision_reasons:lastResult.reasons
 };
-const newPhoto=!!selectedPhotoFile&&photoChanged;
+
+const newPhoto=!!selectedPhotoFile;
 const ingredientChanged=!!record.ingredient_text&&
 record.ingredient_text!==originalIngredients;
-const hadOriginalIngredients=!!originalIngredients;
-const newIngredients=ingredientChanged&&!hadOriginalIngredients;
-const correction=ingredientChanged&&hadOriginalIngredients;
-if(currentPhoto.startsWith('data:')){
-if(saveProductPhoto(currentPhoto))record.local_photo_key=photoIdentity();
-}
-let localSaved=false;
-try{
-const scans=getScans();
-const existing=scans.findIndex(s=>sameBarcode(s.barcode,barcode));
-if(existing>=0)scans.splice(existing,1);
-scans.unshift(record);
-localStorage.setItem(KEY,JSON.stringify(scans.slice(0,500)));
-renderHistory();
-localSaved=true;
-}catch(e){}
+const newIngredients=ingredientChanged&&!originalIngredients;
+const correction=ingredientChanged&&!!originalIngredients;
+
 const button=$('save');
 button.disabled=true;
-button.textContent='Saving…';
-$('saveMessage').textContent='Saving product…';
+button.textContent='Saving to cloud…';
+$('saveMessage').textContent='Saving to Supabase…';
+
 let cloudSaved=false;
 let uploadedPhoto='';
+let rewardText='';
+
 try{
 const db=requireDB();
 let id=loadedCloudId;
 let existingRecord=null;
+
 if(id===null){
 const found=await findCloudRecord(barcode);
 if(found.error)throw Error(found.error);
@@ -1258,6 +1272,7 @@ id=found.record.id??null;
 existingRecord=found.record;
 }
 }
+
 const payload={
 barcode,
 brand:record.brand||null,
@@ -1266,16 +1281,19 @@ ingredients:record.ingredient_text||null,
 vegan_status:record.vegan_result,
 vegan_reason:record.decision_reasons.join('; ')
 };
+
 Object.entries(nutritionPayload()).forEach(([key,value])=>{
 if(value!==null)payload[key]=value;
 });
+
 if(newPhoto){
 uploadedPhoto=await uploadProductPhoto(db,selectedPhotoFile,barcode);
 payload.image_url=uploadedPhoto;
-}else if(/^https:\/\//i.test(currentPhoto)&&
+}else if(validPhotoURL(currentPhoto)&&
 !existingRecord?.image_url){
 payload.image_url=currentPhoto;
 }
+
 const updating=id!==null;
 const saved=await apiRequest(
 updating?
@@ -1284,26 +1302,39 @@ updating?
 method:updating?'PATCH':'POST',
 headers:{Prefer:'return=representation'},
 body:JSON.stringify(payload)
-});
+}
+);
+
 if(saved?.[0]?.id!==undefined)loadedCloudId=saved[0].id;
 cloudSaved=true;
-if(uploadedPhoto){
-showPhoto(uploadedPhoto,'Saved product picture');
-saveProductPhoto(uploadedPhoto);
-}
-selectedPhotoFile=null;
-photoChanged=false;
 originalIngredients=record.ingredient_text;
-$('dbMessage').textContent='Product saved successfully to Supabase.';
-}catch(e){
-$('dbMessage').textContent='Supabase save failed: '+e.message;
+
+if(uploadedPhoto){
+showPhoto(uploadedPhoto,'Supabase cloud picture');
+releaseSelectedPhoto();
+frontInput.value='';
+$('frontMessage').textContent='Picture uploaded to Supabase.';
 }
-let rewardText='';
+
+$('dbMessage').textContent='Product saved to Supabase.';
+await loadCloudHistory();
+
+}catch(e){
+$('dbMessage').textContent='Cloud save failed: '+e.message;
+$('saveMessage').textContent=
+'❌ Not saved to Supabase. '+e.message+
+' Please keep this page open and try again.';
+button.disabled=false;
+button.textContent='💾 Save Scan to Cloud';
+return;
+}
+
 if(currentUser&&cloudSaved){
 let type=null;
 if(newPhoto&&photoWasMissing)type='product_photo';
 else if(newIngredients)type='ingredients';
 else if(correction)type='correction';
+
 if(type){
 try{
 await submitContribution(
@@ -1311,66 +1342,88 @@ type,barcode,
 type==='product_photo'?uploadedPhoto:null,
 type==='product_photo'?null:record.ingredient_text
 );
-rewardText=' Contribution submitted! Points are pending approval.';
+rewardText=' Contribution submitted. Points pending approval.';
 await loadRewards();
 }catch(e){
 rewardText=' Reward submission failed: '+e.message;
 }
 }
 }else if(!currentUser&&(newPhoto||newIngredients||correction)){
-rewardText=' Log in before contributing to earn points.';
+rewardText=' Sign in before contributing to earn rewards.';
 }
+
 $('saveMessage').textContent=
-(cloudSaved?'✅ Product saved to Supabase.':
-localSaved?'Product saved on this device only.':
-'Product could not be saved.')+rewardText;
+'✅ Saved to Supabase cloud. No permanent scan or picture copy was saved by this app on your phone.'+
+rewardText;
+
 button.disabled=false;
-button.textContent='💾 Save Scan';
+button.textContent='💾 Save Scan to Cloud';
 };
 
-/* HISTORY */
+/* CLOUD HISTORY — NO LOCAL SCAN DATABASE */
 
-function renderHistory(){
+async function loadCloudHistory(){
 const box=$('history');
+box.textContent='Loading cloud products…';
+try{
+const records=await apiRequest(
+'/rest/v1/products?select=id,barcode,brand,product_name,vegan_status,image_url,created_at&order=created_at.desc&limit=30'
+);
+cloudHistory=records||[];
 box.replaceChildren();
-const scans=getScans();
-if(!scans.length){
-box.textContent='No saved scans yet.';
+
+if(!cloudHistory.length){
+box.textContent='No cloud products found.';
 return;
 }
-scans.slice(0,20).forEach(s=>{
+
+cloudHistory.forEach(s=>{
 const d=document.createElement('div');
 d.className='entry';
-const photo=s.local_photo_key&&getPhotos()[s.local_photo_key];
-if(photo){
+
+if(validPhotoURL(s.image_url)){
 const img=document.createElement('img');
-img.src=photo;
+img.src=s.image_url;
 img.alt='Product picture';
+img.loading='lazy';
 d.append(img);
 }
 const b=document.createElement('strong');
 b.textContent=(s.product_name||'Unnamed product')+
-' — '+normalizeStatus(s.vegan_result||s.vegan_status);
+' — '+normalizeStatus(s.vegan_status);
 const p=document.createElement('div');
 p.className='muted';
-p.textContent=resolveBrand(s.brand,s.barcode)+
-' • '+(s.barcode||'')+
+p.textContent=(s.brand||'')+' • '+(s.barcode||'')+
 ' • '+(s.created_at||'');
 d.append(b,p);
 box.append(d);
 });
+}catch(e){
+cloudHistory=[];
+box.textContent='Cloud history unavailable: '+e.message;
 }
-$('export').onclick=()=>{
+}
+
+$('refreshHistory').onclick=loadCloudHistory;
+
+$('export').onclick=async()=>{
+try{
+const records=await apiRequest(
+'/rest/v1/products?select=*&order=created_at.desc&limit=1000'
+);
 const blob=new Blob(
-[JSON.stringify(getScans(),null,2)],
+[JSON.stringify(records,null,2)],
 {type:'application/json'}
 );
 const url=URL.createObjectURL(blob);
 const a=document.createElement('a');
 a.href=url;
-a.download='verified-vegan-scans.json';
+a.download='verified-vegan-cloud-export.json';
 a.click();
 setTimeout(()=>URL.revokeObjectURL(url),1000);
+}catch(e){
+alert('Cloud export failed: '+e.message);
+}
 };
 
 /* BARCODE CAMERA */
@@ -1385,6 +1438,7 @@ $('video').srcObject=null;
 $('cameraPanel').style.display='none';
 }
 $('stopCamera').onclick=stopCamera;
+
 $('startCamera').onclick=async()=>{
 if(!navigator.mediaDevices?.getUserMedia){
 alert('Camera permission or HTTPS is required.');
@@ -1405,6 +1459,7 @@ audio:false
 $('video').srcObject=stream;
 $('cameraPanel').style.display='block';
 scanActive=true;
+
 async function scan(){
 if(!scanActive)return;
 try{
@@ -1427,11 +1482,12 @@ alert('Camera error: '+e.message);
 }
 };
 
-/* INGREDIENT PHOTO OCR */
+/* INGREDIENT PHOTO OCR — TEMPORARY MEMORY ONLY */
 
 const photoInput=$('photoInput');
 const cropCanvas=$('cropCanvas');
 const ctx=cropCanvas.getContext('2d');
+
 $('takePhoto').onclick=()=>{
 photoInput.setAttribute('capture','environment');
 photoInput.value='';
@@ -1442,6 +1498,7 @@ photoInput.removeAttribute('capture');
 photoInput.value='';
 photoInput.click();
 };
+
 function message(s,error=false){
 $('ocrMessage').textContent=s;
 $('ocrMessage').className=error?'warning':'muted';
@@ -1502,6 +1559,7 @@ async function readImage(canvas){
 const worker=await getWorker();
 return worker.recognize(canvas);
 }
+
 photoInput.onchange=async()=>{
 const file=photoInput.files?.[0];
 if(!file||ocrBusy)return;
@@ -1516,14 +1574,19 @@ ctx.drawImage(small,0,0);
 cropRect=null;
 $('cropPanel').style.display='none';
 $('manualCropButton').style.display='block';
+
 const preview=$('ingredientPreview');
-if(preview.src.startsWith('blob:'))URL.revokeObjectURL(preview.src);
+if(preview.src.startsWith('blob:')){
+URL.revokeObjectURL(preview.src);
+}
 preview.src=URL.createObjectURL(file);
 preview.style.display='block';
+
 busy(true);
 message('Reading ingredient photograph…');
 const result=await readImage(canvas);
 const parsed=splitPackageText(result.data?.text||'');
+
 if(readableIngredients(parsed,result.data?.confidence||0)){
 displayOCR(parsed);
 }else{
@@ -1531,13 +1594,17 @@ failedOCR('Ingredient text unclear. Try a sharper picture or select the ingredie
 }
 }catch(e){
 failedOCR('Photo reading failed: '+e.message);
-}finally{busy(false)}
+}finally{
+busy(false);
+}
 };
+
 $('manualCropButton').onclick=()=>{
 $('cropPanel').style.display='block';
 drawCrop();
 $('cropPanel').scrollIntoView({behavior:'smooth',block:'start'});
 };
+
 function drawCrop(){
 if(!photoBitmap)return;
 const w=cropCanvas.width,h=cropCanvas.height;
@@ -1583,10 +1650,12 @@ drawCrop();
 });
 cropCanvas.addEventListener('pointerup',()=>dragStart=null);
 cropCanvas.addEventListener('pointercancel',()=>dragStart=null);
+
 $('resetCrop').onclick=()=>{
 cropRect=null;
 drawCrop();
 };
+
 $('readCrop').onclick=async()=>{
 if(ocrBusy||!photoBitmap)return;
 busy(true);
@@ -1615,8 +1684,11 @@ failedOCR('Selected text unclear. Try another picture or type the ingredients.')
 }
 }catch(e){
 failedOCR('Reading failed: '+e.message);
-}finally{busy(false)}
+}finally{
+busy(false);
+}
 };
+
 $('ingredients').addEventListener('input',()=>{
 if(ingredientSource==='ocr')$('confirmed').checked=false;
 if(lastResult){
@@ -1664,11 +1736,21 @@ try{await ensureProfile()}catch(e){}
 await loadRewards();
 $('authMessage').textContent='Email confirmed. You are signed in!';
 }
+
 window.addEventListener('pagehide',()=>{
 stopCamera();
+releaseSelectedPhoto();
+if(photoBitmap){
+photoBitmap.close();
+photoBitmap=null;
+}
+const preview=$('ingredientPreview');
+if(preview.src.startsWith('blob:')){
+URL.revokeObjectURL(preview.src);
+}
 if(ocrWorker)ocrWorker.terminate().catch(()=>{});
 });
-renderHistory();
+
 (async()=>{
 try{
 if(location.hash.includes('access_token=')){
@@ -1678,6 +1760,9 @@ await restoreAuth();
 }
 }catch(e){
 $('authMessage').textContent='Authentication: '+e.message;
+}
+if(dbConfig().url&&dbConfig().key){
+await loadCloudHistory();
 }
 })();
 </script>
