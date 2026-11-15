@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -10,7 +9,8 @@
 *{box-sizing:border-box}
 body{margin:0;background:#f4faf5;color:#173b2a;font-family:system-ui,Arial}
 header{background:#126c42;color:white;text-align:center;padding:22px 12px}
-h1{margin:0}header p{margin:6px}
+h1{margin:0}
+header p{margin:6px}
 main{max-width:700px;margin:auto;padding:15px}
 section{background:white;border-radius:16px;padding:18px;margin-bottom:15px;box-shadow:0 2px 12px #1232}
 h2{font-size:20px;margin-top:0}
@@ -154,31 +154,46 @@ const $=id=>document.getElementById(id);
 const KEY='verified-vegan-v1';
 const DBKEY='verified-vegan-supabase-config-v1';
 const PHOTO_KEY='verified-vegan-product-photos-v1';
-const clean=s=>String(s||'').replace(/\s+/g,' ').trim();
+const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
 
-let stream=null,scanActive=false,lastResult=null;
-let photoBitmap=null,ocrWorker=null,ocrBusy=false;
-let cropRect=null,dragStart=null;
+let stream=null;
+let scanActive=false;
+let lastResult=null;
+let photoBitmap=null;
+let ocrWorker=null;
+let ocrBusy=false;
+let cropRect=null;
+let dragStart=null;
 let ingredientSource='none';
 let allergens={contains:'',mayContain:''};
-let currentPhoto='',currentPhotoSource='';
+let currentPhoto='';
 let currentNutrition={};
 let currentServingSize='';
 let photoRequest=0;
+let lookupSerial=0;
+let loadedCloudId=null;
 
 function readJSON(key,fallback){
 try{
-const value=JSON.parse(localStorage.getItem(key)||'null');
-return value===null?fallback:value;
-}catch{return fallback}
+return JSON.parse(localStorage.getItem(key)||'null')??fallback;
+}catch{
+return fallback;
+}
 }
 
 function getScans(){return readJSON(KEY,[])}
 function getPhotos(){return readJSON(PHOTO_KEY,{})}
+function dbConfig(){return readJSON(DBKEY,{})}
 
-function showPhoto(url,source){
+function normalizedStatus(s){
+const v=clean(s).toLowerCase().replace(/[_-]+/g,' ');
+if(v==='vegan')return 'Vegan';
+if(v==='not vegan'||v==='non vegan')return 'Not Vegan';
+return 'Needs Verification';
+}
+
+function showPhoto(url,source=''){
 currentPhoto=url||'';
-currentPhotoSource=source||'';
 const img=$('productPhoto');
 const request=++photoRequest;
 img.onload=null;
@@ -199,7 +214,7 @@ img.src=url;
 img.removeAttribute('src');
 }
 $('photoPlaceholder').style.display=url?'none':'block';
-$('photoSource').textContent=source||'';
+$('photoSource').textContent=source;
 }
 
 function photoIdentity(){
@@ -220,7 +235,7 @@ try{
 localStorage.setItem(PHOTO_KEY,JSON.stringify(photos));
 $('frontMessage').textContent='Product picture saved on this device.';
 return true;
-}catch(e){
+}catch{
 $('frontMessage').textContent='Picture displayed, but device storage is full.';
 return false;
 }
@@ -272,7 +287,6 @@ $('frontMessage').textContent='Could not load picture: '+e.message;
 });
 
 $('barcode').addEventListener('change',restoreProductPhoto);
-
 $('productName').addEventListener('change',()=>{
 if(currentPhoto.startsWith('data:'))saveProductPhoto(currentPhoto);
 });
@@ -321,7 +335,7 @@ const rules=[
 ['Gelatin',/\b(gelatin|gelatine|isinglass)\b/i],
 ['Carmine or cochineal',/\b(carmine|cochineal|carminic acid|e120)\b/i],
 ['Shellac',/\b(shellac|confectioner'?s glaze|e904)\b/i],
-['Meat or animal fat',/\b(beef|pork|chicken fat|chicken broth|lard|tallow|suet|duck fat|goose fat|bacon|meat extract)\b/i],
+['Meat or animal fat',/\b(beef|pork|chicken fat|chicken broth|lard|tallow|suet|duck fat|goose fat|bacon fat|meat extract)\b/i],
 ['Fish or seafood',/\b(fish|anchov(?:y|ies)|oyster|shrimp|prawn|crab|lobster|fish sauce|fish oil|bonito)\b/i],
 ['Other animal ingredients',/\b(collagen|keratin|lanolin|wool fat)\b/i]
 ];
@@ -374,7 +388,7 @@ lastResult=result;
 setStatus(result.status);
 $('explanation').textContent=result.explanation;
 $('reasons').replaceChildren();
-result.reasons.forEach(s=>{
+(result.reasons||[]).forEach(s=>{
 const li=document.createElement('li');
 li.textContent=s;
 $('reasons').append(li);
@@ -425,8 +439,6 @@ box.append(d);
 });
 }
 
-function dbConfig(){return readJSON(DBKEY,{})}
-
 const config=dbConfig();
 $('supabaseUrl').value=config.url||'';
 $('supabaseKey').value=config.key||'';
@@ -465,11 +477,31 @@ serving_size:currentServingSize||null
 };
 }
 
+function cloudHeaders(db){
+return {
+'Content-Type':'application/json',
+'apikey':db.key,
+'Authorization':'Bearer '+db.key
+};
+}
+
+async function cloudError(response){
+let detail='';
+try{
+const error=await response.json();
+detail=error.message||error.details||error.hint||JSON.stringify(error);
+}catch{
+detail=await response.text().catch(()=>'Unknown server error');
+}
+return 'HTTP '+response.status+': '+String(detail).slice(0,350);
+}
+
 $('save').onclick=async()=>{
 if(!lastResult){
 alert('Verify ingredients first.');
 return;
 }
+
 const record={
 barcode:$('barcode').value.trim(),
 brand:$('brand').value.trim(),
@@ -497,7 +529,7 @@ scans.unshift(localRecord);
 localStorage.setItem(KEY,JSON.stringify(scans.slice(0,500)));
 savedLocally=true;
 renderHistory();
-}catch(e){
+}catch{
 $('dbMessage').textContent='Device storage is full. Local scan could not be saved.';
 }
 
@@ -518,9 +550,8 @@ vegan_status:record.vegan_result,
 vegan_reason:record.decision_reasons.join('; ')
 };
 
-const photoForCloud=currentPhoto;
-if(/^https:\/\//i.test(photoForCloud)){
-payload.image_url=photoForCloud;
+if(/^https:\/\//i.test(currentPhoto)){
+payload.image_url=currentPhoto;
 }
 
 const nutrition=nutritionPayload();
@@ -533,27 +564,39 @@ button.disabled=true;
 button.textContent='Saving to cloud…';
 
 try{
-const response=await fetch(db.url+'/rest/v1/products',{
-method:'POST',
+let existingId=loadedCloudId;
+
+if(existingId===null&&record.barcode){
+const search=await fetch(
+db.url+'/rest/v1/products?barcode=eq.'+
+encodeURIComponent(record.barcode)+
+'&select=id&limit=1',
+{headers:cloudHeaders(db)}
+);
+if(!search.ok)throw Error(await cloudError(search));
+const matches=await search.json();
+if(matches.length)existingId=matches[0].id;
+}
+
+const updating=existingId!==null;
+const endpoint=updating?
+db.url+'/rest/v1/products?id=eq.'+
+encodeURIComponent(existingId):
+db.url+'/rest/v1/products';
+
+const response=await fetch(endpoint,{
+method:updating?'PATCH':'POST',
 headers:{
-'Content-Type':'application/json',
-'apikey':db.key,
-'Authorization':'Bearer '+db.key,
-'Prefer':'return=minimal'
+...cloudHeaders(db),
+'Prefer':'return=representation'
 },
 body:JSON.stringify(payload)
 });
 
-if(!response.ok){
-let detail='';
-try{
-const error=await response.json();
-detail=error.message||error.details||error.hint||JSON.stringify(error);
-}catch{
-detail=await response.text().catch(()=>'Unknown server error');
-}
-throw Error('HTTP '+response.status+': '+String(detail).slice(0,350));
-}
+if(!response.ok)throw Error(await cloudError(response));
+
+const saved=await response.json();
+if(saved[0]?.id!==undefined)loadedCloudId=saved[0].id;
 
 $('dbMessage').textContent=
 'Scan saved successfully to Supabase products table.'+
@@ -598,6 +641,73 @@ $('nutrition').textContent=v.length?
 'Nutrition information not available.';
 }
 
+function applyCloudRecord(saved){
+loadedCloudId=saved.id??null;
+$('productName').value=saved.product_name||'';
+$('brand').value=saved.brand||'';
+
+if(!restoreProductPhoto()){
+showPhoto(saved.image_url||'','Saved product picture');
+}
+
+showNutrition({
+proteins_100g:saved.protein_100g,
+carbohydrates_100g:saved.carb_100g,
+fat_100g:saved.fat_100g,
+sugars_100g:saved.sugar_100g,
+fiber_100g:saved.fiber_100g,
+salt_100g:saved.salt_100g
+});
+currentServingSize=saved.serving_size||'';
+
+const parsed=splitPackageText(saved.ingredients||'');
+$('ingredients').value=parsed.ingredients;
+ingredientSource='database';
+allergens={
+contains:parsed.contains,
+mayContain:parsed.mayContain
+};
+updateAllergens();
+
+const status=normalizedStatus(saved.vegan_status);
+const screened=classify(parsed.ingredients);
+
+if(status==='Needs Verification'){
+if(parsed.ingredients){
+showResult(screened);
+$('lookupMessage').textContent=
+'Cloud record loaded. Ingredient screening performed.';
+}else{
+setStatus('Needs Verification');
+$('lookupMessage').textContent=
+'Cloud record found, but no verified ingredient list is available.';
+}
+return;
+}
+
+if(parsed.ingredients&&
+screened.status!==status){
+clearResult();
+setStatus('Needs Verification');
+$('lookupMessage').textContent=
+'Saved classification conflicts with ingredient screening. Review before saving.';
+return;
+}
+
+showResult({
+status,
+reasons:clean(saved.vegan_reason)?
+saved.vegan_reason.split(';').map(clean).filter(Boolean):
+screened.reasons,
+explanation:'Saved classification loaded from your Supabase database.',
+caution:parsed.ingredients?
+screened.caution:
+'The saved classification has no ingredient list attached. Add the complete ingredients to confirm the result.'
+});
+
+$('lookupMessage').textContent=
+'Product loaded from your Supabase database.';
+}
 
 async function lookupProduct(){
 const barcode=$('barcode').value.trim();
@@ -606,6 +716,8 @@ $('lookupMessage').textContent='Enter a valid 8–14 digit barcode.';
 return;
 }
 
+const serial=++lookupSerial;
+loadedCloudId=null;
 $('lookupMessage').textContent='Checking saved products…';
 clearResult();
 setStatus('Looking up…');
@@ -627,72 +739,31 @@ if(db.url&&db.key){
 try{
 const url=db.url+'/rest/v1/products?barcode=eq.'+
 encodeURIComponent(barcode)+
-'&select=*&order=created_at.desc&limit=20';
+'&select=*&order=created_at.desc&limit=100';
 
 const response=await fetch(url,{
-headers:{
-'apikey':db.key,
-'Authorization':'Bearer '+db.key
-}
+headers:cloudHeaders(db)
 });
 
-if(!response.ok){
-const detail=await response.text();
-throw Error('HTTP '+response.status+': '+detail.slice(0,150));
-}
+if(!response.ok)throw Error(await cloudError(response));
 
 const records=await response.json();
+if(serial!==lookupSerial)return;
+
 const saved=records.find(p=>
-p.ingredients&&
-['Vegan','Not Vegan'].includes(p.vegan_status)
-);
+normalizedStatus(p.vegan_status)!=='Needs Verification'&&
+clean(p.ingredients)
+)||records.find(p=>
+normalizedStatus(p.vegan_status)!=='Needs Verification'
+)||records.find(p=>clean(p.ingredients))
+||records[0];
 
 if(saved){
-$('productName').value=saved.product_name||'';
-$('brand').value=saved.brand||'';
-
-if(!restoreProductPhoto()){
-showPhoto(saved.image_url||'','Saved product picture');
-}
-
-const nutrition={
-proteins_100g:saved.protein_100g,
-carbohydrates_100g:saved.carb_100g,
-fat_100g:saved.fat_100g,
-sugars_100g:saved.sugar_100g,
-fiber_100g:saved.fiber_100g,
-salt_100g:saved.salt_100g
-};
-showNutrition(nutrition);
-currentServingSize=saved.serving_size||'';
-
-const parsed=splitPackageText(saved.ingredients);
-$('ingredients').value=parsed.ingredients;
-ingredientSource='database';
-allergens={
-contains:parsed.contains,
-mayContain:parsed.mayContain
-};
-updateAllergens();
-
-const result=classify(parsed.ingredients);
-if(result.status===saved.vegan_status){
-showResult(result);
-$('lookupMessage').textContent=
-'Product loaded from your Supabase database.';
-}else{
-setStatus('Needs Verification');
-$('lookupMessage').textContent=
-'Saved classification conflicts with current ingredient screening. Review ingredients before saving.';
-}
+applyCloudRecord(saved);
 return;
 }
-
-if(records.length){
-$('lookupMessage').textContent=
-'Saved record has no verified ingredient list. Checking product database…';
-}
 }catch(e){
+if(serial!==lookupSerial)return;
 $('lookupMessage').textContent=
 'Supabase lookup failed: '+e.message+
 '. Trying Open Food Facts…';
@@ -706,6 +777,7 @@ encodeURIComponent(barcode)+'.json'
 );
 if(!r.ok)throw Error('Product service unavailable');
 const data=await r.json();
+if(serial!==lookupSerial)return;
 
 if(data.status!==1||!data.product){
 $('lookupMessage').textContent=
@@ -751,12 +823,12 @@ $('lookupMessage').textContent=
 'No ingredients found. Take an ingredient picture.';
 }
 }catch(e){
+if(serial!==lookupSerial)return;
 setStatus('Needs Verification');
 $('lookupMessage').textContent='Lookup failed: '+e.message;
 restoreProductPhoto();
 }
 }
-
 
 $('lookup').onclick=lookupProduct;
 
