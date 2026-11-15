@@ -11,24 +11,27 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#f4faf5;color:#173b2a;font-family:system-ui,Arial}
-header{background:#126c42;color:white;text-align:center;padding:22px 12px}
+header{background:#126c42;color:white;text-align:center;padding:20px 12px}
 h1{margin:0}
-header p{margin:6px}
-main{max-width:700px;margin:auto;padding:15px}
-section{background:white;border-radius:16px;padding:18px;margin-bottom:15px;box-shadow:0 2px 12px #1232}
-h2{font-size:20px;margin-top:0}
+header p{margin:5px}
+main{max-width:720px;margin:auto;padding:14px}
+section{background:white;border-radius:16px;padding:17px;margin-bottom:15px;box-shadow:0 2px 12px #1232}
+h2{font-size:20px;margin:0 0 12px}
+h3{margin-bottom:8px}
 input,textarea,button{font:inherit;width:100%;padding:12px;border-radius:10px;margin:5px 0}
 input,textarea{border:1px solid #a9c2b2}
 textarea{min-height:120px}
 button{border:0;background:#126c42;color:white;font-weight:700;cursor:pointer}
 button.secondary{background:#426755}
+button.danger{background:#8a3d36}
 button:disabled{opacity:.55}
 label{display:block;margin-top:9px}
 video{width:100%;max-height:340px;background:#111;border-radius:12px}
 .muted{color:#617469}
 .warning{color:#a32117}
 .success{color:#126c42}
-.productTop{display:flex;align-items:center;gap:14px;margin:15px 0}
+.small{font-size:13px}
+.productTop{display:flex;align-items:center;gap:12px;margin:15px 0}
 .photoBox{width:46%;min-height:160px;background:#f4faf5;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px}
 #productPhoto{max-width:100%;max-height:220px;object-fit:contain}
 #photoPlaceholder,#photoSource{font-size:13px;text-align:center;color:#617469}
@@ -38,7 +41,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 .unknown{background:#fff0c5;color:#795000}
 .pending{background:#edf2ee;color:#52675a}
 #nutrition{line-height:1.8}
-.entry{border-bottom:1px solid #ddd;padding:10px 0;min-height:65px}
+.entry{border-bottom:1px solid #ddd;padding:10px 0;min-height:55px;overflow-wrap:anywhere}
 .entry img{width:55px;height:55px;object-fit:contain;float:right}
 #cropCanvas{width:100%;height:auto;touch-action:none;border-radius:10px;border:1px solid #a9c2b2}
 #confirmedRow{display:flex;gap:10px;align-items:flex-start;margin:12px 0}
@@ -48,20 +51,17 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 #allergenPanel{background:#f1f5f1;border-radius:10px;padding:12px;margin:12px 0}
 #brandDisplay{font-size:20px;font-weight:800;color:#126c42;margin:10px 0}
 #photoMessage,#photoSource{font-size:13px;color:#617469}
-#dbMessage,#lookupMessage,#authMessage,#rewardMessage{overflow-wrap:anywhere}
+#dbMessage,#lookupMessage,#authMessage,#rewardMessage,#saveMessage{overflow-wrap:anywhere}
 .rewardGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
 .rewardBox{background:#f1f7f2;border-radius:12px;padding:15px;text-align:center}
 .rewardBox strong{display:block;font-size:27px;color:#126c42}
 .rewardBox span{font-size:13px;color:#617469}
 .steps{background:#f1f7f2;border-radius:12px;padding:12px 18px}
 .steps li{margin:9px 0}
-#cameraPanel,#result,#cropPanel,#ingredientPreview,#allergenPanel,#signedInPanel{display:none}
+#cameraPanel,#result,#cropPanel,#ingredientPreview,#allergenPanel,#signedInPanel,#myRewards,#passwordPanel{display:none}
 #frontInput,#photoInput{display:none}
 #brandDisplay{display:none}
 #authSection{border:2px solid #d7e8dc}
-#myRewards{display:none}
-#logout{background:#8a3d36}
-.small{font-size:13px}
 </style>
 </head>
 <body>
@@ -74,26 +74,28 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 
 <section id="authSection">
 <h2>🏆 Community Rewards</h2>
-<p>Help improve Verified Vegan and earn points for verified contributions.</p>
-<p class="muted">Scanning is always free. An account is only needed to earn rewards.</p>
-
+<p>Help improve Verified Vegan and earn points for approved contributions.</p>
+<p class="muted">Scanning is always free. Sign-in is only needed for rewards.</p>
 <div id="signedOutPanel">
 <h3>Create Account or Log In</h3>
 <label for="authEmail">Email address</label>
 <input id="authEmail" type="email" autocomplete="email" placeholder="Your email">
 <label for="authPassword">Password</label>
-<input id="authPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters">
+<input id="authPassword" type="password" autocomplete="current-password" placeholder="At least 8 characters">
 <button id="signUp">🌱 Create Free Account</button>
 <button id="signIn" class="secondary">Log In</button>
 <button id="resetPassword" class="secondary">Forgot Password?</button>
 </div>
-
+<div id="passwordPanel">
+<h3>Set New Password</h3>
+<input id="newPassword" type="password" autocomplete="new-password" placeholder="New password, at least 8 characters">
+<button id="savePassword">Save New Password</button>
+</div>
 <div id="signedInPanel">
 <p id="welcomeUser"></p>
 <button id="refreshRewards">🏆 My Rewards</button>
-<button id="logout" class="secondary">Log Out</button>
+<button id="logout" class="danger">Log Out</button>
 </div>
-
 <p id="authMessage" class="muted" aria-live="polite"></p>
 </section>
 
@@ -138,25 +140,22 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 </div>
 <div id="productStatus" class="pending" aria-live="polite">Scan a product</div>
 </div>
-
 <div class="steps">
 <strong>📸 Missing a Product Picture? Earn Points!</strong>
 <ol>
 <li>Scan the product barcode.</li>
 <li>Tap <strong>Take Product Picture</strong>.</li>
 <li>Photograph the front of the package.</li>
-<li>Tap <strong>Save Scan</strong> below.</li>
+<li>Tap <strong>Save Scan</strong>.</li>
 <li>Earn 10 points after your picture is approved!</li>
 </ol>
-<p class="small">Sign in to receive points. You can still save pictures without an account.</p>
+<p class="small">Sign in for rewards. Product scanning remains free.</p>
 </div>
-
 <input id="frontInput" type="file" accept="image/*" capture="environment">
 <button id="takeFront">📸 Take Product Picture</button>
 <button id="chooseFront" class="secondary">Choose Product Picture From Gallery</button>
 <p id="frontMessage" class="muted">Add a product picture if needed.</p>
 <p id="photoMessage"></p>
-
 <label for="productName">Product name</label>
 <input id="productName" placeholder="Product name">
 <label for="brand">Brand</label>
@@ -167,13 +166,12 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 
 <section>
 <h2>Ingredients</h2>
-<p>Take a clear picture of the ingredient list.</p>
+<p>Take a clear picture of the ingredient list, or enter the ingredients manually.</p>
 <input id="photoInput" type="file" accept="image/*" capture="environment">
 <button id="takePhoto">📸 Take Ingredient Picture</button>
 <button id="choosePhoto" class="secondary">Choose Existing Ingredient Photo</button>
 <img id="ingredientPreview" alt="Ingredient photograph">
 <p id="ocrMessage" class="muted">No ingredient picture selected yet.</p>
-
 <div id="cropPanel">
 <h2>Adjust Ingredient Area</h2>
 <p>Draw a rectangle around the ingredient list.</p>
@@ -181,17 +179,14 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <button id="readCrop">Read Selected Ingredients</button>
 <button id="resetCrop" class="secondary">Reset Selection</button>
 </div>
-
 <button id="manualCropButton" class="secondary" style="display:none">Adjust Ingredient Area Manually</button>
 <label for="ingredients">Ingredient list</label>
-<textarea id="ingredients" placeholder="Ingredients appear here. You can correct or type them."></textarea>
-
+<textarea id="ingredients" placeholder="Ingredients appear here. Correct or type them."></textarea>
 <div id="allergenPanel">
 <strong>Separate Package Statements</strong>
 <p id="containsText"></p>
 <p id="mayContainText"></p>
 </div>
-
 <div id="confirmedRow">
 <input id="confirmed" type="checkbox">
 <label for="confirmed">I checked the complete ingredient list against the package and corrected any mistakes.</label>
@@ -211,7 +206,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 
 <section>
 <h2>Cloud Database Connection</h2>
-<p class="muted">Use your existing Supabase URL and public anon or publishable key. Never enter a secret or service-role key.</p>
+<p class="muted">Use your Supabase URL and public anon/publishable key. Never use a secret or service-role key.</p>
 <label for="supabaseUrl">Supabase Project URL</label>
 <input id="supabaseUrl" type="url">
 <label for="supabaseKey">Supabase Public Key</label>
@@ -250,12 +245,9 @@ let allergens={contains:'',mayContain:''};
 let currentPhoto='',currentNutrition={},currentServingSize='';
 let loadedCloudId=null,lookupNumber=0,photoRequest=0;
 let selectedPhotoFile=null,photoChanged=false;
-let currentUser=null,authSession=null;
-let authRefreshPromise=null;
-let originalIngredients='';
-let originalPhoto='';
-let originalStatus='';
-let photoWasMissing=false;
+let currentUser=null,authSession=null,authRefreshPromise=null;
+let originalIngredients='',originalPhoto='',originalStatus='';
+let photoWasMissing=false,recoveryMode=false;
 
 function readJSON(key,fallback){
 try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}
@@ -287,7 +279,6 @@ const v=clean($('brand').value);
 $('brandDisplay').textContent=v?'Brand: '+v:'';
 $('brandDisplay').style.display=v?'block':'none';
 });
-
 function normalizeStatus(v){
 const s=clean(v).toLowerCase().replace(/[_-]/g,' ');
 if(s==='vegan')return 'Vegan';
@@ -337,7 +328,7 @@ return 'HTTP '+response.status+': '+(e.msg||e.message||e.error_description||e.de
 }
 function requireDB(){
 const db=dbConfig();
-if(!db.url||!db.key)throw Error('Save your Supabase connection settings first.');
+if(!db.url||!db.key)throw Error('Save Supabase connection settings first.');
 return db;
 }
 async function apiRequest(path,options={}){
@@ -382,7 +373,7 @@ $('dbMessage').textContent='Supabase connection successful.';
 }catch(e){$('dbMessage').textContent=e.message}
 };
 
-/* CONTRIBUTOR AUTHENTICATION */
+/* AUTHENTICATION */
 
 function saveSession(session){
 authSession=session;
@@ -408,8 +399,7 @@ $('contributionHistory').replaceChildren();
 }
 async function authCall(endpoint,body){
 const db=requireDB();
-const response=await fetch(
-db.url+'/auth/v1/'+endpoint,{
+const response=await fetch(db.url+'/auth/v1/'+endpoint,{
 method:'POST',
 headers:headers(db),
 body:JSON.stringify(body)
@@ -417,14 +407,12 @@ body:JSON.stringify(body)
 if(!response.ok)throw Error(await responseError(response));
 return response.json();
 }
-function authRedirect(){
-return location.origin+location.pathname;
-}
+function authRedirect(){return location.origin+location.pathname}
 $('signUp').onclick=async()=>{
 const email=$('authEmail').value.trim();
 const password=$('authPassword').value;
 if(!email||password.length<8){
-$('authMessage').textContent='Enter your email and a password of at least 8 characters.';
+$('authMessage').textContent='Enter an email and password of at least 8 characters.';
 return;
 }
 $('authMessage').textContent='Creating account…';
@@ -435,12 +423,11 @@ const data=await authCall(
 );
 if(data.access_token){
 saveSession(data);
-await ensureProfile();
+try{await ensureProfile()}catch(e){}
 await loadRewards();
 $('authMessage').textContent='Account created and signed in.';
 }else{
-$('authMessage').textContent=
-'Account request submitted. Check your email and confirm your address, then return here to log in.';
+$('authMessage').textContent='Check your email to confirm your account, then log in.';
 }
 }catch(e){$('authMessage').textContent='Sign up failed: '+e.message}
 };
@@ -451,7 +438,7 @@ $('authMessage').textContent='Signing in…';
 try{
 const data=await authCall('token?grant_type=password',{email,password});
 saveSession(data);
-await ensureProfile();
+try{await ensureProfile()}catch(e){}
 await loadRewards();
 $('authMessage').textContent='Signed in successfully.';
 }catch(e){$('authMessage').textContent='Log in failed: '+e.message}
@@ -467,24 +454,43 @@ await authCall(
 'recover?redirect_to='+encodeURIComponent(authRedirect()),
 {email}
 );
-$('authMessage').textContent=
-'If the email is registered, a password recovery message will be sent.';
+$('authMessage').textContent='If the email is registered, a recovery email will be sent.';
 }catch(e){$('authMessage').textContent=e.message}
 };
-$('logout').onclick=async()=>{
-const token=authSession?.access_token;
+$('savePassword').onclick=async()=>{
+const password=$('newPassword').value;
+if(password.length<8){
+$('authMessage').textContent='Use a password of at least 8 characters.';
+return;
+}
 try{
+const token=await userToken();
+const db=requireDB();
+const response=await fetch(db.url+'/auth/v1/user',{
+method:'PUT',
+headers:headers(db,token),
+body:JSON.stringify({password})
+});
+if(!response.ok)throw Error(await responseError(response));
+recoveryMode=false;
+$('passwordPanel').style.display='none';
+$('authMessage').textContent='Password updated successfully.';
+}catch(e){$('authMessage').textContent='Password update failed: '+e.message}
+};
+$('logout').onclick=async()=>{
+try{
+const token=authSession?.access_token;
 if(token){
-await apiRequest('/auth/v1/logout',{
-method:'POST',
-headers:{Authorization:'Bearer '+token}
+const db=requireDB();
+await fetch(db.url+'/auth/v1/logout',{
+method:'POST',headers:headers(db,token)
 });
 }
 }catch(e){}
 saveSession(null);
+$('passwordPanel').style.display='none';
 $('authMessage').textContent='Logged out.';
 };
-
 async function refreshSession(){
 if(!authSession?.refresh_token)throw Error('Please log in again.');
 if(authRefreshPromise)return authRefreshPromise;
@@ -497,7 +503,7 @@ saveSession(data);
 return data.access_token;
 }catch(e){
 saveSession(null);
-throw Error('Your session expired. Please log in again.');
+throw Error('Session expired. Please log in again.');
 }finally{authRefreshPromise=null}
 })();
 return authRefreshPromise;
@@ -540,16 +546,13 @@ if(!rows.length){
 await userRequest('/rest/v1/vv_profiles',{
 method:'POST',
 headers:{Prefer:'return=minimal'},
-body:JSON.stringify({
-user_id:id,
-show_on_leaderboard:false
-})
+body:JSON.stringify({user_id:id,show_on_leaderboard:false})
 });
 }
 }
 async function loadRewards(){
 if(!currentUser)return;
-$('rewardMessage').textContent='Loading your rewards…';
+$('rewardMessage').textContent='Loading rewards…';
 try{
 const id=currentUser.id;
 const totals=await userRequest(
@@ -570,16 +573,17 @@ contributions.forEach(c=>{
 const div=document.createElement('div');
 div.className='entry';
 div.textContent=
-c.contribution_type.replace(/_/g,' ')+
+String(c.contribution_type||'Contribution').replace(/_/g,' ')+
 ' • '+c.barcode+
 ' • '+c.points+' points • '+c.status;
 box.append(div);
 });
-$('rewardMessage').textContent='Points are awarded only after approval.';
-}catch(e){$('rewardMessage').textContent='Rewards unavailable: '+e.message}
+$('rewardMessage').textContent='Points are awarded after verification.';
+}catch(e){
+$('rewardMessage').textContent='Rewards unavailable: '+e.message;
+}
 }
 $('refreshRewards').onclick=loadRewards;
-
 async function restoreAuth(){
 const saved=readJSON(AUTHKEY,null);
 if(!saved?.access_token)return;
@@ -660,7 +664,7 @@ return;
 const c=candidates[index++];
 if(!validPhotoURL(c.url)){next();return}
 let done=false;
-const timer=setTimeout(()=>fail(),4500);
+const timer=setTimeout(fail,4500);
 function fail(){
 if(done||request!==photoRequest)return;
 done=true;
@@ -689,8 +693,7 @@ resetPhoto();
 showPhotoCandidates([{url,source}]);
 }
 function extractOFFImages(p){
-const candidates=[];
-const seen=new Set();
+const candidates=[],seen=new Set();
 function add(url,source){
 if(validPhotoURL(url)&&!seen.has(url)){
 seen.add(url);
@@ -755,8 +758,8 @@ photoChanged=true;
 showPhoto(url,'Your new product picture');
 const saved=saveProductPhoto(url);
 $('frontMessage').textContent=saved?
-'Picture saved on this device. Tap Save Scan after verifying ingredients to upload it to Supabase.':
-'Picture selected. Tap Save Scan after verifying ingredients.';
+'Picture saved on this device. Tap Save Scan to upload it.':
+'Picture selected. Tap Save Scan to save it.';
 }catch(e){$('frontMessage').textContent=e.message}
 };
 
@@ -932,7 +935,7 @@ return score(b)-score(a);
 return {record:matches[0]||null,error:null};
 }catch(e){return {record:null,error:e.message}}
 }
-function loadCloudRecord(p,serial){
+function loadCloudRecord(p){
 loadedCloudId=p.id??null;
 $('productName').value=p.product_name||'';
 displayBrand(p.brand,$('barcode').value);
@@ -1009,7 +1012,7 @@ currentServingSize='';
 const cloud=await findCloudRecord(barcode);
 if(serial!==lookupNumber)return;
 if(cloud.record){
-loadCloudRecord(cloud.record,serial);
+loadCloudRecord(cloud.record);
 return;
 }
 const local=localMatch(barcode);
@@ -1057,7 +1060,7 @@ photoWasMissing=true;
 }
 $('lookup').onclick=lookupProduct;
 
-/* SAVE PRODUCT AND SUBMIT REWARD */
+/* SAVE PRODUCT AND REWARD */
 
 function numericValue(value){
 if(value===undefined||value===null||value==='')return null;
@@ -1083,11 +1086,12 @@ file.type==='image/webp'?'webp':'jpg';
 const filename=safeBarcode+'-'+Date.now()+'.'+extension;
 const url=db.url+'/storage/v1/object/product-images/'+
 encodeURIComponent(filename);
+const token=currentUser?await userToken():db.key;
 const r=await fetch(url,{
 method:'POST',
 headers:{
 'apikey':db.key,
-'Authorization':'Bearer '+db.key,
+'Authorization':'Bearer '+token,
 'Content-Type':file.type||'image/jpeg',
 'x-upsert':'false'
 },
@@ -1256,7 +1260,7 @@ button.disabled=false;
 button.textContent='💾 Save Scan';
 };
 
-/* SCAN HISTORY */
+/* HISTORY */
 
 function renderHistory(){
 const box=$('history');
@@ -1319,7 +1323,7 @@ alert('Camera permission or HTTPS is required.');
 return;
 }
 if(!('BarcodeDetector' in window)){
-alert('Barcode detection is unavailable in this browser. Enter the barcode manually.');
+alert('Barcode detection unavailable. Enter barcode manually.');
 return;
 }
 try{
@@ -1415,7 +1419,7 @@ ingredientSource='ocr';
 $('confirmed').checked=false;
 clearResult();
 setStatus('Needs Verification');
-message('Ingredients detected. Check and correct every word before verifying.');
+message('Ingredients detected. Check every word before verifying.');
 $('ingredients').scrollIntoView({behavior:'smooth',block:'center'});
 }
 function failedOCR(text){
@@ -1455,7 +1459,7 @@ const parsed=splitPackageText(result.data?.text||'');
 if(readableIngredients(parsed,result.data?.confidence||0)){
 displayOCR(parsed);
 }else{
-failedOCR('Ingredient text could not be read reliably. Try a sharper picture or select the ingredient area manually.');
+failedOCR('Ingredient text unclear. Try a sharper picture or select the ingredient area.');
 }
 }catch(e){
 failedOCR('Photo reading failed: '+e.message);
@@ -1468,8 +1472,7 @@ $('cropPanel').scrollIntoView({behavior:'smooth',block:'start'});
 };
 function drawCrop(){
 if(!photoBitmap)return;
-const w=cropCanvas.width;
-const h=cropCanvas.height;
+const w=cropCanvas.width,h=cropCanvas.height;
 ctx.clearRect(0,0,w,h);
 ctx.drawImage(photoBitmap,0,0,w,h);
 if(cropRect){
@@ -1525,8 +1528,7 @@ const sx=photoBitmap.width/cropCanvas.width;
 const sy=photoBitmap.height/cropCanvas.height;
 const r=cropRect&&cropRect.w>10&&cropRect.h>10?
 cropRect:{x:0,y:0,w:cropCanvas.width,h:cropCanvas.height};
-const x=Math.floor(r.x*sx);
-const y=Math.floor(r.y*sy);
+const x=Math.floor(r.x*sx),y=Math.floor(r.y*sy);
 const w=Math.max(1,Math.floor(r.w*sx));
 const h=Math.max(1,Math.floor(r.h*sy));
 const out=document.createElement('canvas');
@@ -1541,7 +1543,7 @@ const parsed=splitPackageText(result.data?.text||'');
 if(readableIngredients(parsed,result.data?.confidence||0)){
 displayOCR(parsed);
 }else{
-failedOCR('Selected ingredient text is unclear. Try another picture or type the ingredients.');
+failedOCR('Selected text unclear. Try another picture or type the ingredients.');
 }
 }catch(e){
 failedOCR('Reading failed: '+e.message);
@@ -1570,11 +1572,6 @@ const refresh=hash.get('refresh_token');
 const type=hash.get('type');
 if(!access||!refresh)return;
 history.replaceState(null,'',location.pathname+location.search);
-if(type==='recovery'){
-$('authMessage').textContent=
-'Recovery link confirmed. Password update screen is not yet implemented. Please contact the administrator if you need help.';
-return;
-}
 const db=requireDB();
 const r=await fetch(db.url+'/auth/v1/user',{
 headers:headers(db,access)
@@ -1589,7 +1586,13 @@ expires_in:expires,
 expires_at:Math.floor(Date.now()/1000)+expires,
 user
 });
-await ensureProfile();
+if(type==='recovery'){
+recoveryMode=true;
+$('passwordPanel').style.display='block';
+$('authMessage').textContent='Enter your new password below.';
+return;
+}
+try{await ensureProfile()}catch(e){}
 await loadRewards();
 $('authMessage').textContent='Email confirmed. You are signed in!';
 }
