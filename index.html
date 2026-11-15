@@ -72,6 +72,19 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 </header>
 <main>
 
+<section id="scannerSection">
+<h2>📷 Scan a Barcode</h2>
+<button id="startCamera">Start Barcode Scanner</button>
+<div id="cameraPanel">
+<video id="video" autoplay muted playsinline></video>
+<button id="stopCamera" class="secondary">Stop Camera</button>
+</div>
+<label for="barcode">Or enter UPC / EAN</label>
+<input id="barcode" inputmode="numeric" placeholder="Barcode number">
+<button id="lookup">Look Up Product</button>
+<p id="lookupMessage" class="muted"></p>
+</section>
+
 <section id="authSection">
 <h2>🏆 Community Rewards</h2>
 <p>Help improve Verified Vegan and earn points for approved contributions.</p>
@@ -114,19 +127,6 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <p id="rewardMessage" class="muted"></p>
 <h3>Your Contributions</h3>
 <div id="contributionHistory"></div>
-</section>
-
-<section>
-<h2>📷 Scan a Barcode</h2>
-<button id="startCamera">Start Barcode Scanner</button>
-<div id="cameraPanel">
-<video id="video" autoplay muted playsinline></video>
-<button id="stopCamera" class="secondary">Stop Camera</button>
-</div>
-<label for="barcode">Or enter UPC / EAN</label>
-<input id="barcode" inputmode="numeric" placeholder="Barcode number">
-<button id="lookup">Look Up Product</button>
-<p id="lookupMessage" class="muted"></p>
 </section>
 
 <section>
