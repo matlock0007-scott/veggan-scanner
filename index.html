@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -215,14 +216,6 @@ Hold the camera straight, fill the picture with the ingredient label, avoid glar
 <button id="testDb" class="secondary">Test Database Connection</button>
 <p id="dbMessage" class="muted"></p>
 </section>
-
-<section>
-<h2>Recent Cloud Products</h2>
-<p class="muted">Loaded from Supabase, not permanently saved on your phone.</p>
-<button id="refreshHistory" class="secondary">Refresh Cloud History</button>
-<div id="history"></div>
-<button id="export" class="secondary">Export Cloud Products as JSON</button>
-</section>
 </main>
 
 <script>
@@ -252,7 +245,7 @@ let loadedCloudId=null,lookupNumber=0,photoRequest=0;
 let selectedPhotoFile=null,selectedPhotoURL='';
 let currentUser=null,authSession=null,authRefreshPromise=null;
 let originalIngredients='',originalStatus='',photoWasMissing=false;
-let cloudHistory=[],recoveryMode=false;
+let recoveryMode=false;
 let autoSaveBusy=false,autoSavePromise=null,autoSaveSerial=0;
 let cloudRecordExists=false,contributionBaseline=null;
 let productSession=0,savingContribution=false;
@@ -444,7 +437,6 @@ const previous=dbConfig();
 localStorage.setItem(DBKEY,JSON.stringify({url,key}));
 if(previous.url!==url||previous.key!==key)saveSession(null);
 $('dbMessage').textContent='Connection settings saved.';
-loadCloudHistory();
 }catch(e){$('dbMessage').textContent=e.message}
 };
 $('testDb').onclick=async()=>{
@@ -452,7 +444,6 @@ $('dbMessage').textContent='Testing Supabase connection…';
 try{
 await apiRequest('/rest/v1/products?select=id&limit=1');
 $('dbMessage').textContent='Supabase connection successful.';
-await loadCloudHistory();
 }catch(e){$('dbMessage').textContent=e.message}
 };
 
@@ -1037,7 +1028,6 @@ cloudRecordExists=true;rememberBaseline(saved[0]);
 }
 notice.textContent='✅ Automatically saved to Supabase cloud. No Save Scan needed.';
 $('dbMessage').textContent='Automatic product save successful.';
-await loadCloudHistory();
 }catch(e){
 if(serial!==lookupNumber)return;
 if(/409|duplicate|unique constraint/i.test(e.message)){
@@ -1320,7 +1310,6 @@ rewardText+=' Sign in before contributing to earn rewards.';
 if(cloudSaved){
 originalIngredients=record.ingredient_text;
 $('dbMessage').textContent='Product saved to Supabase.';
-await loadCloudHistory();
 }
 $('saveMessage').textContent='✅ Saved to Supabase cloud.'+rewardText;
 }catch(e){
@@ -1331,54 +1320,6 @@ savingContribution=false;
 button.disabled=false;
 button.textContent='💾 Save Scan / Submit Contribution';
 }
-};
-
-/* CLOUD HISTORY */
-
-async function loadCloudHistory(){
-const box=$('history');
-box.textContent='Loading cloud products…';
-try{
-const records=await apiRequest(
-'/rest/v1/products?select=id,barcode,brand,product_name,vegan_status,image_url,created_at&order=created_at.desc&limit=30'
-);
-cloudHistory=records||[];
-box.replaceChildren();
-if(!cloudHistory.length){
-box.textContent='No cloud products found.';return;
-}
-cloudHistory.forEach(s=>{
-const d=document.createElement('div');
-d.className='entry';
-if(validPhotoURL(s.image_url)){
-const img=document.createElement('img');
-img.src=s.image_url;img.alt='Product picture';img.loading='lazy';
-d.append(img);
-}
-const b=document.createElement('strong');
-b.textContent=(s.product_name||'Unnamed product')+' — '+normalizeStatus(s.vegan_status);
-const p=document.createElement('div');
-p.className='muted';
-p.textContent=(s.brand||'')+' • '+(s.barcode||'')+' • '+(s.created_at||'');
-d.append(b,p);box.append(d);
-});
-}catch(e){
-cloudHistory=[];
-box.textContent='Cloud history unavailable: '+e.message;
-}
-}
-$('refreshHistory').onclick=loadCloudHistory;
-$('export').onclick=async()=>{
-try{
-const records=await apiRequest(
-'/rest/v1/products?select=*&order=created_at.desc&limit=1000'
-);
-const blob=new Blob([JSON.stringify(records,null,2)],{type:'application/json'});
-const url=URL.createObjectURL(blob);
-const a=document.createElement('a');
-a.href=url;a.download='verified-vegan-cloud-export.json';a.click();
-setTimeout(()=>URL.revokeObjectURL(url),1000);
-}catch(e){alert('Cloud export failed: '+e.message)}
 };
 
 /* BARCODE CAMERA */
@@ -1886,7 +1827,6 @@ await handleAuthReturn();
 await restoreAuth();
 }
 }catch(e){$('authMessage').textContent='Authentication: '+e.message}
-if(dbConfig().url&&dbConfig().key)await loadCloudHistory();
 })();
 </script>
 </body>
