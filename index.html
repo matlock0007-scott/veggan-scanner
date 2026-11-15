@@ -598,6 +598,7 @@ $('nutrition').textContent=v.length?
 'Nutrition information not available.';
 }
 
+
 async function lookupProduct(){
 const barcode=$('barcode').value.trim();
 if(!/^\d{8,14}$/.test(barcode)){
@@ -605,7 +606,7 @@ $('lookupMessage').textContent='Enter a valid 8–14 digit barcode.';
 return;
 }
 
-$('lookupMessage').textContent='Looking up product…';
+$('lookupMessage').textContent='Checking saved products…';
 clearResult();
 setStatus('Looking up…');
 showPhoto('','');
@@ -616,8 +617,87 @@ $('ingredients').value='';
 $('productName').value='';
 $('brand').value='';
 ingredientSource='none';
+$('confirmed').checked=false;
 allergens={contains:'',mayContain:''};
 updateAllergens();
+
+const db=dbConfig();
+
+if(db.url&&db.key){
+try{
+const url=db.url+'/rest/v1/products?barcode=eq.'+
+encodeURIComponent(barcode)+
+'&select=*&order=created_at.desc&limit=20';
+
+const response=await fetch(url,{
+headers:{
+'apikey':db.key,
+'Authorization':'Bearer '+db.key
+}
+});
+
+if(!response.ok){
+const detail=await response.text();
+throw Error('HTTP '+response.status+': '+detail.slice(0,150));
+}
+
+const records=await response.json();
+const saved=records.find(p=>
+p.ingredients&&
+['Vegan','Not Vegan'].includes(p.vegan_status)
+);
+
+if(saved){
+$('productName').value=saved.product_name||'';
+$('brand').value=saved.brand||'';
+
+if(!restoreProductPhoto()){
+showPhoto(saved.image_url||'','Saved product picture');
+}
+
+const nutrition={
+proteins_100g:saved.protein_100g,
+carbohydrates_100g:saved.carb_100g,
+fat_100g:saved.fat_100g,
+sugars_100g:saved.sugar_100g,
+fiber_100g:saved.fiber_100g,
+salt_100g:saved.salt_100g
+};
+showNutrition(nutrition);
+currentServingSize=saved.serving_size||'';
+
+const parsed=splitPackageText(saved.ingredients);
+$('ingredients').value=parsed.ingredients;
+ingredientSource='database';
+allergens={
+contains:parsed.contains,
+mayContain:parsed.mayContain
+};
+updateAllergens();
+
+const result=classify(parsed.ingredients);
+if(result.status===saved.vegan_status){
+showResult(result);
+$('lookupMessage').textContent=
+'Product loaded from your Supabase database.';
+}else{
+setStatus('Needs Verification');
+$('lookupMessage').textContent=
+'Saved classification conflicts with current ingredient screening. Review ingredients before saving.';
+}
+return;
+}
+
+if(records.length){
+$('lookupMessage').textContent=
+'Saved record has no verified ingredient list. Checking product database…';
+}
+}catch(e){
+$('lookupMessage').textContent=
+'Supabase lookup failed: '+e.message+
+'. Trying Open Food Facts…';
+}
+}
 
 try{
 const r=await fetch(
@@ -628,7 +708,8 @@ if(!r.ok)throw Error('Product service unavailable');
 const data=await r.json();
 
 if(data.status!==1||!data.product){
-$('lookupMessage').textContent='Product not found. Enter details or photograph ingredients.';
+$('lookupMessage').textContent=
+'Product not found. Enter details or photograph ingredients.';
 setStatus('Needs Verification');
 restoreProductPhoto();
 return;
@@ -639,25 +720,35 @@ $('productName').value=p.product_name||'';
 $('brand').value=p.brands||'';
 
 if(!restoreProductPhoto()){
-showPhoto(p.image_front_url||p.image_url||'','Product database picture');
+showPhoto(
+p.image_front_url||p.image_url||'',
+'Product database picture'
+);
 }
 
 showNutrition(p.nutriments||{});
 currentServingSize=p.serving_size||'';
 
-const parsed=splitPackageText(p.ingredients_text_en||p.ingredients_text||'');
+const parsed=splitPackageText(
+p.ingredients_text_en||p.ingredients_text||''
+);
 $('ingredients').value=parsed.ingredients;
 ingredientSource='database';
 $('confirmed').checked=false;
-allergens={contains:parsed.contains,mayContain:parsed.mayContain};
+allergens={
+contains:parsed.contains,
+mayContain:parsed.mayContain
+};
 updateAllergens();
 
 if(parsed.ingredients){
 showResult(classify(parsed.ingredients));
-$('lookupMessage').textContent='Product found. Review ingredients and result.';
+$('lookupMessage').textContent=
+'Product found in Open Food Facts. Review ingredients and result.';
 }else{
 setStatus('Needs Verification');
-$('lookupMessage').textContent='No ingredients found. Take an ingredient picture.';
+$('lookupMessage').textContent=
+'No ingredients found. Take an ingredient picture.';
 }
 }catch(e){
 setStatus('Needs Verification');
@@ -665,6 +756,7 @@ $('lookupMessage').textContent='Lookup failed: '+e.message;
 restoreProductPhoto();
 }
 }
+
 
 $('lookup').onclick=lookupProduct;
 
