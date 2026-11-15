@@ -56,7 +56,7 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 #frontInput,#photoInput,#brandDisplay{display:none}
 #authSection{border:2px solid #d7e8dc}
 #scannerSection{scroll-margin-top:10px}
-#dbMessage,#lookupMessage,#authMessage,#rewardMessage,#saveMessage{overflow-wrap:anywhere}
+#lookupMessage,#authMessage,#rewardMessage,#saveMessage{overflow-wrap:anywhere}
 #ocrProgress{height:9px;background:#e2eee5;border-radius:20px;overflow:hidden;display:none;margin:10px 0}
 #ocrProgressBar{height:100%;width:0;background:#126c42;transition:width .2s}
 #ocrAdvice{background:#f1f7f2;padding:12px;border-radius:10px;margin:10px 0;font-size:14px}
@@ -204,28 +204,19 @@ Hold the camera straight, fill the picture with the ingredient label, avoid glar
 <button id="save">💾 Save Scan / Submit Contribution</button>
 <p id="saveMessage" class="muted" aria-live="polite"></p>
 </section>
-
-<section>
-<h2>Cloud Database Connection</h2>
-<p class="muted">Enter your Supabase project URL and public key. Never enter a service-role or secret key.</p>
-<label for="supabaseUrl">Supabase Project URL</label>
-<input id="supabaseUrl" type="url">
-<label for="supabaseKey">Supabase Public Key</label>
-<input id="supabaseKey" type="password" autocomplete="off">
-<button id="connectDb">Save Connection Settings</button>
-<button id="testDb" class="secondary">Test Database Connection</button>
-<p id="dbMessage" class="muted"></p>
-</section>
 </main>
 
 <script>
 'use strict';
 
+/* AUTOMATIC SUPABASE CONNECTION */
+
+const SUPABASE_URL='https://bluaqqfcsjudoiaxkbjn.supabase.co';
+const SUPABASE_KEY='sb_publishable_ed4oFchBc40deLLF5Ws9CQ_MVz_sxog';
+
 const $=id=>document.getElementById(id);
-const DBKEY='verified-vegan-supabase-config-v1';
 const AUTHKEY='verified-vegan-auth-v1';
-const OLD_SCAN_KEY='verified-vegan-v1';
-const OLD_PHOTO_KEY='verified-vegan-product-photos-v1';
+const DBKEY='verified-vegan-supabase-config-v1';
 
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
 const normalizeBarcode=v=>String(v??'').replace(/\D/g,'').replace(/^0+(?=\d)/,'');
@@ -254,14 +245,14 @@ function readJSON(key,fallback){
 try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}
 catch{return fallback}
 }
-function dbConfig(){return readJSON(DBKEY,{})}
-
+function dbConfig(){
+return {url:SUPABASE_URL,key:SUPABASE_KEY};
+}
 function releaseSelectedPhoto(){
 if(selectedPhotoURL)URL.revokeObjectURL(selectedPhotoURL);
 selectedPhotoURL='';
 selectedPhotoFile=null;
 }
-
 function displayBrand(brand,barcode){
 let value=clean(brand);
 if(sameBarcode(barcode,COCONUT_BARCODE))value=COCONUT_BRAND;
@@ -276,14 +267,12 @@ const value=clean($('brand').value);
 $('brandDisplay').textContent=value?'Brand: '+value:'';
 $('brandDisplay').style.display=value?'block':'none';
 });
-
 function normalizeStatus(value){
 const s=clean(value).toLowerCase().replace(/[_-]/g,' ');
 if(s==='vegan')return 'Vegan';
 if(s==='not vegan'||s==='non vegan')return 'Not Vegan';
 return 'Needs Verification';
 }
-
 function setStatus(status){
 const e=$('productStatus');
 e.textContent=status;
@@ -291,7 +280,6 @@ e.className=status==='Vegan'?'vegan':
 status==='Not Vegan'?'notvegan':
 status==='Needs Verification'?'unknown':'pending';
 }
-
 function clearResult(){
 lastResult=null;
 $('result').style.display='none';
@@ -300,7 +288,6 @@ $('reasons').replaceChildren();
 $('caution').textContent='';
 $('saveMessage').textContent='';
 }
-
 function showResult(result){
 lastResult=result;
 setStatus(result.status);
@@ -314,7 +301,6 @@ $('reasons').append(li);
 $('caution').textContent=result.caution||'';
 $('result').style.display='block';
 }
-
 function resetPhoto(){
 ++photoRequest;
 currentPhoto='';
@@ -325,7 +311,6 @@ $('photoPlaceholder').style.display='block';
 $('photoPlaceholder').textContent='Product picture appears here';
 $('photoSource').textContent='';
 }
-
 function resetIngredientPhoto(){
 ++ocrSession;
 ocrRejected=false;
@@ -348,7 +333,6 @@ cropRect=null;dragStart=null;
 $('cropCanvas').width=1;
 $('cropCanvas').height=1;
 }
-
 function resetProductData(){
 ++productSession;++lookupNumber;++autoSaveSerial;++photoRequest;
 loadedCloudId=null;cloudRecordExists=false;
@@ -370,7 +354,6 @@ updateAllergens();showNutrition({});clearResult();
 setStatus('Scan a product');
 autoSavePromise=null;autoSaveBusy=false;
 }
-
 function showProductView(){
 stopCamera();
 $('scannerView').style.display='none';
@@ -389,14 +372,15 @@ stopCamera();resetProductData();showScannerView();
 await startBarcodeCamera();
 };
 
-/* SUPABASE */
+/* SUPABASE API: PUBLISHABLE KEY SUPPORT */
 
 function headers(db,token=null){
-return {
+const h={
 'apikey':db.key,
-'Authorization':'Bearer '+(token||db.key),
 'Content-Type':'application/json'
 };
+if(token)h.Authorization='Bearer '+token;
+return h;
 }
 async function responseError(response){
 const text=await response.text();
@@ -407,7 +391,7 @@ return 'HTTP '+response.status+': '+(e.msg||e.message||e.error_description||e.de
 }
 function requireDB(){
 const db=dbConfig();
-if(!db.url||!db.key)throw Error('Save Supabase connection settings first.');
+if(!db.url||!db.key)throw Error('Supabase configuration missing.');
 return db;
 }
 async function apiRequest(path,options={}){
@@ -421,31 +405,6 @@ if(response.status===204)return null;
 const text=await response.text();
 return text?JSON.parse(text):null;
 }
-const config=dbConfig();
-$('supabaseUrl').value=config.url||'';
-$('supabaseKey').value=config.key||'';
-
-$('connectDb').onclick=()=>{
-const url=$('supabaseUrl').value.trim().replace(/\/+$/,'');
-const key=$('supabaseKey').value.trim();
-if(!/^https:\/\/[\w.-]+\.supabase\.co$/.test(url)||!key){
-$('dbMessage').textContent='Enter a valid Supabase URL and public key.';
-return;
-}
-try{
-const previous=dbConfig();
-localStorage.setItem(DBKEY,JSON.stringify({url,key}));
-if(previous.url!==url||previous.key!==key)saveSession(null);
-$('dbMessage').textContent='Connection settings saved.';
-}catch(e){$('dbMessage').textContent=e.message}
-};
-$('testDb').onclick=async()=>{
-$('dbMessage').textContent='Testing Supabase connection…';
-try{
-await apiRequest('/rest/v1/products?select=id&limit=1');
-$('dbMessage').textContent='Supabase connection successful.';
-}catch(e){$('dbMessage').textContent=e.message}
-};
 
 /* ACCOUNTS AND REWARDS */
 
@@ -893,8 +852,6 @@ return response.json();
 }finally{clearTimeout(timeout)}
 }
 async function findCloudRecord(barcode){
-const db=dbConfig();
-if(!db.url||!db.key)return {record:null,error:'Cloud not configured'};
 try{
 const variants=new Set([
 barcode,normalizeBarcode(barcode),
@@ -983,10 +940,6 @@ if(!p||!p.product_name&&!p.brands&&!p.ingredients_text&&!p.ingredients_text_en){
 if(serial===lookupNumber)notice.textContent='No reliable product details to save automatically.';
 return;
 }
-if(!dbConfig().url||!dbConfig().key){
-if(serial===lookupNumber)notice.textContent='Automatic cloud save unavailable: connect Supabase.';
-return;
-}
 if(serial===lookupNumber)notice.textContent='Automatically saving new product to Supabase…';
 autoSaveBusy=true;
 const name=clean(p.product_name),brand=clean(p.brands);
@@ -1027,7 +980,6 @@ loadedCloudId=saved[0].id??null;
 cloudRecordExists=true;rememberBaseline(saved[0]);
 }
 notice.textContent='✅ Automatically saved to Supabase cloud. No Save Scan needed.';
-$('dbMessage').textContent='Automatic product save successful.';
 }catch(e){
 if(serial!==lookupNumber)return;
 if(/409|duplicate|unique constraint/i.test(e.message)){
@@ -1039,7 +991,6 @@ cloudRecordExists=true;rememberBaseline(found.record);
 }
 }else{
 notice.textContent='⚠️ Automatic cloud save failed: '+e.message;
-$('dbMessage').textContent='Automatic save failed: '+e.message;
 }
 }finally{
 if(saveSerial===autoSaveSerial)autoSaveBusy=false;
@@ -1121,15 +1072,16 @@ $('lookup').onclick=lookupProduct;
 async function uploadProductPhoto(db,file,barcode){
 const filename=normalizeBarcode(barcode)+'-'+Date.now()+'.jpg';
 const url=db.url+'/storage/v1/object/product-images/'+encodeURIComponent(filename);
-const token=currentUser?await userToken():db.key;
-const response=await fetch(url,{
-method:'POST',
-headers:{
+const token=currentUser?await userToken():null;
+const h={
 'apikey':db.key,
-'Authorization':'Bearer '+token,
 'Content-Type':'image/jpeg',
 'x-upsert':'false'
-},
+};
+if(token)h.Authorization='Bearer '+token;
+const response=await fetch(url,{
+method:'POST',
+headers:h,
 body:file
 });
 if(!response.ok)throw Error(await responseError(response));
@@ -1309,11 +1261,9 @@ if(!currentUser&&hasContribution)
 rewardText+=' Sign in before contributing to earn rewards.';
 if(cloudSaved){
 originalIngredients=record.ingredient_text;
-$('dbMessage').textContent='Product saved to Supabase.';
 }
 $('saveMessage').textContent='✅ Saved to Supabase cloud.'+rewardText;
 }catch(e){
-$('dbMessage').textContent='Cloud save failed: '+e.message;
 $('saveMessage').textContent='❌ Save failed: '+e.message;
 }finally{
 savingContribution=false;
@@ -1408,7 +1358,7 @@ resetProductData();showScannerView();
 await startBarcodeCamera();
 };
 
-/* IMPROVED INGREDIENT PHOTO RECOGNITION */
+/* INGREDIENT PHOTO RECOGNITION */
 
 const photoInput=$('photoInput');
 const cropCanvas=$('cropCanvas');
@@ -1445,8 +1395,6 @@ photoInput.click();
 $('takePhoto').onclick=()=>openIngredientCamera(true);
 $('choosePhoto').onclick=()=>openIngredientCamera(false);
 
-/* Load Tesseract only once. */
-
 async function getWorker(){
 if(ocrWorker)return ocrWorker;
 if(!ocrLoadPromise){
@@ -1472,8 +1420,6 @@ throw e;
 }
 }
 
-/* Preserve enough resolution for small printed ingredients. */
-
 function makeCanvas(bitmap,max=2400){
 const scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));
 const canvas=document.createElement('canvas');
@@ -1484,8 +1430,6 @@ bitmap,0,0,canvas.width,canvas.height
 );
 return canvas;
 }
-
-/* Build a contrast-enhanced copy. */
 
 function enhanceCanvas(source,mode='contrast'){
 const out=document.createElement('canvas');
@@ -1519,8 +1463,6 @@ c.putImageData(image,0,0);
 return out;
 }
 
-/* Upscale selected areas for small lettering. */
-
 function upscaleCanvas(source,max=3200){
 const scale=Math.min(2.2,Math.max(1,3200/Math.max(source.width,source.height)));
 if(scale<=1.05)return source;
@@ -1533,8 +1475,6 @@ c.imageSmoothingQuality='high';
 c.drawImage(source,0,0,out.width,out.height);
 return out;
 }
-
-/* Detect obvious gibberish without pretending OCR is infallible. */
 
 function scoreOCR(text,confidence=0){
 const parsed=splitPackageText(text);
@@ -1556,7 +1496,6 @@ if(bad>Math.max(2,words.length*.12))score-=35;
 if(t.length>1800&&!parsed.foundHeading)score-=15;
 return {score,parsed,confidence,words:words.length,meaningful};
 }
-
 function acceptableOCR(candidate){
 if(!candidate)return false;
 const p=candidate.parsed;
@@ -1566,7 +1505,6 @@ if(!p.foundHeading&&!candidate.meaningful)return false;
 if(candidate.confidence<35&&!p.foundHeading)return false;
 return true;
 }
-
 function displayOCR(candidate){
 const parsed=candidate.parsed;
 loadIngredients(parsed.ingredients);
@@ -1590,9 +1528,6 @@ setStatus('Needs Verification');
 message(text,true);
 $('manualCropButton').style.display='block';
 }
-
-/* Try original, enhanced, and black-and-white images.
-   Stop early when a high-quality ingredient reading is found. */
 
 async function recognizeBest(source,session,barcode){
 const worker=await getWorker();
