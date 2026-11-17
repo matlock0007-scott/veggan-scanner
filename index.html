@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -123,7 +124,6 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <p>Free scanning • Independent results • For the animals</p>
 </header>
 <main>
-
 <section id="scannerSection">
 <div id="scannerView">
 <h2>📷 Scan Any Product Barcode</h2>
@@ -144,7 +144,6 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <button id="lookup">Look Up Product</button>
 </div>
 </div>
-
 <div id="productDetails">
 <h2>Product Details</h2>
 <button id="scanAnother" class="secondary">📷 Scan Another Product</button>
@@ -152,14 +151,12 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <p id="productSourceDisplay"></p>
 <div id="lookupSources"></div>
 <p id="lookupProgress"></p>
-
 <div id="identityWarning" role="alert">
 <strong>⚠️ Product Identity Conflict</strong>
 <p id="identityWarningText"></p>
 <button id="showConflictDetails" class="secondary">View Conflicting Information</button>
 <div id="conflictDetails" style="display:none"></div>
 </div>
-
 <div class="productTop">
 <div class="photoBox">
 <img id="productPhoto" alt="Product packaging" hidden>
@@ -172,7 +169,6 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <p id="lookupMessage" class="muted" aria-live="polite"></p>
 <p id="autoSaveMessage" class="small muted" aria-live="polite"></p>
 <button id="retryLookup" class="secondary">🔎 Search Additional Sources Again</button>
-
 <div id="contributionSteps" class="steps">
 <strong>🏆 Contribute Missing Information & Earn Points</strong>
 <ol>
@@ -184,26 +180,21 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 </ol>
 <p class="small">Scanning is free. Sign in to submit contributions for rewards.</p>
 </div>
-
 <div id="adminNotice">
 🛡️ Administrator Mode — You can correct product information. Your account does not participate in contributor rewards.
 </div>
-
 <input id="frontInput" type="file" accept="image/*" capture="environment">
 <button id="takeFront">📸 Take Product Picture</button>
 <button id="chooseFront" class="secondary">Choose Product Picture From Gallery</button>
 <p id="frontMessage" class="muted">Contributed photos upload to Supabase when you save.</p>
-
 <label for="productName">Product name</label>
 <input id="productName" placeholder="Product name">
 <label for="brand">Brand</label>
 <input id="brand" placeholder="Brand">
-
 <h2 id="nutritionHeading">Nutrition Facts</h2>
 <div id="nutrition" class="muted">Nutrition information appears here when available.</div>
 </div>
 </section>
-
 <section id="authSection">
 <h2>🏆 Community Rewards</h2>
 <p>Help improve Verified Vegan and earn points for approved contributions.</p>
@@ -230,7 +221,6 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 </div>
 <p id="authMessage" class="muted" aria-live="polite"></p>
 </section>
-
 <section id="adminSection">
 <h2>🛡️ Administrator Dashboard</h2>
 <p>Review contributions before awarding points.</p>
@@ -238,7 +228,6 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <p id="adminMessage" class="muted" aria-live="polite"></p>
 <div id="adminPending"></div>
 </section>
-
 <section id="myRewards">
 <h2>🏆 My Rewards</h2>
 <div class="rewardGrid">
@@ -249,7 +238,6 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <h3>Your Contributions</h3>
 <div id="contributionHistory"></div>
 </section>
-
 <section id="leaderboardSection">
 <div class="leaderboardHeading">
 <h2>🏆 Monthly Leaderboard</h2>
@@ -266,7 +254,6 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 <p>Only approved contributions count toward rankings.</p>
 </div>
 </section>
-
 <section>
 <h2>Ingredients</h2>
 <p>Photograph the ingredients or enter them manually.</p>
@@ -302,7 +289,6 @@ Fill the picture with the ingredient label, avoid nutrition facts, keep the came
 </div>
 <button id="check">🌱 Verify Ingredients</button>
 </section>
-
 <section id="result">
 <h2>Verification Details</h2>
 <p id="explanation"></p>
@@ -312,7 +298,6 @@ Fill the picture with the ingredient label, avoid nutrition facts, keep the came
 <button id="save">💾 Save Scan / Submit Contribution</button>
 <p id="saveMessage" class="muted"></p>
 </section>
-
 <section id="contactSupport">
 <h2>✉️ Contact & Support</h2>
 <p>Have a question, suggestion, or product correction?</p>
@@ -322,23 +307,22 @@ Fill the picture with the ingredient label, avoid nutrition facts, keep the came
 <p class="copyright">© 2026 Verified Vegan. Helping animals, one product at a time. 🌱</p>
 </section>
 </main>
-
 <script>
 'use strict';
 
 /*
  VERIFIED VEGAN
- Single-file camera implementation:
- - iPhone Safari: html5-qrcode fallback
- - Android: native BarcodeDetector where available
- - Ingredient OCR: manual crop, layout filtering and validation
- - Supabase: no automatic saving of unverified outside data
+ Classification repair:
+ - Accept valid single-ingredient lists
+ - Reject recipe and unrelated package text
+ - Do not trust conflicting imported ingredient data
+ - Require explicit package confirmation for corrections
+ - Preserve native barcode scanner speed
 */
 
 const SUPABASE_URL='https://bluaqqfcsjudoiaxkbjn.supabase.co';
 const SUPABASE_KEY='sb_publishable_ed4oFchBc40deLLF5Ws9CQ_MVz_sxog';
 const AUTHKEY='verified-vegan-auth-v1';
-
 const $=id=>document.getElementById(id);
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
 const normalizeBarcode=v=>String(v??'').replace(/\D/g,'').replace(/^0+(?=\d)/,'');
@@ -355,7 +339,6 @@ let scannerSession=0;
 let scannerLibraryPromise=null;
 let nativeDetector=null;
 let nativeTimer=null;
-
 let lastResult=null;
 let photoBitmap=null;
 let ocrWorker=null;
@@ -366,7 +349,6 @@ let cropRect=null;
 let dragStart=null;
 let ingredientSource='none';
 let allergens={contains:'',mayContain:''};
-
 let currentPhoto='';
 let currentNutrition={};
 let currentServingSize='';
@@ -402,7 +384,6 @@ const PRODUCT_SOURCES=[
 ];
 
 const UPCITEMDB_URL='https://api.upcitemdb.com/prod/trial/lookup?upc=';
-
 const CONFLICT_TEST_BARCODE='076840674442';
 
 const ANIMAL_RULES=[
@@ -413,10 +394,33 @@ const ANIMAL_RULES=[
 ['Carmine or cochineal',/\b(carmine|cochineal|carminic acid|e120|ci\s*75470)\b/i],
 ['Shellac',/\b(shellac|confectioner'?s glaze|e904)\b/i],
 ['Animal fat',/\b(lard|tallow|suet|duck fat|goose fat|bacon fat|mink oil|emu oil)\b/i],
-['Meat',/\b(beef|pork|chicken broth|chicken fat|meat extract)\b/i],
+['Meat',/\b(beef|pork|chicken|turkey|meat extract|meat broth|bone broth)\b/i],
 ['Fish or seafood',/\b(fish oil|fish sauce|anchov(?:y|ies)|oyster|shrimp|prawn|crab|lobster|bonito|cod liver oil)\b/i],
 ['Animal proteins',/\b(collagen|hydrolyzed collagen|keratin|elastin)\b/i]
 ];
+
+const SINGLE_INGREDIENTS=new Set([
+'cornstarch','corn starch','maize starch',
+'red pepper','crushed red pepper','red pepper flakes',
+'onion','granulated onion','onion powder','dehydrated onion',
+'garlic','granulated garlic','garlic powder','dehydrated garlic',
+'black pepper','ground black pepper','white pepper',
+'paprika','smoked paprika','cayenne pepper',
+'cinnamon','ground cinnamon','turmeric','ground turmeric',
+'ginger','ground ginger','cumin','ground cumin',
+'oregano','basil','thyme','rosemary','parsley',
+'sea salt','salt','iodized salt','sugar',
+'organic cane sugar','cane sugar','brown sugar',
+'almonds','almond butter','peanuts','peanut butter',
+'cashews','walnuts','pecans','oats','rolled oats',
+'white rice','brown rice','rice','quinoa',
+'chia seeds','flax seeds','sesame seeds',
+'olive oil','extra virgin olive oil','coconut oil',
+'avocado oil','sunflower oil','canola oil',
+'corn oil','vegetable oil','cocoa powder',
+'unsweetened cocoa powder','baking soda',
+'potato starch','tapioca starch','arrowroot powder'
+]);
 
 function normalizeStatus(value){
 const s=clean(value).toLowerCase().replace(/[_-]/g,' ');
@@ -446,7 +450,6 @@ $('result').style.display='block';
 $('explanation').textContent=result.explanation||'';
 $('caution').textContent=result.caution||'';
 $('reasons').replaceChildren();
-
 (result.reasons||[]).forEach(reason=>{
 const li=document.createElement('li');
 li.textContent=reason;
@@ -501,9 +504,7 @@ const open=box.style.display!=='block';
 box.style.display=open?'block':'none';
 $('showConflictDetails').textContent=open?
 'Hide Conflicting Information':'View Conflicting Information';
-
 if(!open)return;
-
 box.replaceChildren();
 identityConflictDetails.forEach(detail=>{
 const p=document.createElement('p');
@@ -555,7 +556,6 @@ lookupHadCloudError=false;
 clearIdentityConflict();
 releaseSelectedPhoto();
 resetPhoto();
-
 $('barcode').value='';
 $('productName').value='';
 displayBrand('');
@@ -577,7 +577,6 @@ $('cropPanel').style.display='none';
 $('manualCropButton').style.display='none';
 $('ingredientWarning').style.display='none';
 $('ocrMessage').textContent='No ingredient picture selected yet.';
-
 allergens={contains:'',mayContain:''};
 updateAllergens();
 showNutrition({});
@@ -667,9 +666,7 @@ return text?JSON.parse(text):null;
 
 async function userToken(){
 if(!authSession?.access_token)throw Error('Please log in.');
-
 const expiry=authSession.expires_at||0;
-
 if(expiry&&Date.now()/1000>expiry-60){
 const data=await authCall('token?grant_type=refresh_token',{
 refresh_token:authSession.refresh_token
@@ -681,14 +678,11 @@ return authSession.access_token;
 
 async function userRequest(path,options={}){
 let token=await userToken();
-
 const send=t=>fetch(SUPABASE_URL+path,{
 ...options,
 headers:{...headers(t),...(options.headers||{})}
 });
-
 let response=await send(token);
-
 if(response.status===401){
 const data=await authCall('token?grant_type=refresh_token',{
 refresh_token:authSession.refresh_token
@@ -696,10 +690,8 @@ refresh_token:authSession.refresh_token
 saveSession(data);
 response=await send(data.access_token);
 }
-
 if(!response.ok)throw Error(await responseError(response));
 if(response.status===204)return null;
-
 const text=await response.text();
 return text?JSON.parse(text):null;
 }
@@ -709,13 +701,11 @@ return text?JSON.parse(text):null;
 function barcodeVariants(barcode){
 const code=String(barcode).replace(/\D/g,'');
 const variants=new Set([code]);
-
 if(code.length===12)variants.add('0'+code);
 if(code.length===13&&code.startsWith('0'))
 variants.add(code.slice(1));
 if(code.length===14&&code.startsWith('0'))
 variants.add(code.slice(1));
-
 return [...variants].filter(validBarcode);
 }
 
@@ -737,7 +727,6 @@ p.ingredients_text_pt
 function extractImages(p,sourceName){
 const out=[];
 const seen=new Set();
-
 function add(url,label){
 if(typeof url==='string'&&
 /^https:\/\//i.test(url)&&
@@ -746,16 +735,13 @@ seen.add(url);
 out.push({url,source:label});
 }
 }
-
 add(p.image_front_url,sourceName+' front picture');
 add(p.image_front_small_url,sourceName+' front picture');
 add(p.image_url,sourceName+' picture');
 add(p.image_small_url,sourceName+' picture');
-
 if(Array.isArray(p.images)){
 p.images.forEach(url=>add(url,sourceName+' picture'));
 }
-
 const selected=p.selected_images?.front;
 if(selected){
 for(const size of ['display','small','thumb']){
@@ -769,7 +755,8 @@ return out;
 }
 
 function productQuality(p){
-return (productIngredients(p)?100:0)+
+const ingredient=productIngredients(p);
+return (ingredient&&ingredientTextQuality(ingredient)?100:0)+
 (clean(p.product_name)?30:0)+
 (extractImages(p,'source').length?15:0)+
 (clean(p.brands)?10:0);
@@ -778,7 +765,6 @@ return (productIngredients(p)?100:0)+
 async function fetchJSON(url,timeout=8000){
 const controller=new AbortController();
 const timer=setTimeout(()=>controller.abort(),timeout);
-
 try{
 const response=await fetch(url,{
 signal:controller.signal,
@@ -795,13 +781,10 @@ clearTimeout(timer);
 
 function normalizeMatch(product,sourceName,barcode){
 if(!product||typeof product!=='object')return null;
-
 const reported=String(
 product.code||product.barcode||product.upc||''
 ).replace(/\D/g,'');
-
 if(reported&&!sameBarcode(reported,barcode))return null;
-
 const p={
 ...product,
 product_name:clean(
@@ -813,7 +796,6 @@ product.name
 brands:clean(product.brands||product.brand),
 ingredients_text:productIngredients(product)
 };
-
 return {
 product:p,
 sourceName,
@@ -829,12 +811,9 @@ const url=source.universal?
 '?product_type=all':
 'https://'+source.host+
 '/api/v2/product/'+encodeURIComponent(barcode)+'.json';
-
 const data=await fetchJSON(url);
-
 if(!data?.product)return null;
 if(data.status===0||data.status==='failure')return null;
-
 return normalizeMatch(
 data.product,source.name,barcode
 );
@@ -844,15 +823,11 @@ async function fetchUPCItemDB(barcode){
 const data=await fetchJSON(
 UPCITEMDB_URL+encodeURIComponent(barcode),8500
 );
-
 if(!data?.items?.length)return null;
-
 const item=data.items.find(x=>
 sameBarcode(x.upc||x.ean||x.gtin,barcode)
 );
-
 if(!item)return null;
-
 return normalizeMatch({
 code:item.upc||item.ean||barcode,
 product_name:item.title||'',
@@ -871,14 +846,10 @@ return clean(value).toLowerCase()
 function productVariant(name,ingredients=''){
 const n=normalizeProductName(name);
 const t=clean(ingredients);
-
 const nondairy=/\b(non dairy|nondairy|dairy free|plant based|oat milk|oatmilk|almond milk|almondmilk|vegan)\b/i.test(n);
-
 const dairyIngredients=/\b(?:cream|skim milk|whole milk|milk fat|milkfat|egg yolks?|whey|buttermilk|dairy milk)\b/i.test(t);
-
 if(nondairy&&dairyIngredients)
 return 'internally-conflicting';
-
 if(nondairy)return 'non-dairy';
 if(dairyIngredients)return 'dairy';
 return 'unspecified';
@@ -896,64 +867,42 @@ const an=normalizeProductName(a.product.product_name);
 const bn=normalizeProductName(b.product.product_name);
 const ab=normalizeProductName(a.product.brands);
 const bb=normalizeProductName(b.product.brands);
-
 const af=productFamily(an);
 const bf=productFamily(bn);
-
-const av=productVariant(
-an,productIngredients(a.product)
-);
-const bv=productVariant(
-bn,productIngredients(b.product)
-);
-
+const av=productVariant(an,productIngredients(a.product));
+const bv=productVariant(bn,productIngredients(b.product));
 if(av==='internally-conflicting'||
 bv==='internally-conflicting')return false;
-
 if(av!==bv&&av!=='unspecified'&&bv!=='unspecified')
 return false;
-
 const compatibleName=!an||!bn||
 an===bn||an.includes(bn)||bn.includes(an)||
 (af&&bf&&(af===bf||af.includes(bf)||bf.includes(af)));
-
 const compatibleBrand=!ab||!bb||
 ab===bb||ab.includes(bb)||bb.includes(ab);
-
 return compatibleName&&compatibleBrand;
 }
 
 function combineMatches(matches){
 if(!matches.length)return null;
-
 const sorted=[...matches].sort((a,b)=>b.quality-a.quality);
 const best=sorted[0];
 const p={...best.product};
-
-const compatible=sorted.filter(x=>
-sameProductIdentity(best,x)
-);
-
+const compatible=sorted.filter(x=>sameProductIdentity(best,x));
 if(!productIngredients(p)){
 const match=compatible.find(x=>productIngredients(x.product));
-if(match)
-p.ingredients_text=productIngredients(match.product);
+if(match)p.ingredients_text=productIngredients(match.product);
 }
-
 if(!clean(p.product_name)){
 const match=compatible.find(x=>clean(x.product.product_name));
 if(match)p.product_name=match.product.product_name;
 }
-
 if(!clean(p.brands)){
 const match=compatible.find(x=>clean(x.product.brands));
 if(match)p.brands=match.product.brands;
 }
-
 if(!extractImages(p,best.sourceName).length){
-const match=compatible.find(x=>
-extractImages(x.product,x.sourceName).length
-);
+const match=compatible.find(x=>extractImages(x.product,x.sourceName).length);
 if(match){
 p.image_front_url=
 match.product.image_front_url||
@@ -961,7 +910,6 @@ match.product.image_url||
 match.product.images?.[0]||'';
 }
 }
-
 return {
 product:p,
 sourceName:compatible.map(x=>x.sourceName)
@@ -974,49 +922,32 @@ matches:compatible
 async function fetchAllProducts(barcode,progress=()=>{}){
 const variants=barcodeVariants(barcode);
 const requests=[];
-
 for(const code of variants){
 for(const source of PRODUCT_SOURCES){
 requests.push(fetchSource(code,source));
 }
 }
-
 progress('Searching product databases…');
-
 const results=await Promise.allSettled(requests);
-
 let found=results
 .filter(r=>r.status==='fulfilled'&&r.value)
 .map(r=>r.value);
-
 if(!found.some(x=>clean(x.product.product_name))){
 progress('Checking retail barcode information…');
-
 for(const code of variants){
 const extra=await fetchUPCItemDB(code);
-if(extra){
-found.push(extra);
-break;
+if(extra){found.push(extra);break;}
 }
 }
-}
-
 found=found.filter(x=>sameBarcode(x.barcode,barcode));
-
 const dedup=new Map();
-
 for(const match of found){
 const key=match.sourceName+'|'+normalizeBarcode(match.barcode);
-
-if(!dedup.has(key)||
-dedup.get(key).quality<match.quality){
+if(!dedup.has(key)||dedup.get(key).quality<match.quality){
 dedup.set(key,match);
 }
 }
-
-found=[...dedup.values()]
-.sort((a,b)=>b.quality-a.quality);
-
+found=[...dedup.values()].sort((a,b)=>b.quality-a.quality);
 return {
 best:found[0]||null,
 all:found,
@@ -1031,10 +962,8 @@ const request=++photoRequest;
 const img=$('productPhoto');
 let index=0;
 currentPhoto='';
-
 function next(){
 if(request!==photoRequest)return;
-
 if(index>=candidates.length){
 img.hidden=true;
 $('photoPlaceholder').style.display='block';
@@ -1042,19 +971,14 @@ $('photoPlaceholder').textContent='No product picture available';
 $('photoSource').textContent='You can contribute a picture';
 return;
 }
-
 const candidate=candidates[index++];
-
 if(!candidate.url||
 !(candidate.url.startsWith('blob:')||
 /^https:\/\//i.test(candidate.url))){
-next();
-return;
+next();return;
 }
-
 let done=false;
 const timer=setTimeout(fail,4500);
-
 function fail(){
 if(done||request!==photoRequest)return;
 done=true;
@@ -1063,15 +987,9 @@ img.onload=null;
 img.onerror=null;
 next();
 }
-
 img.onload=()=>{
 if(done||request!==photoRequest)return;
-
-if(img.naturalWidth<20){
-fail();
-return;
-}
-
+if(img.naturalWidth<20){fail();return;}
 done=true;
 clearTimeout(timer);
 img.hidden=false;
@@ -1079,42 +997,29 @@ $('photoPlaceholder').style.display='none';
 $('photoSource').textContent=candidate.source;
 currentPhoto=candidate.url;
 };
-
 img.onerror=fail;
 img.src=candidate.url;
 }
-
 next();
 }
 
 function displayProductImages(barcode,cloudUrl='',matches=[]){
 resetPhoto();
-
 const candidates=[];
-
 if(/^https:\/\//i.test(cloudUrl)){
-candidates.push({
-url:cloudUrl,
-source:'Supabase cloud picture'
-});
+candidates.push({url:cloudUrl,source:'Supabase cloud picture'});
 }
-
 for(const match of matches){
-candidates.push(...extractImages(
-match.product,match.sourceName
-));
+candidates.push(...extractImages(match.product,match.sourceName));
 }
-
 const unique=[];
 const seen=new Set();
-
 for(const candidate of candidates){
 if(!seen.has(candidate.url)){
 seen.add(candidate.url);
 unique.push(candidate);
 }
 }
-
 showPhotoCandidates(unique);
 }
 
@@ -1139,52 +1044,32 @@ $('frontInput').click();
 
 async function imageFileToCanvas(file,max=1400){
 const bitmap=await createImageBitmap(file);
-
 try{
-const scale=Math.min(
-1,max/Math.max(bitmap.width,bitmap.height)
-);
+const scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));
 const canvas=document.createElement('canvas');
 canvas.width=Math.max(1,Math.round(bitmap.width*scale));
 canvas.height=Math.max(1,Math.round(bitmap.height*scale));
-canvas.getContext('2d').drawImage(
-bitmap,0,0,canvas.width,canvas.height
-);
+canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
 return canvas;
-}finally{
-bitmap.close();
-}
+}finally{bitmap.close();}
 }
 
 $('frontInput').onchange=async()=>{
 const file=$('frontInput').files?.[0];
 if(!file)return;
-
 try{
 const canvas=await imageFileToCanvas(file,1200);
-
-const blob=await new Promise(resolve=>
-canvas.toBlob(resolve,'image/jpeg',.78)
-);
-
+const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.78));
 if(!blob)throw Error('Image conversion failed.');
-
 releaseSelectedPhoto();
-
-selectedPhotoFile=new File(
-[blob],'product.jpg',{type:'image/jpeg'}
-);
+selectedPhotoFile=new File([blob],'product.jpg',{type:'image/jpeg'});
 selectedPhotoURL=URL.createObjectURL(blob);
-
 showPhoto(selectedPhotoURL,'Temporary preview');
-$('frontMessage').textContent=
-'Picture ready. Tap Save Scan.';
-}catch(e){
-$('frontMessage').textContent=e.message;
-}
+$('frontMessage').textContent='Picture ready. Tap Save Scan.';
+}catch(e){$('frontMessage').textContent=e.message;}
 };
 
-/* INGREDIENT SCREENING */
+/* INGREDIENT SCREENING — REPAIRED */
 
 function removePlantIngredientNames(text){
 return text
@@ -1193,6 +1078,39 @@ return text
 .replace(/\b(?:cocoa|shea|peanut|almond|cashew|apple)\s+butter\b/gi,'plant fat')
 .replace(/\bcream of tartar\b/gi,'tartar')
 .replace(/\bcreamed coconut\b/gi,'coconut');
+}
+
+const RECIPE_SIGNALS=[
+/\b(?:recipe|recipes|serving suggestion|suggested recipe)\b/i,
+/\b(?:chicken marsala|chicken cutlets?|preheat oven|cook until|simmer for)\b/i,
+/\b(?:in a skillet|in a saucepan|heat a skillet|heat the oil)\b/i,
+/\b(?:tablespoons?|teaspoons?|tbsp|tsp)\b/i,
+/\b(?:directions|preparation instructions|cooking instructions)\b/i,
+/\b(?:add the chicken|stir in|bring to a boil|serve with)\b/i,
+/\b(?:minutes? until|degrees fahrenheit|degrees celsius)\b/i
+];
+
+const NONINGREDIENT_SIGNALS=[
+/\b(?:distributed by|manufactured by|packed for|imported by)\b/i,
+/\b(?:wholesale|retail|customer service|contact us)\b/i,
+/\b(?:www\.|https?:\/\/|@[\w.-]+\.[a-z]{2,})\b/i,
+/\b(?:nutrition facts|serving size|daily value|calories)\b/i,
+/\b(?:net weight|net wt|best before|lot number)\b/i
+];
+
+function looksLikeRecipe(raw){
+const text=clean(raw);
+let hits=RECIPE_SIGNALS.filter(r=>r.test(text)).length;
+if(/\b(?:chicken|beef|pork)\b/i.test(text)&&
+/\b(?:recipe|cutlets?|skillet|cook|simmer|tbsp|tsp)\b/i.test(text)){
+hits+=2;
+}
+return hits>=2;
+}
+
+function looksLikeUnrelatedText(raw){
+const text=clean(raw);
+return NONINGREDIENT_SIGNALS.filter(r=>r.test(text)).length>=2;
 }
 
 function splitPackageText(raw){
@@ -1212,86 +1130,86 @@ const stops=[
 /\bmade\s+in\s+a\s+facility\b/i,
 /\bmanufactured\s+in\s+a\s+facility\b/i,
 /\b(?:nutrition facts|nutrition information)\b/i,
-/\b(?:distributed by|manufactured by)\b/i,
+/\b(?:distributed by|manufactured by|packed for)\b/i,
 /\b(?:visit us at|www\.)\b/i,
 /\b(?:calories per serving|serving size|servings per container)\b/i,
+/\b(?:recipe|directions|preparation instructions|serving suggestion)\b/i,
 /\b(?:total fat|saturated fat|trans fat|cholesterol|total carbohydrate|dietary fiber|total sugars|added sugars|daily value)\s*[:\d]/i
 ];
 
 let end=text.length;
-
 for(const re of stops){
 const match=re.exec(text);
 if(match&&match.index<end)end=match.index;
 }
 
-return {
-ingredients:clean(text.slice(0,end))
+const ingredients=clean(text.slice(0,end))
 .replace(/^[\s:;.,\-]+|[\s:;.,\-]+$/g,'')
-.slice(0,3500),
-contains:clean(
-source.match(/\bcontains\s*:?\s+([^\n.]{2,120})/i)?.[1]||''
-),
-mayContain:clean(
-source.match(/\bmay\s+(?:also\s+)?contain\s*:?\s+([^\n.]{2,120})/i)?.[1]||''
-)
+.slice(0,3500);
+
+return {
+ingredients,
+contains:clean(source.match(/\bcontains\s*:?\s+([^\n.]{2,120})/i)?.[1]||''),
+mayContain:clean(source.match(/\bmay\s+(?:also\s+)?contain\s*:?\s+([^\n.]{2,120})/i)?.[1]||''),
+hadHeading:!!heading
 };
 }
 
 function looksLikeNutrition(text){
 const t=clean(text).toLowerCase();
-
 const terms=[
-'nutrition facts',
-'serving size',
-'calories',
-'total fat',
-'saturated fat',
-'cholesterol',
-'total carbohydrate',
-'dietary fiber',
-'daily value',
-'added sugars',
-'vitamin d',
-'potassium',
-'calcium'
+'nutrition facts','serving size','calories','total fat',
+'saturated fat','cholesterol','total carbohydrate',
+'dietary fiber','daily value','added sugars',
+'vitamin d','potassium','calcium'
 ];
-
-const hits=terms.filter(term=>t.includes(term)).length;
-
-return hits>=3;
+return terms.filter(term=>t.includes(term)).length>=3;
 }
 
-function ingredientTextQuality(text){
-const t=clean(text);
+function ingredientTextQuality(raw){
+const t=clean(raw);
+if(!t)return false;
+if(t.length>3500)return false;
 
-if(t.length<18)return false;
+const lower=t.toLowerCase()
+.replace(/^ingredients?\s*:\s*/,'')
+.replace(/[.!]+$/,'').trim();
 
-const words=t.match(/[A-Za-z]{3,}/g)||[];
+if(SINGLE_INGREDIENTS.has(lower))return true;
 
-if(words.length<4)return false;
+if(looksLikeRecipe(t))return false;
+if(looksLikeUnrelatedText(t))return false;
+if(looksLikeNutrition(t))return false;
+
+if(/\b(?:distributed by|wholesale|customer service)\b/i.test(t))
+return false;
+
+const words=t.match(/[A-Za-z]{2,}/g)||[];
+if(words.length<1)return false;
 
 const symbols=(t.match(/[^A-Za-z0-9\s,().:%\-']/g)||[]).length;
-
 if(symbols>t.length*.20)return false;
 
-if(looksLikeNutrition(t)&&
-!/\b(water|oats|sugar|coconut oil|pea protein|soy lecithin|guar gum|extract|cocoa)\b/i.test(t)){
-return false;
+if(t.length<18){
+return words.length>=1&&
+/^[a-z][a-z\s-]*$/i.test(t);
 }
+
+if(words.length<2)return false;
 
 return true;
 }
 
 function classify(raw){
-const t=splitPackageText(raw).ingredients;
+const parsed=splitPackageText(raw);
+const t=parsed.ingredients;
 
 if(!ingredientTextQuality(t)){
 return {
 status:'Needs Verification',
 reasons:[],
 explanation:'No reliable complete ingredient list is available.',
-caution:'Photograph or enter the ingredients from the package.'
+caution:'Photograph or enter the actual ingredients from the package.'
 };
 }
 
@@ -1306,8 +1224,8 @@ if(reasons.length){
 return {
 status:'Not Vegan',
 reasons,
-explanation:'Animal-derived ingredients detected.',
-caution:'Confirm the ingredient list belongs to the scanned product.'
+explanation:'Animal-derived ingredients detected in the ingredient list.',
+caution:'Confirm the ingredients belong to this exact product.'
 };
 }
 
@@ -1315,40 +1233,32 @@ return {
 status:'Vegan',
 reasons:['No explicitly animal-derived ingredients detected.'],
 explanation:'Vegan by ingredient-text screening.',
-caution:'Ingredient screening is not manufacturer certification. Verify uncertain ingredient origins when needed.'
+caution:'Ingredient screening is not manufacturer certification. Some ingredient origins may require additional verification.'
 };
 }
 
 function updateAllergens(){
 $('containsText').textContent=
-allergens.contains?
-'Contains: '+allergens.contains:'';
-
+allergens.contains?'Contains: '+allergens.contains:'';
 $('mayContainText').textContent=
-allergens.mayContain?
-'May contain: '+allergens.mayContain:'';
-
+allergens.mayContain?'May contain: '+allergens.mayContain:'';
 $('allergenPanel').style.display=
-allergens.contains||allergens.mayContain?
-'block':'none';
+allergens.contains||allergens.mayContain?'block':'none';
 }
 
 function loadIngredients(raw){
 const parsed=splitPackageText(raw);
 $('ingredients').value=parsed.ingredients;
-
 allergens={
 contains:parsed.contains,
 mayContain:parsed.mayContain
 };
-
 updateAllergens();
 return parsed.ingredients;
 }
 
 function showNutrition(n){
 currentNutrition=n||{};
-
 const fields=[
 ['Calories',n?.['energy-kcal_100g'],'kcal'],
 ['Protein',n?.proteins_100g,'g'],
@@ -1358,16 +1268,9 @@ const fields=[
 ['Fiber',n?.fiber_100g,'g'],
 ['Salt',n?.salt_100g,'g']
 ];
-
-const values=fields.filter(x=>
-x[1]!=null&&x[1]!==''&&
-Number.isFinite(Number(x[1]))
-);
-
+const values=fields.filter(x=>x[1]!=null&&x[1]!==''&&Number.isFinite(Number(x[1])));
 $('nutrition').textContent=values.length?
-'Per 100 g: '+values.map(x=>
-x[0]+': '+Number(x[1]).toFixed(1)+' '+x[2]
-).join(' • '):
+'Per 100 g: '+values.map(x=>x[0]+': '+Number(x[1]).toFixed(1)+' '+x[2]).join(' • '):
 'Nutrition information not available.';
 }
 
@@ -1384,7 +1287,6 @@ salt_100g:p.salt_100g
 
 function nutritionPayload(n=currentNutrition){
 const result={};
-
 const keys={
 protein_100g:'proteins_100g',
 carb_100g:'carbohydrates_100g',
@@ -1393,15 +1295,11 @@ sugar_100g:'sugars_100g',
 fiber_100g:'fiber_100g',
 salt_100g:'salt_100g'
 };
-
 for(const [key,source] of Object.entries(keys)){
 const value=n?.[source];
-
 result[key]=value!=null&&value!==''&&
-Number.isFinite(Number(value))?
-Number(value):null;
+Number.isFinite(Number(value))?Number(value):null;
 }
-
 result.serving_size=currentServingSize||null;
 return result;
 }
@@ -1410,46 +1308,27 @@ return result;
 
 async function findCloudRecord(barcode,authenticated=false){
 try{
-const request=authenticated&&currentUser?
-userRequest:apiRequest;
-
+const request=authenticated&&currentUser?userRequest:apiRequest;
 const variants=barcodeVariants(barcode);
 const records=[];
-
 for(const code of variants){
 const rows=await request(
 '/rest/v1/products?barcode=eq.'+
-encodeURIComponent(code)+
-'&select=*&limit=100'
+encodeURIComponent(code)+'&select=*&limit=100'
 );
-
 records.push(...(Array.isArray(rows)?rows:[]));
 }
-
-const matches=records.filter(p=>
-sameBarcode(p.barcode,barcode)
-);
-
+const matches=records.filter(p=>sameBarcode(p.barcode,barcode));
 matches.sort((a,b)=>{
 const score=p=>
 (clean(p.ingredients)?10:0)+
 (clean(p.image_url)?5:0)+
 (clean(p.product_name)?2:0);
-
 return score(b)-score(a);
 });
-
-return {
-record:matches[0]||null,
-records:matches,
-error:null
-};
+return {record:matches[0]||null,records:matches,error:null};
 }catch(e){
-return {
-record:null,
-records:[],
-error:e.message
-};
+return {record:null,records:[],error:e.message};
 }
 }
 
@@ -1463,36 +1342,76 @@ vegan_status:normalizeStatus(p.vegan_status)
 };
 }
 
+/*
+ Imported database results are provisional.
+ Only package-confirmed ingredients may be used for a
+ new trusted correction.
+*/
+
+function importedResult(ingredients,productName=''){
+const raw=clean(ingredients);
+
+if(!raw||!ingredientTextQuality(raw)){
+return {
+status:'Needs Verification',
+reasons:[],
+explanation:'Imported ingredient information is missing or unreliable.',
+caution:'Check the actual package ingredients.'
+};
+}
+
+const variant=productVariant(productName,raw);
+if(variant==='internally-conflicting'){
+return {
+status:'Needs Verification',
+reasons:[],
+explanation:'The product description conflicts with the imported ingredients.',
+caution:'Verify the ingredient list on the physical package.'
+};
+}
+
+return classify(raw);
+}
+
+function showImportedIngredients(ingredients,name=''){
+const result=importedResult(ingredients,name);
+if(result.status==='Needs Verification'){
+clearResult();
+setStatus('Needs Verification');
+$('ingredientWarning').style.display='block';
+$('ingredientWarning').textContent=
+'⚠️ Imported ingredients need package verification. Check the actual ingredient list.';
+}else{
+showResult(result);
+}
+return result;
+}
+
 function loadCloudRecord(p){
 loadedCloudId=p.id??null;
 cloudRecordExists=true;
 rememberBaseline(p);
-
 $('productName').value=p.product_name||'';
 displayBrand(p.brand);
-
 const ingredients=loadIngredients(p.ingredients||'');
 originalIngredients=ingredients;
 originalStatus=normalizeStatus(p.vegan_status);
 ingredientSource='database';
-
 showNutrition(nutritionFromCloud(p));
 currentServingSize=p.serving_size||'';
-
 displayProductImages(currentBarcode,p.image_url||'');
-
 setSource('Supabase cloud');
 
 if(ingredients){
-showResult(classify(ingredients));
+showImportedIngredients(ingredients,p.product_name||'');
 $('lookupMessage').textContent=
 'Product loaded from Supabase. Check the package.';
 }else{
+clearResult();
 setStatus('Needs Verification');
 $('lookupMessage').textContent=
 'Product found, but ingredients are missing.';
 }
-
 $('autoSaveMessage').textContent=
 'Existing Supabase record. No automatic changes made.';
 }
@@ -1501,33 +1420,21 @@ $('autoSaveMessage').textContent=
 
 function cloudExternalConflict(cloud,match){
 if(!cloud||!match)return false;
-
 const cp={
 product_name:cloud.product_name||'',
 brands:cloud.brand||'',
 ingredients_text:cloud.ingredients||''
 };
-
 const ep=match.product;
-
-const cloudVariant=productVariant(
-cp.product_name,cp.ingredients_text
-);
-
-const externalVariant=productVariant(
-ep.product_name,productIngredients(ep)
-);
+const cloudVariant=productVariant(cp.product_name,cp.ingredients_text);
+const externalVariant=productVariant(ep.product_name,productIngredients(ep));
 
 if(cloudVariant==='internally-conflicting'||
-externalVariant==='internally-conflicting'){
-return true;
-}
+externalVariant==='internally-conflicting')return true;
 
 if(cloudVariant!=='unspecified'&&
 externalVariant!=='unspecified'&&
-cloudVariant!==externalVariant){
-return true;
-}
+cloudVariant!==externalVariant)return true;
 
 const cloudName=normalizeProductName(cp.product_name);
 const externalName=normalizeProductName(ep.product_name);
@@ -1537,62 +1444,43 @@ const externalBrand=normalizeProductName(ep.brands);
 if(cloudBrand&&externalBrand&&
 cloudBrand!==externalBrand&&
 !cloudBrand.includes(externalBrand)&&
-!externalBrand.includes(cloudBrand)){
-return true;
-}
+!externalBrand.includes(cloudBrand))return true;
 
 if(cloudName&&externalName){
 const cf=productFamily(cloudName);
 const ef=productFamily(externalName);
-
 if(cf&&ef&&cf!==ef&&
-!cf.includes(ef)&&!ef.includes(cf)){
-return true;
+!cf.includes(ef)&&!ef.includes(cf))return true;
 }
-}
-
 return false;
 }
 
 function findIdentityConflicts(cloud,matches){
 const conflicts=[];
 if(!cloud)return conflicts;
-
 for(const match of matches){
 if(cloudExternalConflict(cloud,match)){
 conflicts.push(
-match.sourceName+
-': '+(match.product.product_name||'Unnamed product')+
+match.sourceName+': '+
+(match.product.product_name||'Unnamed product')+
 ' | Brand: '+(match.product.brands||'Unknown')+
 ' | Ingredients: '+
 (productIngredients(match.product)||'Not provided')
 );
 }
 }
-
 return conflicts;
 }
 
 function conflictingIngredientSources(matches){
-const entries=matches.filter(x=>
-productIngredients(x.product)
-);
-
+const entries=matches.filter(x=>productIngredients(x.product));
 if(entries.length<2)return [];
-
 const conflicts=[];
-
 for(let i=0;i<entries.length;i++){
 for(let j=i+1;j<entries.length;j++){
-const a=entries[i];
-const b=entries[j];
-
-const ai=productIngredients(a.product);
-const bi=productIngredients(b.product);
-
-const ar=classify(ai);
-const br=classify(bi);
-
+const a=entries[i],b=entries[j];
+const ar=importedResult(productIngredients(a.product),a.product.product_name);
+const br=importedResult(productIngredients(b.product),b.product.product_name);
 if(ar.status!==br.status&&
 ar.status!=='Needs Verification'&&
 br.status!=='Needs Verification'){
@@ -1603,7 +1491,6 @@ a.sourceName+' reports '+ar.status+
 }
 }
 }
-
 return conflicts;
 }
 
@@ -1616,26 +1503,18 @@ return sameBarcode(barcode,CONFLICT_TEST_BARCODE);
 function displayLookupResult(lookup,barcode,cloud=null){
 const found=lookup.combined;
 const p=found.product;
-
 $('productName').value=p.product_name||'';
 displayBrand(p.brands);
-
 showNutrition(p.nutriments||{});
 currentServingSize=p.serving_size||'';
-
-displayProductImages(
-barcode,cloud?.image_url||'',lookup.all
-);
+displayProductImages(barcode,cloud?.image_url||'',lookup.all);
 
 const ingredients=loadIngredients(
 cloud?.ingredients||productIngredients(p)
 );
-
 originalIngredients=ingredients;
 ingredientSource='database';
-
 setSource(found.sourceName);
-
 $('lookupSources').style.display='block';
 $('lookupSources').textContent=
 'Barcode sources: '+
@@ -1643,35 +1522,33 @@ lookup.all.map(x=>x.sourceName)
 .filter((x,i,a)=>a.indexOf(x)===i).join(', ')+'.';
 
 if(ingredients){
-showResult(classify(ingredients));
+const result=showImportedIngredients(ingredients,p.product_name||'');
 $('lookupMessage').textContent=
-'Product information found. Check the ingredients against the package.';
+result.status==='Needs Verification'?
+'Ingredient information needs package verification.':
+'Product information found. Check ingredients against the package.';
 }else{
+clearResult();
 setStatus('Needs Verification');
 $('lookupMessage').textContent=
 'Product found, but ingredients are missing. Take an ingredient picture.';
 }
-
 $('autoSaveMessage').textContent=
 'External lookup only — not automatically saved to Supabase.';
 }
 
 async function lookupProduct(){
 const barcode=$('barcode').value.trim();
-
 if(!validBarcode(barcode)){
 alert('Enter a valid 8–14 digit barcode.');
 return;
 }
-
 if(lookupInProgress)return;
-lookupInProgress=true;
 
+lookupInProgress=true;
 const serial=++lookupNumber;
 const session=productSession;
-
 currentBarcode=barcode;
-
 stopCamera();
 clearResult();
 clearIdentityConflict();
@@ -1699,18 +1576,15 @@ sourceUntrusted=false;
 searchEvidence=[];
 currentLookupMatches=[];
 lookupHadCloudError=false;
-
 showNutrition({});
 setSource('');
 setStatus('Looking up…');
 showProductView();
 
-const isCurrent=()=>serial===lookupNumber&&
-session===productSession;
+const isCurrent=()=>serial===lookupNumber&&session===productSession;
 
 try{
 const cloud=await findCloudRecord(barcode);
-
 if(!isCurrent())return;
 
 if(cloud.error){
@@ -1725,32 +1599,21 @@ $('lookupMessage').textContent=
 'Checking product identity against outside sources…';
 }
 
-const lookup=await fetchAllProducts(
-barcode,
-message=>{
-if(isCurrent())
-$('lookupProgress').textContent=message;
-}
-);
+const lookup=await fetchAllProducts(barcode,message=>{
+if(isCurrent())$('lookupProgress').textContent=message;
+});
 
 if(!isCurrent())return;
-
 searchEvidence=lookup.all;
 currentLookupMatches=lookup.all;
 $('lookupProgress').textContent='';
 
-const conflicts=findIdentityConflicts(
-cloud.record,lookup.all
-);
-
-const ingredientConflicts=
-conflictingIngredientSources(lookup.all);
-
+const conflicts=findIdentityConflicts(cloud.record,lookup.all);
+const ingredientConflicts=conflictingIngredientSources(lookup.all);
 const duplicateConflicts=[];
 
 if(cloud.records?.length>1){
 const base=cloud.records[0];
-
 for(const row of cloud.records.slice(1)){
 const match={
 product:{
@@ -1759,7 +1622,6 @@ brands:row.brand||'',
 ingredients_text:row.ingredients||''
 }
 };
-
 if(cloudExternalConflict(base,match)){
 duplicateConflicts.push(
 'Supabase record '+row.id+
@@ -1773,10 +1635,8 @@ duplicateConflicts.push(
 if(conflicts.length||
 duplicateConflicts.length||
 ingredientConflicts.length){
-
 if(cloud.record)loadCloudRecord(cloud.record);
-else if(lookup.combined)
-displayLookupResult(lookup,barcode);
+else if(lookup.combined)displayLookupResult(lookup,barcode);
 
 flagIdentityConflict(
 'The databases disagree about this barcode. Check the physical package and photograph the actual ingredients before saving.',
@@ -1787,7 +1647,6 @@ flagIdentityConflict(
 ...ingredientConflicts
 ]
 );
-
 $('retryLookup').style.display='block';
 return;
 }
@@ -1796,47 +1655,39 @@ if(cloud.record){
 if(lookup.combined){
 const external=lookup.combined.product;
 const saved=cloud.record;
-
 const merged={
 ...external,
-product_name:saved.product_name||
-external.product_name,
+product_name:saved.product_name||external.product_name,
 brands:saved.brand||external.brands,
-ingredients_text:saved.ingredients||
-productIngredients(external)
+ingredients_text:saved.ingredients||productIngredients(external)
 };
-
 displayLookupResult({
 ...lookup,
-combined:{
-...lookup.combined,
-product:merged
-}
+combined:{...lookup.combined,product:merged}
 },barcode,saved);
-
 rememberBaseline(saved);
 loadedCloudId=saved.id;
 cloudRecordExists=true;
-
-$('autoSaveMessage').textContent=
-'Existing Supabase record preserved.';
+$('autoSaveMessage').textContent='Existing Supabase record preserved.';
 }else{
 loadCloudRecord(cloud.record);
 }
 
 if(isHighRiskBarcode(barcode)){
 sourceUntrusted=true;
+clearResult();
+setStatus('Needs Verification');
 $('ingredientWarning').style.display='block';
 $('ingredientWarning').textContent=
-'This barcode previously returned dairy ingredients for a non-dairy package. Verify the ingredients directly from your container.';
+'⚠️ This barcode previously returned dairy ingredients for a non-dairy package. Verify the ingredients directly from your container.';
 $('autoSaveMessage').textContent=
 'Automatic saving disabled. Package verification required.';
 }
-
 return;
 }
 
 if(!lookup.best){
+clearResult();
 setStatus('Needs Verification');
 $('lookupMessage').textContent=
 'No matching product found. Add its name and photograph the ingredients.';
@@ -1864,23 +1715,20 @@ x.sourceName+': '+
 
 if(isHighRiskBarcode(barcode)){
 sourceUntrusted=true;
-
 $('ingredientWarning').style.display='block';
 $('ingredientWarning').textContent=
-'⚠️ This barcode has previously returned incorrect dairy ingredients for a non-dairy product. Do not trust the imported ingredients. Take an ingredient picture and verify the package.';
-
+'⚠️ This barcode has previously returned incorrect dairy ingredients for a non-dairy product. Do not trust imported ingredients. Verify the package.';
 clearResult();
 setStatus('Needs Verification');
-
 $('autoSaveMessage').textContent=
 'Automatic saving blocked. No unverified ingredients were written to Supabase.';
 }
 
 }catch(e){
 if(!isCurrent())return;
+clearResult();
 setStatus('Needs Verification');
-$('lookupMessage').textContent=
-'Lookup failed: '+e.message;
+$('lookupMessage').textContent='Lookup failed: '+e.message;
 }finally{
 if(isCurrent()){
 lookupInProgress=false;
@@ -1890,40 +1738,31 @@ $('lookupProgress').textContent='';
 }
 
 $('lookup').onclick=lookupProduct;
-
 $('retryLookup').onclick=async()=>{
 if(lookupInProgress)return;
 await lookupProduct();
 };
 
-/* CAMERA: SAFARI + ANDROID */
+/* CAMERA — KEEP FAST BARCODE SCANNING */
 
 function loadScannerLibrary(){
 if(window.Html5Qrcode)return Promise.resolve();
-
 if(scannerLibraryPromise)return scannerLibraryPromise;
-
 scannerLibraryPromise=new Promise((resolve,reject)=>{
 const script=document.createElement('script');
-
-script.src=
-'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
-
+script.src='https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
 script.onload=()=>{
 if(window.Html5Qrcode)resolve();
 else reject(Error('Scanner library unavailable.'));
 };
-
 script.onerror=()=>reject(
 Error('Unable to load barcode scanner. Check your connection.')
 );
-
 document.head.append(script);
 }).catch(e=>{
 scannerLibraryPromise=null;
 throw e;
 });
-
 return scannerLibraryPromise;
 }
 
@@ -1931,32 +1770,25 @@ async function stopCamera(){
 scanActive=false;
 scannerStarting=false;
 ++scannerSession;
-
 if(nativeTimer){
 clearTimeout(nativeTimer);
 nativeTimer=null;
 }
-
 const oldScanner=scanner;
 scanner=null;
-
 if(oldScanner){
 try{await oldScanner.stop()}catch(e){}
 try{oldScanner.clear()}catch(e){}
 }
-
 if(stream){
 stream.getTracks().forEach(track=>{
 try{track.stop()}catch(e){}
 });
 stream=null;
 }
-
 const video=$('video');
-
 try{video.pause()}catch(e){}
 video.srcObject=null;
-
 $('cameraPanel').style.display='none';
 $('startCamera').disabled=false;
 $('startCamera').textContent='📷 Scan Barcode';
@@ -1966,19 +1798,11 @@ $('stopCamera').onclick=stopCamera;
 
 async function processScannedBarcode(raw,session){
 if(!scanActive||session!==scannerSession)return;
-
 const barcode=String(raw||'').replace(/\D/g,'');
-
 if(!validBarcode(barcode))return;
-
 scanActive=false;
-
-try{
-if(navigator.vibrate)navigator.vibrate(80);
-}catch(e){}
-
+try{if(navigator.vibrate)navigator.vibrate(80);}catch(e){}
 await stopCamera();
-
 $('barcode').value=barcode;
 lookupInProgress=false;
 await lookupProduct();
@@ -1986,20 +1810,13 @@ await lookupProduct();
 
 async function startNativeScanner(session){
 const formats=['ean_13','ean_8','upc_a','upc_e'];
-
 const supported=
 typeof BarcodeDetector.getSupportedFormats==='function'?
-await BarcodeDetector.getSupportedFormats():
-formats;
-
+await BarcodeDetector.getSupportedFormats():formats;
 const allowed=formats.filter(f=>supported.includes(f));
+if(!allowed.length)throw Error('Native barcode formats unavailable.');
 
-if(!allowed.length)
-throw Error('Native barcode formats unavailable.');
-
-nativeDetector=new BarcodeDetector({
-formats:allowed
-});
+nativeDetector=new BarcodeDetector({formats:allowed});
 
 const newStream=await navigator.mediaDevices.getUserMedia({
 video:{
@@ -2016,32 +1833,26 @@ return;
 }
 
 stream=newStream;
-
 const video=$('video');
 video.srcObject=stream;
 $('cameraPanel').style.display='block';
 await video.play();
-
 if(session!==scannerSession)return;
 
 scannerStarting=false;
 scanActive=true;
 $('startCamera').disabled=false;
 $('startCamera').textContent='📷 Scanner Running';
-
 $('scannerFeedback').textContent=
 'Hold the barcode steady inside the green frame. Move closer or farther away until sharp.';
 
 async function scan(){
 if(!scanActive||session!==scannerSession)return;
-
 try{
 if(video.readyState>=2){
 const hits=await nativeDetector.detect(video);
-
 for(const hit of hits){
 const code=String(hit.rawValue||'').replace(/\D/g,'');
-
 if(validBarcode(code)){
 await processScannedBarcode(code,session);
 return;
@@ -2049,27 +1860,22 @@ return;
 }
 }
 }catch(e){}
-
 if(scanActive&&session===scannerSession){
 nativeTimer=setTimeout(scan,150);
 }
 }
-
 scan();
 }
 
 async function startSafariScanner(session){
 await loadScannerLibrary();
-
 if(session!==scannerSession)return;
 
 const video=$('video');
-
 video.style.display='none';
 $('scanGuide').style.display='none';
 
 let reader=document.getElementById('html5Reader');
-
 if(!reader){
 reader=document.createElement('div');
 reader.id='html5Reader';
@@ -2080,7 +1886,6 @@ reader.style.borderRadius='12px';
 reader.style.overflow='hidden';
 $('barcodeFrame').append(reader);
 }
-
 reader.style.display='block';
 
 scanner=new Html5Qrcode('html5Reader',{
@@ -2122,14 +1927,12 @@ scannerStarting=false;
 scanActive=true;
 $('startCamera').disabled=false;
 $('startCamera').textContent='📷 Scanner Running';
-
 $('scannerFeedback').textContent=
-'iPhone scanner running. Center the barcode, keep it flat, and adjust distance until the bars are sharp.';
+'iPhone scanner running. Center the barcode, keep it flat, and adjust distance until sharp.';
 }
 
 async function startBarcodeCamera(){
 if(scanActive||scannerStarting)return;
-
 if(!navigator.mediaDevices?.getUserMedia){
 $('cameraError').textContent=
 'Camera access requires HTTPS and browser permission.';
@@ -2138,9 +1941,7 @@ return;
 }
 
 scannerStarting=true;
-
 const session=++scannerSession;
-
 $('startCamera').disabled=true;
 $('startCamera').textContent='Opening camera…';
 $('cameraError').textContent='';
@@ -2149,15 +1950,11 @@ $('scannerFeedback').textContent='Starting barcode camera…';
 const video=$('video');
 video.style.display='block';
 $('scanGuide').style.display='block';
-
 const reader=document.getElementById('html5Reader');
 if(reader)reader.style.display='none';
 
 try{
-const isSafari=/^((?!chrome|android).)*safari/i.test(
-navigator.userAgent
-);
-
+const isSafari=/^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 const canNative='BarcodeDetector' in window;
 
 if(canNative&&!isSafari){
@@ -2171,18 +1968,12 @@ stream=null;
 }
 }
 }
-
 await startSafariScanner(session);
-
 }catch(e){
 await stopCamera();
-
-$('cameraError').textContent=
-'Camera could not start: '+e.message;
-
+$('cameraError').textContent='Camera could not start: '+e.message;
 $('scannerFeedback').textContent=
 'Check camera permission or enter the barcode manually.';
-
 $('manualEntry').style.display='block';
 $('manualToggle').setAttribute('aria-expanded','true');
 $('manualToggle').textContent='Hide Manual Barcode Entry';
@@ -2191,7 +1982,6 @@ $('manualToggle').textContent='Hide Manual Barcode Entry';
 
 $('startCamera').onclick=async()=>{
 if(savingContribution)return;
-
 await stopCamera();
 resetProductData();
 showScannerView();
@@ -2205,18 +1995,14 @@ const cropCanvas=$('cropCanvas');
 const ctx=cropCanvas.getContext('2d');
 
 $('takePhoto').onclick=()=>{
-if(!currentBarcode)
-return alert('Scan a product first.');
-
+if(!currentBarcode)return alert('Scan a product first.');
 photoInput.setAttribute('capture','environment');
 photoInput.value='';
 photoInput.click();
 };
 
 $('choosePhoto').onclick=()=>{
-if(!currentBarcode)
-return alert('Scan a product first.');
-
+if(!currentBarcode)return alert('Scan a product first.');
 photoInput.removeAttribute('capture');
 photoInput.value='';
 photoInput.click();
@@ -2224,67 +2010,40 @@ photoInput.click();
 
 async function getWorker(){
 if(ocrWorker)return ocrWorker;
-
 if(!ocrLoadPromise){
 ocrLoadPromise=(async()=>{
 if(!window.Tesseract){
 await new Promise((resolve,reject)=>{
 const script=document.createElement('script');
-script.src=
-'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
 script.onload=resolve;
-script.onerror=()=>reject(
-Error('Text reader failed to load.')
-);
+script.onerror=()=>reject(Error('Text reader failed to load.'));
 document.head.append(script);
 });
 }
-
 return Tesseract.createWorker('eng');
 })();
 }
-
 ocrWorker=await ocrLoadPromise;
 return ocrWorker;
 }
 
 function makeCanvas(bitmap,max=2400){
-const scale=Math.min(
-1,max/Math.max(bitmap.width,bitmap.height)
-);
-
+const scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));
 const canvas=document.createElement('canvas');
-
-canvas.width=Math.max(
-1,Math.round(bitmap.width*scale)
-);
-
-canvas.height=Math.max(
-1,Math.round(bitmap.height*scale)
-);
-
-canvas.getContext('2d').drawImage(
-bitmap,0,0,canvas.width,canvas.height
-);
-
+canvas.width=Math.max(1,Math.round(bitmap.width*scale));
+canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
 return canvas;
 }
 
 function enhanceCanvas(canvas){
 const enhanced=document.createElement('canvas');
-
 enhanced.width=canvas.width;
 enhanced.height=canvas.height;
-
-const c=enhanced.getContext('2d',{
-willReadFrequently:true
-});
-
+const c=enhanced.getContext('2d',{willReadFrequently:true});
 c.drawImage(canvas,0,0);
-
-const image=c.getImageData(
-0,0,enhanced.width,enhanced.height
-);
+const image=c.getImageData(0,0,enhanced.width,enhanced.height);
 
 for(let i=0;i<image.data.length;i+=4){
 const gray=Math.round(
@@ -2292,16 +2051,11 @@ const gray=Math.round(
 .587*image.data[i+1]+
 .114*image.data[i+2]
 );
-
-const value=Math.max(
-0,Math.min(255,(gray-128)*1.5+128)
-);
-
+const value=Math.max(0,Math.min(255,(gray-128)*1.5+128));
 image.data[i]=value;
 image.data[i+1]=value;
 image.data[i+2]=value;
 }
-
 c.putImageData(image,0,0);
 return enhanced;
 }
@@ -2309,13 +2063,9 @@ return enhanced;
 function ocrScore(text,confidence){
 const parsed=splitPackageText(text);
 const ingredients=parsed.ingredients;
-
 const words=ingredients.match(/[A-Za-z]{3,}/g)||[];
-
 const heading=/ingredients?\s*:/i.test(text);
-
-const meaningful=
-/\b(water|sugar|salt|oil|acid|extract|protein|milk|coconut|oats|guar gum|lecithin|vanilla)\b/i.test(ingredients);
+const meaningful=/\b(water|sugar|salt|oil|acid|extract|protein|milk|coconut|oats|guar gum|lecithin|vanilla|cornstarch|pepper|onion|garlic)\b/i.test(ingredients);
 
 let score=
 words.length*2+
@@ -2324,39 +2074,26 @@ confidence*.25+
 (meaningful?20:0);
 
 if(looksLikeNutrition(ingredients))score-=35;
-
+if(looksLikeRecipe(text))score-=80;
+if(looksLikeUnrelatedText(text))score-=60;
 if(!ingredientTextQuality(ingredients))score-=45;
-
 return score;
 }
 
 async function readIngredientsCanvas(canvas){
 const worker=await getWorker();
-
-const variants=[
-canvas,
-enhanceCanvas(canvas)
-];
-
+const variants=[canvas,enhanceCanvas(canvas)];
 let best=null;
-
 $('ocrProgress').style.display='block';
 
 for(let i=0;i<variants.length;i++){
 $('ocrMessage').textContent=
-'Reading ingredients ('+
-(i+1)+' of '+variants.length+')…';
-
-$('ocrProgressBar').style.width=
-(15+i*40)+'%';
+'Reading ingredients ('+(i+1)+' of '+variants.length+')…';
+$('ocrProgressBar').style.width=(15+i*40)+'%';
 
 const result=await worker.recognize(variants[i]);
-
 const text=result.data?.text||'';
-const confidence=Number(
-result.data?.confidence
-)||0;
-
+const confidence=Number(result.data?.confidence)||0;
 const score=ocrScore(text,confidence);
 
 if(!best||score>best.score){
@@ -2365,56 +2102,43 @@ best={text,score,confidence};
 }
 
 $('ocrProgressBar').style.width='100%';
-
 const parsed=splitPackageText(best?.text||'');
 
 if(!best||
-best.score<45||
+best.score<30||
 best.confidence<30||
-!ingredientTextQuality(parsed.ingredients)){
-
+!ingredientTextQuality(parsed.ingredients)||
+looksLikeRecipe(best.text)||
+looksLikeUnrelatedText(best.text)){
 ocrRejected=true;
 ingredientSource='ocr';
-
 $('ocrMessage').textContent=
-'The photo includes unclear or mixed text. Select only the ingredient list using the crop tool, or type the ingredients manually.';
-
+'The photo contains unclear or unrelated text. Select only the ingredient list using the crop tool, or type the ingredients manually.';
 $('ingredientWarning').style.display='block';
 $('ingredientWarning').textContent=
 '⚠️ Ingredient text was not reliable. No vegan result has been assigned.';
-
 $('manualCropButton').style.display='block';
 $('cropPanel').style.display='block';
-
 clearResult();
 setStatus('Needs Verification');
 return;
 }
 
 loadIngredients(best.text);
-
 ingredientSource='ocr';
 ocrRejected=false;
 verifiedByPackage=false;
-
 $('confirmed').checked=false;
 clearResult();
 setStatus('Needs Verification');
-
 $('ingredientWarning').style.display='none';
-
 $('ocrMessage').textContent=
 'Ingredients detected. Check every word against the package, correct mistakes, then confirm.';
-
-$('ingredients').scrollIntoView({
-behavior:'smooth',
-block:'center'
-});
+$('ingredients').scrollIntoView({behavior:'smooth',block:'center'});
 }
 
 photoInput.onchange=async()=>{
 const file=photoInput.files?.[0];
-
 if(!file||ocrBusy)return;
 
 ocrBusy=true;
@@ -2422,39 +2146,30 @@ $('check').disabled=true;
 
 try{
 if(photoBitmap)photoBitmap.close();
-
 photoBitmap=await createImageBitmap(file);
-
 const canvas=makeCanvas(photoBitmap);
-
 cropCanvas.width=canvas.width;
 cropCanvas.height=canvas.height;
-
 ctx.drawImage(canvas,0,0);
 
 const preview=$('ingredientPreview');
-
 if(preview.src.startsWith('blob:')){
 URL.revokeObjectURL(preview.src);
 }
-
 preview.src=URL.createObjectURL(file);
 preview.style.display='block';
-
 cropRect=null;
-
 $('manualCropButton').style.display='block';
 $('cropPanel').style.display='block';
-
 $('ocrMessage').textContent=
-'Reading photo. If it includes nutrition facts, select only the ingredient section below.';
+'Select ONLY the ingredients below. Other label text must not be included.';
 
-await readIngredientsCanvas(canvas);
+ocrRejected=true;
+clearResult();
+setStatus('Needs Verification');
 
 }catch(e){
-$('ocrMessage').textContent=
-'Photo reading failed: '+e.message;
-
+$('ocrMessage').textContent='Photo reading failed: '+e.message;
 ocrRejected=true;
 $('cropPanel').style.display='block';
 }finally{
@@ -2465,44 +2180,25 @@ $('check').disabled=false;
 
 function drawCrop(){
 if(!photoBitmap)return;
-
-ctx.drawImage(
-photoBitmap,
-0,0,
-cropCanvas.width,
-cropCanvas.height
-);
-
+ctx.drawImage(photoBitmap,0,0,cropCanvas.width,cropCanvas.height);
 if(cropRect){
 ctx.strokeStyle='#00e676';
 ctx.lineWidth=5;
-
-ctx.strokeRect(
-cropRect.x,
-cropRect.y,
-cropRect.w,
-cropRect.h
-);
+ctx.strokeRect(cropRect.x,cropRect.y,cropRect.w,cropRect.h);
 }
 }
 
 $('manualCropButton').onclick=()=>{
 $('cropPanel').style.display='block';
 drawCrop();
-
-$('cropPanel').scrollIntoView({
-behavior:'smooth'
-});
+$('cropPanel').scrollIntoView({behavior:'smooth'});
 };
 
 function cropPoint(e){
 const rect=cropCanvas.getBoundingClientRect();
-
 return {
-x:(e.clientX-rect.left)*
-cropCanvas.width/rect.width,
-y:(e.clientY-rect.top)*
-cropCanvas.height/rect.height
+x:(e.clientX-rect.left)*cropCanvas.width/rect.width,
+y:(e.clientY-rect.top)*cropCanvas.height/rect.height
 };
 }
 
@@ -2513,16 +2209,13 @@ cropCanvas.setPointerCapture(e.pointerId);
 
 cropCanvas.onpointermove=e=>{
 if(!dragStart)return;
-
 const p=cropPoint(e);
-
 cropRect={
 x:Math.min(dragStart.x,p.x),
 y:Math.min(dragStart.y,p.y),
 w:Math.abs(p.x-dragStart.x),
 h:Math.abs(p.y-dragStart.y)
 };
-
 drawCrop();
 };
 
@@ -2536,17 +2229,12 @@ drawCrop();
 
 $('readCrop').onclick=async()=>{
 if(!photoBitmap||ocrBusy)return;
-
 ocrBusy=true;
 $('readCrop').disabled=true;
 
 try{
-const r=cropRect||{
-x:0,
-y:0,
-w:cropCanvas.width,
-h:cropCanvas.height
-};
+if(!cropRect)throw Error('Draw a rectangle around ONLY the ingredient list first.');
+const r=cropRect;
 
 if(r.w<20||r.h<20){
 throw Error('Select a larger ingredient area.');
@@ -2554,30 +2242,15 @@ throw Error('Select a larger ingredient area.');
 
 const sx=photoBitmap.width/cropCanvas.width;
 const sy=photoBitmap.height/cropCanvas.height;
-
 const canvas=document.createElement('canvas');
-
-canvas.width=Math.max(
-1,Math.round(r.w*sx)
-);
-
-canvas.height=Math.max(
-1,Math.round(r.h*sy)
-);
-
+canvas.width=Math.max(1,Math.round(r.w*sx));
+canvas.height=Math.max(1,Math.round(r.h*sy));
 canvas.getContext('2d').drawImage(
 photoBitmap,
-r.x*sx,
-r.y*sy,
-r.w*sx,
-r.h*sy,
-0,0,
-canvas.width,
-canvas.height
+r.x*sx,r.y*sy,r.w*sx,r.h*sy,
+0,0,canvas.width,canvas.height
 );
-
 await readIngredientsCanvas(canvas);
-
 }catch(e){
 $('ocrMessage').textContent=e.message;
 }finally{
@@ -2591,7 +2264,6 @@ ocrRejected=false;
 ingredientSource='manual';
 verifiedByPackage=false;
 $('confirmed').checked=false;
-
 clearResult();
 setStatus('Needs Verification');
 };
@@ -2600,53 +2272,39 @@ $('check').onclick=()=>{
 if(ocrBusy)return;
 
 if(ocrRejected){
-return alert(
-'Correct the unreadable ingredients or enter them manually first.'
-);
+return alert('Correct unreadable ingredients or enter them manually first.');
 }
 
-const parsed=splitPackageText(
-$('ingredients').value
-);
+const parsed=splitPackageText($('ingredients').value);
 
 if(!ingredientTextQuality(parsed.ingredients)){
-return alert(
-'The ingredient list is incomplete or unreadable.'
-);
+return alert('The ingredient list is incomplete, contains unrelated text, or is unreadable.');
 }
 
 if(!$('confirmed').checked){
-return alert(
-'Check the complete ingredient list against the package and tick the confirmation box.'
-);
+return alert('Check the complete ingredient list against the package and tick the confirmation box.');
 }
 
 $('ingredients').value=parsed.ingredients;
-
 allergens={
 contains:parsed.contains||allergens.contains,
 mayContain:parsed.mayContain||allergens.mayContain
 };
-
 updateAllergens();
 
 verifiedByPackage=true;
 ingredientSource='verified';
 
 const result=classify(parsed.ingredients);
-
 showResult(result);
 
 if(identityConflict||sourceUntrusted){
 $('ingredientWarning').style.display='block';
 $('ingredientWarning').textContent=
-'Package ingredients verified. Any conflicting product identity still requires correction before database saving.';
+'Package ingredients verified. Check the product name and brand before saving a correction.';
 }
 
-$('result').scrollIntoView({
-behavior:'smooth',
-block:'start'
-});
+$('result').scrollIntoView({behavior:'smooth',block:'start'});
 };
 
 /* AUTHENTICATION */
@@ -2654,67 +2312,38 @@ block:'start'
 function saveSession(session){
 authSession=session;
 currentUser=session?.user||null;
-
 try{
-if(session){
-localStorage.setItem(
-AUTHKEY,JSON.stringify(session)
-);
-}else{
-localStorage.removeItem(AUTHKEY);
-}
+if(session)localStorage.setItem(AUTHKEY,JSON.stringify(session));
+else localStorage.removeItem(AUTHKEY);
 }catch(e){}
-
 updateAccountMode();
 }
 
 function updateAccountMode(){
 const signed=!!currentUser;
 const admin=signed&&adminAuthorized;
-
-$('signedOutPanel').style.display=
-signed?'none':'block';
-
-$('signedInPanel').style.display=
-signed?'block':'none';
-
-$('myRewards').style.display=
-signed&&!admin?'block':'none';
-
-$('adminSection').style.display=
-admin?'block':'none';
-
-$('contributionSteps').style.display=
-admin?'none':'block';
-
-$('adminNotice').style.display=
-admin?'block':'none';
-
-$('refreshRewards').style.display=
-admin?'none':'block';
-
+$('signedOutPanel').style.display=signed?'none':'block';
+$('signedInPanel').style.display=signed?'block':'none';
+$('myRewards').style.display=signed&&!admin?'block':'none';
+$('adminSection').style.display=admin?'block':'none';
+$('contributionSteps').style.display=admin?'none':'block';
+$('adminNotice').style.display=admin?'block':'none';
+$('refreshRewards').style.display=admin?'none':'block';
 $('welcomeUser').textContent=signed?
-'Signed in: '+
-(currentUser.email||'Contributor')+
+'Signed in: '+(currentUser.email||'Contributor')+
 (admin?' — Administrator':''):'';
-
 $('save').textContent=admin?
 '💾 Save Scan — Administrator':
 '💾 Save Scan / Submit Contribution';
 }
 
 async function authCall(endpoint,body){
-const response=await fetch(
-SUPABASE_URL+'/auth/v1/'+endpoint,{
+const response=await fetch(SUPABASE_URL+'/auth/v1/'+endpoint,{
 method:'POST',
 headers:headers(),
 body:JSON.stringify(body)
-}
-);
-
-if(!response.ok)
-throw Error(await responseError(response));
-
+});
+if(!response.ok)throw Error(await responseError(response));
 return response.json();
 }
 
@@ -2725,152 +2354,105 @@ return location.origin+location.pathname;
 $('signUp').onclick=async()=>{
 const email=$('authEmail').value.trim();
 const password=$('authPassword').value;
-
 if(!email||password.length<8){
 $('authMessage').textContent=
 'Enter an email and password of at least 8 characters.';
 return;
 }
-
 try{
 const data=await authCall(
-'signup?redirect_to='+
-encodeURIComponent(authRedirect()),
+'signup?redirect_to='+encodeURIComponent(authRedirect()),
 {email,password}
 );
-
 if(data.access_token){
 saveSession(data);
 await initializeSignedInAccount();
-$('authMessage').textContent=
-'Account created.';
+$('authMessage').textContent='Account created.';
 }else{
-$('authMessage').textContent=
-'Check your email to confirm your account.';
+$('authMessage').textContent='Check your email to confirm your account.';
 }
-}catch(e){
-$('authMessage').textContent=e.message;
-}
+}catch(e){$('authMessage').textContent=e.message;}
 };
 
 $('signIn').onclick=async()=>{
 try{
-const data=await authCall(
-'token?grant_type=password',{
+const data=await authCall('token?grant_type=password',{
 email:$('authEmail').value.trim(),
 password:$('authPassword').value
-}
-);
-
+});
 saveSession(data);
 await initializeSignedInAccount();
-
-$('authMessage').textContent=
-'Signed in successfully.';
-}catch(e){
-$('authMessage').textContent=e.message;
-}
+$('authMessage').textContent='Signed in successfully.';
+}catch(e){$('authMessage').textContent=e.message;}
 };
 
 $('resetPassword').onclick=async()=>{
 const email=$('authEmail').value.trim();
 if(!email)return;
-
 try{
 await authCall(
-'recover?redirect_to='+
-encodeURIComponent(authRedirect()),
+'recover?redirect_to='+encodeURIComponent(authRedirect()),
 {email}
 );
-
 $('authMessage').textContent=
 'Check your email for recovery instructions.';
-}catch(e){
-$('authMessage').textContent=e.message;
-}
+}catch(e){$('authMessage').textContent=e.message;}
 };
 
 $('savePassword').onclick=async()=>{
 try{
 const password=$('newPassword').value;
-
-if(password.length<8)
-throw Error('Use at least 8 characters.');
-
+if(password.length<8)throw Error('Use at least 8 characters.');
 const token=await userToken();
-
-const response=await fetch(
-SUPABASE_URL+'/auth/v1/user',{
+const response=await fetch(SUPABASE_URL+'/auth/v1/user',{
 method:'PUT',
 headers:headers(token),
 body:JSON.stringify({password})
-}
-);
-
-if(!response.ok)
-throw Error(await responseError(response));
-
+});
+if(!response.ok)throw Error(await responseError(response));
 $('passwordPanel').style.display='none';
-$('authMessage').textContent=
-'Password updated.';
-}catch(e){
-$('authMessage').textContent=e.message;
-}
+$('authMessage').textContent='Password updated.';
+}catch(e){$('authMessage').textContent=e.message;}
 };
 
 $('logout').onclick=()=>{
 saveSession(null);
 adminAuthorized=false;
 updateAccountMode();
-
 $('authMessage').textContent='Logged out.';
 };
 
 async function checkAdminAccess(){
 const serial=++adminCheckSerial;
 adminAuthorized=false;
-
 if(!currentUser)return false;
-
 try{
 const rows=await userRequest(
 '/rest/v1/vv_admins?user_id=eq.'+
 encodeURIComponent(currentUser.id)+
 '&select=user_id&limit=1'
 );
-
 if(serial!==adminCheckSerial)return false;
-
 adminAuthorized=Array.isArray(rows)&&
 rows.some(x=>x.user_id===currentUser.id);
-
 updateAccountMode();
-
-if(adminAuthorized)
-await loadAdminPending();
-
+if(adminAuthorized)await loadAdminPending();
 return adminAuthorized;
-
 }catch(e){
-$('authMessage').textContent=
-'Administrator check: '+e.message;
+$('authMessage').textContent='Administrator check: '+e.message;
 return false;
 }
 }
 
 async function initializeSignedInAccount(){
 if(!currentUser)return;
-
 await checkAdminAccess();
-
 if(!adminAuthorized){
 try{
 const rows=await userRequest(
 '/rest/v1/vv_profiles?user_id=eq.'+
-encodeURIComponent(currentUser.id)+
-'&select=user_id'
+encodeURIComponent(currentUser.id)+'&select=user_id'
 );
-
 if(!rows.length){
 await userRequest('/rest/v1/vv_profiles',{
 method:'POST',
@@ -2881,99 +2463,63 @@ show_on_leaderboard:false
 });
 }
 }catch(e){}
-
 await loadRewards();
 }
 }
 
 async function restoreAuth(){
 let saved=null;
-
-try{
-saved=JSON.parse(
-localStorage.getItem(AUTHKEY)||'null'
-);
-}catch(e){}
-
+try{saved=JSON.parse(localStorage.getItem(AUTHKEY)||'null');}
+catch(e){}
 if(!saved?.access_token)return;
-
 saveSession(saved);
-
 try{
 const token=await userToken();
-
-const response=await fetch(
-SUPABASE_URL+'/auth/v1/user',{
+const response=await fetch(SUPABASE_URL+'/auth/v1/user',{
 headers:headers(token)
-}
-);
-
-if(!response.ok)
-throw Error('Session invalid.');
-
+});
+if(!response.ok)throw Error('Session invalid.');
 currentUser=await response.json();
 authSession.user=currentUser;
-
 saveSession(authSession);
 await initializeSignedInAccount();
-
-}catch(e){
-saveSession(null);
-}
+}catch(e){saveSession(null);}
 }
 
 /* REWARDS */
 
 async function loadRewards(){
 if(!currentUser||adminAuthorized)return;
-
 try{
 const id=encodeURIComponent(currentUser.id);
-
 const totals=await userRequest(
-'/rest/v1/vv_my_rewards?user_id=eq.'+
-id+'&select=*'
+'/rest/v1/vv_my_rewards?user_id=eq.'+id+'&select=*'
 );
-
-$('earnedPoints').textContent=
-totals[0]?.earned_points??0;
-
-$('pendingPoints').textContent=
-totals[0]?.pending_points??0;
+$('earnedPoints').textContent=totals[0]?.earned_points??0;
+$('pendingPoints').textContent=totals[0]?.pending_points??0;
 
 const contributions=await userRequest(
 '/rest/v1/vv_contributions?user_id=eq.'+
-id+
-'&select=barcode,contribution_type,points,status,created_at&order=created_at.desc&limit=30'
+id+'&select=barcode,contribution_type,points,status,created_at&order=created_at.desc&limit=30'
 );
 
 $('contributionHistory').replaceChildren();
-
 if(!contributions.length){
-$('contributionHistory').textContent=
-'No contributions yet.';
+$('contributionHistory').textContent='No contributions yet.';
 }
-
 contributions.forEach(c=>{
 const div=document.createElement('div');
 div.className='entry';
-
 div.textContent=
-String(c.contribution_type||'Contribution')
-.replace(/_/g,' ')+
-' • '+c.barcode+
-' • '+c.points+
+String(c.contribution_type||'Contribution').replace(/_/g,' ')+
+' • '+c.barcode+' • '+c.points+
 ' points • '+c.status;
-
 $('contributionHistory').append(div);
 });
-
 $('rewardMessage').textContent=
 'Points are awarded after verification.';
-
 }catch(e){
-$('rewardMessage').textContent=
-'Rewards unavailable: '+e.message;
+$('rewardMessage').textContent='Rewards unavailable: '+e.message;
 }
 }
 
@@ -2983,20 +2529,13 @@ $('refreshRewards').onclick=loadRewards;
 
 async function loadMonthlyLeaderboard(){
 if(leaderboardLoading)return;
-
 leaderboardLoading=true;
-
 const date=new Date();
-
 const month=date.getFullYear()+'-'+
-String(date.getMonth()+1).padStart(2,'0')+
-'-01';
+String(date.getMonth()+1).padStart(2,'0')+'-01';
 
 $('leaderboardMonth').textContent=
-date.toLocaleDateString('en-US',{
-month:'long',
-year:'numeric'
-});
+date.toLocaleDateString('en-US',{month:'long',year:'numeric'});
 
 try{
 const rows=await apiRequest(
@@ -3010,10 +2549,8 @@ const box=$('leaderboardList');
 box.replaceChildren();
 
 const top=(Array.isArray(rows)?rows:[])
-.sort((a,b)=>
-Number(b.approved_points)-
-Number(a.approved_points)
-).slice(0,3);
+.sort((a,b)=>Number(b.approved_points)-Number(a.approved_points))
+.slice(0,3);
 
 if(!top.length){
 $('leaderboardMessage').textContent=
@@ -3022,79 +2559,55 @@ return;
 }
 
 const medals=['🥇','🥈','🥉'];
-
 top.forEach((r,i)=>{
 const card=document.createElement('div');
-
-card.className=
-'leaderboardEntry '+
-['first','second','third'][i];
-
+card.className='leaderboardEntry '+['first','second','third'][i];
 const medal=document.createElement('div');
 medal.className='leaderboardMedal';
 medal.textContent=medals[i];
 
 const person=document.createElement('div');
 person.className='leaderboardPerson';
-
 const name=document.createElement('strong');
-name.textContent=
-clean(r.contributor_name)||
-'Vegan Contributor';
-
+name.textContent=clean(r.contributor_name)||'Vegan Contributor';
 const count=document.createElement('span');
 count.textContent=
-(r.approved_contributions||0)+
-' approved contributions';
-
+(r.approved_contributions||0)+' approved contributions';
 person.append(name,count);
 
 const points=document.createElement('div');
 points.className='leaderboardPoints';
 points.textContent=r.approved_points||0;
-
 card.append(medal,person,points);
 box.append(card);
 });
 
-$('leaderboardMessage').textContent=
-'Current approved rankings.';
-
+$('leaderboardMessage').textContent='Current approved rankings.';
 $('leaderboardUpdated').textContent=
 'Updated: '+new Date().toLocaleString();
 
 }catch(e){
 $('leaderboardMessage').textContent=
 'Leaderboard unavailable: '+e.message;
-}finally{
-leaderboardLoading=false;
-}
+}finally{leaderboardLoading=false;}
 }
 
-$('refreshLeaderboard').onclick=
-loadMonthlyLeaderboard;
+$('refreshLeaderboard').onclick=loadMonthlyLeaderboard;
 
 /* ADMINISTRATOR */
 
 async function loadAdminPending(){
-if(!currentUser||
-!adminAuthorized||
-adminBusy)return;
+if(!currentUser||!adminAuthorized||adminBusy)return;
 
 const box=$('adminPending');
 box.replaceChildren();
-
-$('adminMessage').textContent=
-'Loading pending contributions…';
+$('adminMessage').textContent='Loading pending contributions…';
 
 try{
 const rows=await userRequest(
 '/rest/v1/vv_contributions?status=eq.pending&select=*&order=created_at.asc&limit=100'
 );
-
-const pending=rows.filter(c=>
-c.user_id!==currentUser.id
-);
+const pending=rows.filter(c=>c.user_id!==currentUser.id);
 
 if(!pending.length){
 $('adminMessage').textContent=
@@ -3108,17 +2621,11 @@ pending.length+' pending contribution(s).';
 for(const c of pending){
 const card=document.createElement('div');
 card.className='adminCard';
-
 const heading=document.createElement('h3');
 heading.textContent=
-String(c.contribution_type||'Contribution')
-.replace(/_/g,' ');
-
+String(c.contribution_type||'Contribution').replace(/_/g,' ');
 const detail=document.createElement('p');
-detail.textContent=
-'Barcode: '+c.barcode+
-' • Points: '+c.points;
-
+detail.textContent='Barcode: '+c.barcode+' • Points: '+c.points;
 card.append(heading,detail);
 
 if(c.description){
@@ -3126,16 +2633,12 @@ const p=document.createElement('p');
 p.textContent=c.description;
 card.append(p);
 }
-
 if(c.ingredients){
 const p=document.createElement('p');
-p.textContent=
-'Ingredients: '+c.ingredients;
+p.textContent='Ingredients: '+c.ingredients;
 card.append(p);
 }
-
-if(c.image_url&&
-/^https:\/\//.test(c.image_url)){
+if(c.image_url&&/^https:\/\//.test(c.image_url)){
 const img=document.createElement('img');
 img.src=c.image_url;
 img.alt='Submitted product picture';
@@ -3144,21 +2647,17 @@ card.append(img);
 
 const actions=document.createElement('div');
 actions.className='actions';
-
 const approve=document.createElement('button');
 approve.textContent='✅ Approve';
 approve.onclick=()=>reviewContribution(c,true);
-
 const reject=document.createElement('button');
 reject.className='danger';
 reject.textContent='❌ Reject';
 reject.onclick=()=>reviewContribution(c,false);
-
 actions.append(approve,reject);
 card.append(actions);
 box.append(card);
 }
-
 }catch(e){
 $('adminMessage').textContent=
 'Unable to load reviews: '+e.message;
@@ -3167,34 +2666,21 @@ $('adminMessage').textContent=
 
 async function reviewContribution(c,approve){
 if(adminBusy||!adminAuthorized)return;
-
 if(!confirm(
-'Confirm '+
-(approve?'approval':'rejection')+
+'Confirm '+(approve?'approval':'rejection')+
 ' for '+c.barcode+'?'
 ))return;
 
 adminBusy=true;
-
 try{
-await userRequest(
-'/rest/v1/rpc/vv_review_contribution',{
+await userRequest('/rest/v1/rpc/vv_review_contribution',{
 method:'POST',
-body:JSON.stringify({
-p_id:c.id,
-p_approve:approve
-})
-}
-);
-
+body:JSON.stringify({p_id:c.id,p_approve:approve})
+});
 $('adminMessage').textContent=
-approve?
-'Contribution approved.':
-'Contribution rejected.';
-
+approve?'Contribution approved.':'Contribution rejected.';
 }catch(e){
-$('adminMessage').textContent=
-'Review failed: '+e.message;
+$('adminMessage').textContent='Review failed: '+e.message;
 }finally{
 adminBusy=false;
 await loadAdminPending();
@@ -3207,51 +2693,32 @@ $('refreshAdmin').onclick=loadAdminPending;
 /* PHOTO UPLOAD */
 
 async function uploadProductPhoto(file,barcode){
-const filename=
-normalizeBarcode(barcode)+
-'-'+Date.now()+'.jpg';
-
-const token=currentUser?
-await userToken():null;
-
+const filename=normalizeBarcode(barcode)+'-'+Date.now()+'.jpg';
+const token=currentUser?await userToken():null;
 const response=await fetch(
-SUPABASE_URL+
-'/storage/v1/object/product-images/'+
+SUPABASE_URL+'/storage/v1/object/product-images/'+
 encodeURIComponent(filename),{
 method:'POST',
 headers:{
 'apikey':SUPABASE_KEY,
-...(token?{
-Authorization:'Bearer '+token
-}:{}),
+...(token?{Authorization:'Bearer '+token}:{}),
 'Content-Type':'image/jpeg',
 'x-upsert':'false'
 },
 body:file
 }
 );
-
-if(!response.ok)
-throw Error(await responseError(response));
-
+if(!response.ok)throw Error(await responseError(response));
 return SUPABASE_URL+
 '/storage/v1/object/public/product-images/'+
 encodeURIComponent(filename);
 }
 
-async function submitContribution(
-type,barcode,imageUrl,ingredients
-){
-if(!currentUser)
-throw Error('Sign in to earn rewards.');
+async function submitContribution(type,barcode,imageUrl,ingredients){
+if(!currentUser)throw Error('Sign in to earn rewards.');
+if(adminAuthorized)throw Error('Administrators do not earn rewards.');
 
-if(adminAuthorized)
-throw Error(
-'Administrators do not earn rewards.'
-);
-
-return userRequest(
-'/rest/v1/rpc/vv_submit_contribution',{
+return userRequest('/rest/v1/rpc/vv_submit_contribution',{
 method:'POST',
 body:JSON.stringify({
 p_barcode:barcode,
@@ -3264,48 +2731,29 @@ type==='ingredients'?
 p_image_url:imageUrl||null,
 p_ingredients:ingredients||null
 })
-}
-);
+});
 }
 
 /* SAVE SCAN */
 
 $('save').onclick=async()=>{
 if(savingContribution)return;
+if(!lastResult)return alert('Verify ingredients first.');
+if(!validBarcode(currentBarcode))return alert('Scan a barcode first.');
+if(ocrRejected)return alert('Correct unreadable ingredients first.');
 
-if(!lastResult){
-return alert('Verify ingredients first.');
+if(!verifiedByPackage||!$('confirmed').checked){
+return alert('Confirm that the ingredients match the physical package first.');
 }
 
-if(!validBarcode(currentBarcode)){
-return alert('Scan a barcode first.');
-}
+const fresh=classify($('ingredients').value);
 
-if(ocrRejected){
-return alert('Correct unreadable ingredients first.');
+if(fresh.status==='Needs Verification'){
+return alert('The ingredient list is not reliable enough to save.');
 }
-
-if(!verifiedByPackage||
-!$('confirmed').checked){
-return alert(
-'Confirm that the ingredients match the physical package first.'
-);
-}
-
-if(identityConflict){
-$('saveMessage').textContent=
-'❌ Conflicting product identity. Administrator review is required before this barcode can be saved.';
-return;
-}
-
-const fresh=classify(
-$('ingredients').value
-);
 
 if(fresh.status!==lastResult.status){
-return alert(
-'Ingredients changed. Verify them again.'
-);
+return alert('Ingredients changed. Verify them again.');
 }
 
 savingContribution=true;
@@ -3313,30 +2761,26 @@ $('save').disabled=true;
 $('saveMessage').textContent='Saving…';
 
 try{
-if(currentUser)
-await checkAdminAccess();
+if(currentUser)await checkAdminAccess();
 
 const found=await findCloudRecord(
 currentBarcode,!!currentUser
 );
-
 if(found.error)throw Error(found.error);
 
 const existing=found.record;
-
-const ingredients=clean(
-$('ingredients').value
-);
-
-const brand=displayBrand(
-$('brand').value
-);
-
-const name=clean(
-$('productName').value
-);
-
+const ingredients=clean($('ingredients').value);
+const brand=displayBrand($('brand').value);
+const name=clean($('productName').value);
 const newPhoto=!!selectedPhotoFile;
+
+if(!name||!brand){
+throw Error('Enter the correct product name and brand before saving.');
+}
+
+if(identityConflict&&!adminAuthorized){
+throw Error('Product identity conflict requires administrator review.');
+}
 
 const baseline=contributionBaseline||{
 ingredients:originalIngredients,
@@ -3354,37 +2798,24 @@ let uploadedPhoto='';
 
 if(existing&&!adminAuthorized){
 if(!changed){
-$('saveMessage').textContent=
-'✅ Already saved. No changes needed.';
+$('saveMessage').textContent='✅ Already saved. No changes needed.';
 return;
 }
-
 if(!currentUser){
-throw Error(
-'Sign in to submit corrections to an existing product.'
-);
+throw Error('Sign in to submit corrections to an existing product.');
 }
 
 let type='correction';
-
-if(newPhoto&&!existing.image_url)
-type='product_photo';
-else if(ingredients&&!existing.ingredients)
-type='ingredients';
+if(newPhoto&&!existing.image_url)type='product_photo';
+else if(ingredients&&!existing.ingredients)type='ingredients';
 
 if(newPhoto){
-uploadedPhoto=await uploadProductPhoto(
-selectedPhotoFile,currentBarcode
-);
+uploadedPhoto=await uploadProductPhoto(selectedPhotoFile,currentBarcode);
 }
 
-await submitContribution(
-type,currentBarcode,uploadedPhoto,ingredients
-);
-
+await submitContribution(type,currentBarcode,uploadedPhoto,ingredients);
 $('saveMessage').textContent=
 '✅ Contribution submitted. Points pending approval.';
-
 await loadRewards();
 return;
 }
@@ -3407,62 +2838,38 @@ payload.image_url=uploadedPhoto;
 
 if(existing){
 if(!adminAuthorized){
-throw Error(
-'Administrator approval required.'
-);
+throw Error('Administrator approval required.');
 }
 
 const patch={...payload};
 delete patch.barcode;
 
 const saved=await userRequest(
-'/rest/v1/products?id=eq.'+
-encodeURIComponent(existing.id),{
+'/rest/v1/products?id=eq.'+encodeURIComponent(existing.id),{
 method:'PATCH',
-headers:{
-Prefer:'return=representation'
-},
+headers:{Prefer:'return=representation'},
 body:JSON.stringify(patch)
 }
 );
 
-if(!saved?.length){
-throw Error(
-'Database update not confirmed.'
-);
-}
-
+if(!saved?.length)throw Error('Database update not confirmed.');
 rememberBaseline(saved[0]);
 
 }else{
-if(!newPhoto&&
-/^https:\/\//.test(currentPhoto)){
+if(!newPhoto&&/^https:\/\//.test(currentPhoto)){
 payload.image_url=currentPhoto;
 }
 
-Object.assign(
-payload,nutritionPayload()
-);
+Object.assign(payload,nutritionPayload());
 
-const request=currentUser?
-userRequest:apiRequest;
-
-const saved=await request(
-'/rest/v1/products',{
+const request=currentUser?userRequest:apiRequest;
+const saved=await request('/rest/v1/products',{
 method:'POST',
-headers:{
-Prefer:'return=representation'
-},
+headers:{Prefer:'return=representation'},
 body:JSON.stringify(payload)
-}
-);
+});
 
-if(!saved?.length){
-throw Error(
-'Database insert not confirmed.'
-);
-}
-
+if(!saved?.length)throw Error('Database insert not confirmed.');
 rememberBaseline(saved[0]);
 
 if(currentUser&&!adminAuthorized&&changed){
@@ -3474,36 +2881,27 @@ currentBarcode,
 uploadedPhoto,
 ingredients
 );
-
 await loadRewards();
-
 }catch(e){
 $('saveMessage').textContent=
-'Product saved, but reward submission failed: '+
-e.message;
+'Product saved, but reward submission failed: '+e.message;
 return;
 }
 }
 }
 
 if(uploadedPhoto){
-showPhoto(
-uploadedPhoto,
-'Supabase cloud picture'
-);
+showPhoto(uploadedPhoto,'Supabase cloud picture');
 releaseSelectedPhoto();
 }
 
-$('saveMessage').textContent=
-'✅ Saved successfully to Supabase.';
+$('saveMessage').textContent='✅ Saved successfully to Supabase.';
 
 }catch(e){
-$('saveMessage').textContent=
-'❌ Save failed: '+e.message;
+$('saveMessage').textContent='❌ Save failed: '+e.message;
 }finally{
 savingContribution=false;
 $('save').disabled=false;
-
 $('save').textContent=adminAuthorized?
 '💾 Save Scan — Administrator':
 '💾 Save Scan / Submit Contribution';
@@ -3513,43 +2911,26 @@ $('save').textContent=adminAuthorized?
 /* AUTH RETURN */
 
 async function handleAuthReturn(){
-const hash=new URLSearchParams(
-location.hash.slice(1)
-);
-
+const hash=new URLSearchParams(location.hash.slice(1));
 const access=hash.get('access_token');
 const refresh=hash.get('refresh_token');
-
 if(!access||!refresh)return;
 
-history.replaceState(
-null,'',
-location.pathname+location.search
-);
+history.replaceState(null,'',location.pathname+location.search);
 
-const response=await fetch(
-SUPABASE_URL+'/auth/v1/user',{
+const response=await fetch(SUPABASE_URL+'/auth/v1/user',{
 headers:headers(access)
-}
-);
-
-if(!response.ok){
-throw Error(
-await responseError(response)
-);
-}
+});
+if(!response.ok)throw Error(await responseError(response));
 
 const user=await response.json();
-const expires=Number(
-hash.get('expires_in')
-)||3600;
+const expires=Number(hash.get('expires_in'))||3600;
 
 saveSession({
 access_token:access,
 refresh_token:refresh,
 expires_in:expires,
-expires_at:
-Math.floor(Date.now()/1000)+expires,
+expires_at:Math.floor(Date.now()/1000)+expires,
 user
 });
 
@@ -3557,7 +2938,6 @@ if(hash.get('type')==='recovery'){
 $('passwordPanel').style.display='block';
 return;
 }
-
 await initializeSignedInAccount();
 }
 
@@ -3566,11 +2946,9 @@ await initializeSignedInAccount();
 window.addEventListener('pagehide',()=>{
 stopCamera();
 releaseSelectedPhoto();
-
 if(photoBitmap){
 try{photoBitmap.close()}catch(e){}
 }
-
 if(ocrWorker){
 ocrWorker.terminate().catch(()=>{});
 }
@@ -3588,11 +2966,9 @@ await handleAuthReturn();
 await restoreAuth();
 }
 }catch(e){
-$('authMessage').textContent=
-'Authentication: '+e.message;
+$('authMessage').textContent='Authentication: '+e.message;
 }
 })();
-
 </script>
 </body>
 </html>
