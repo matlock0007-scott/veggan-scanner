@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -103,21 +102,16 @@ video{width:100%;max-height:340px;background:#111;border-radius:12px}
 #lookupSources{background:#f1f7f2;border-radius:10px;padding:12px;margin:10px 0;font-size:13px;display:none}
 #lookupProgress{font-size:13px;color:#426755;margin:10px 0}
 #retryLookup{display:none}
-
-/* DISPLAY CLEANUP — KEEP ALL LOOKUP FUNCTIONALITY */
-#scannerHint,
-#testingNotice,
-label[for="productCategory"],
-#productCategory,
-#productCategoryDisplay {
-display:none!important;
-}
+#identityWarning{display:none;background:#fff0c5;border:2px solid #d7a72b;border-radius:12px;padding:14px;margin:12px 0;overflow-wrap:anywhere}
+#identityWarning strong{display:block;margin-bottom:7px}
+#identityWarning p{margin:7px 0}
+#identityWarning button{margin-top:10px}
+#scannerHint,#testingNotice,label[for="productCategory"],#productCategory,#productCategoryDisplay{display:none!important}
 </style>
 </head>
 <body>
 <header>
 <h1>🌱 Verified Vegan</h1>
-
 <p>Vegans, Know What's in Your Products!</p>
 <p>Free scanning • Independent results • For the animals</p>
 </header>
@@ -126,7 +120,7 @@ display:none!important;
 <section id="scannerSection">
 <div id="scannerView">
 <h2>📷 Scan Any Product Barcode</h2>
-<p id="scannerHint">Food, beverages, cosmetics, toothpaste, shampoo, household cleaners, pet products, and general retail items.</p>
+<p id="scannerHint">Scan a product barcode.</p>
 <button id="startCamera">📷 Scan Barcode</button>
 <div id="cameraPanel">
 <video id="video" autoplay muted playsinline></video>
@@ -139,9 +133,7 @@ display:none!important;
 <input id="barcode" inputmode="numeric" autocomplete="off" placeholder="Barcode number">
 <button id="lookup">Look Up Product</button>
 </div>
-<div id="testingNotice">
-🌍 Worldwide product lookup: Supabase, Open Food Facts, Open Beauty Facts, Open Products Facts, Open Pet Food Facts, Open Facts universal search, and UPCitemdb fallback when available. Commercial services requiring API keys are not connected.
-</div>
+<div id="testingNotice">Worldwide product lookup.</div>
 </div>
 
 <div id="productDetails">
@@ -152,6 +144,14 @@ display:none!important;
 <p id="productSourceDisplay"></p>
 <div id="lookupSources"></div>
 <p id="lookupProgress"></p>
+
+<div id="identityWarning" role="alert">
+<strong>⚠️ Product Identity Conflict</strong>
+<p id="identityWarningText"></p>
+<button id="showConflictDetails" class="secondary">View Conflicting Information</button>
+<div id="conflictDetails" style="display:none"></div>
+</div>
+
 <div class="productTop">
 <div class="photoBox">
 <img id="productPhoto" alt="Product packaging" hidden>
@@ -326,7 +326,10 @@ Hold the camera straight, fill the picture with the ingredient label, avoid glar
 <script>
 'use strict';
 
-/* VERIFIED VEGAN — WORLDWIDE MULTI-SOURCE LOOKUP */
+/* VERIFIED VEGAN — COMPLETE INDEX.HTML
+   Supabase-first lookup, identity-conflict protection,
+   camera scanning, ingredient OCR, rewards and admin.
+*/
 
 const SUPABASE_URL='https://bluaqqfcsjudoiaxkbjn.supabase.co';
 const SUPABASE_KEY='sb_publishable_ed4oFchBc40deLLF5Ws9CQ_MVz_sxog';
@@ -354,19 +357,7 @@ const PRODUCT_SOURCES=[
 {name:'Open Pet Food Facts',host:'world.openpetfoodfacts.org',category:'pet'}
 ];
 
-/*
-UPCitemdb is a limited, public trial lookup.
-It is a fallback, not an unlimited service.
-Commercial barcode APIs require separate authorized credentials.
-*/
-
 const UPCITEMDB_URL='https://api.upcitemdb.com/prod/trial/lookup?upc=';
-
-/*
-Exact-barcode identification fallback for a confirmed test product.
-This record identifies the product only.
-It does not assert ingredients, vegan status, or certification.
-*/
 
 const VERIFIED_IDENTITIES={
 '083000016455':{
@@ -382,6 +373,11 @@ source:'Verified product identification'
 const COCONUT_BARCODE='850030458001';
 const COCONUT_BRAND='Madly Hadley';
 const COCONUT_PHOTO=SUPABASE_URL+'/storage/v1/object/public/product-images/PXL_20261115_031846467.MP.jpg';
+
+/* The following barcode is monitored for conflicting
+   dairy/non-dairy product identity information.
+   No product identity is hardcoded for it. */
+const CONFLICT_TEST_BARCODE='076840674442';
 
 let productCategory='unknown',productSource='';
 let stream=null,scanActive=false,scannerStarting=false,scannerSession=0;
@@ -399,9 +395,10 @@ let productSession=0,savingContribution=false;
 let adminAuthorized=false,adminBusy=false,adminCheckSerial=0;
 let leaderboardLoading=false;
 let autoSavePromise=null,autoSaveBusy=false;
-let searchEvidence=[];
-let currentLookupMatches=[];
+let searchEvidence=[],currentLookupMatches=[];
 let lookupInProgress=false;
+let identityConflict=false,identityConflictDetails=[];
+let lookupHadCloudError=false;
 
 function setCategory(category,source=''){
 productCategory=CATEGORY_NAMES[category]?category:'unknown';
@@ -450,16 +447,52 @@ $('saveMessage').textContent='';
 function showResult(result){
 lastResult=result;
 setStatus(result.status);
+$('result').style.display='block';
 $('explanation').textContent=result.explanation||'';
+$('caution').textContent=result.caution||'';
 $('reasons').replaceChildren();
 (result.reasons||[]).forEach(reason=>{
 const li=document.createElement('li');
 li.textContent=reason;
 $('reasons').append(li);
 });
-$('caution').textContent=result.caution||'';
-$('result').style.display='block';
 }
+
+function clearIdentityConflict(){
+identityConflict=false;
+identityConflictDetails=[];
+$('identityWarning').style.display='none';
+$('identityWarningText').textContent='';
+$('conflictDetails').replaceChildren();
+$('conflictDetails').style.display='none';
+$('showConflictDetails').textContent='View Conflicting Information';
+}
+
+function flagIdentityConflict(message,details=[]){
+identityConflict=true;
+identityConflictDetails=details;
+$('identityWarning').style.display='block';
+$('identityWarningText').textContent=message;
+clearResult();
+setStatus('Needs Verification');
+$('autoSaveMessage').textContent=
+'Automatic saving paused. Existing Supabase records have not been changed.';
+}
+
+$('showConflictDetails').onclick=()=>{
+const box=$('conflictDetails');
+const open=box.style.display!=='block';
+box.style.display=open?'block':'none';
+$('showConflictDetails').textContent=open?
+'Hide Conflicting Information':'View Conflicting Information';
+if(!open)return;
+box.replaceChildren();
+identityConflictDetails.forEach(d=>{
+const p=document.createElement('p');
+p.textContent=d;
+box.append(p);
+});
+};
 
 function displayBrand(brand,barcode){
 let value=clean(brand);
@@ -511,6 +544,8 @@ ocrRejected=false;
 searchEvidence=[];
 currentLookupMatches=[];
 lookupInProgress=false;
+lookupHadCloudError=false;
+clearIdentityConflict();
 releaseSelectedPhoto();
 resetPhoto();
 $('barcode').value='';
@@ -639,11 +674,9 @@ return text?JSON.parse(text):null;
 function barcodeVariants(barcode){
 const code=String(barcode).replace(/\D/g,'');
 const variants=new Set([code]);
-
 if(code.length===12)variants.add('0'+code);
 if(code.length===13&&code.startsWith('0'))variants.add(code.slice(1));
 if(code.length===14&&code.startsWith('0'))variants.add(code.slice(1));
-
 return [...variants].filter(x=>/^\d{8,14}$/.test(x));
 }
 
@@ -717,7 +750,6 @@ p.images.forEach(url=>add(url,sourceName+' picture'));
 }
 
 const selected=p.selected_images?.front;
-
 if(selected){
 for(const size of ['display','small','thumb']){
 const versions=selected[size]||{};
@@ -726,7 +758,6 @@ add(versions[lang],sourceName+' front picture');
 }
 }
 }
-
 return out;
 }
 
@@ -741,7 +772,6 @@ return (productIngredients(p)?100:0)+
 async function fetchJSON(url,timeout=7000){
 const controller=new AbortController();
 const timer=setTimeout(()=>controller.abort(),timeout);
-
 try{
 const response=await fetch(url,{
 signal:controller.signal,
@@ -757,7 +787,6 @@ function normalizeMatch(product,sourceName,sourceCategory,barcode){
 if(!product||typeof product!=='object')return null;
 
 const reported=String(product.code||product.barcode||product.upc||'').replace(/\D/g,'');
-
 if(reported&&!sameBarcode(reported,barcode))return null;
 
 const p={
@@ -780,50 +809,36 @@ async function fetchSource(barcode,source){
 const data=await fetchJSON(
 'https://'+source.host+'/api/v2/product/'+encodeURIComponent(barcode)+'.json'
 );
-
 if(!data||data.status!==1||!data.product)return null;
-
 return normalizeMatch(data.product,source.name,source.category,barcode);
 }
-
-/* OPEN FACTS UNIVERSAL LOOKUP */
 
 async function fetchUniversalFacts(barcode){
 const data=await fetchJSON(
 'https://world.openfoodfacts.org/api/v3/product/'+
 encodeURIComponent(barcode)+'?product_type=all'
 );
-
 if(!data?.product)return null;
-
 if(data.status==='failure'||data.status===0)return null;
 
 const p=data.product;
-
 const category=detectProductCategory(
 p,
 p.product_type==='beauty'?'beauty':
 p.product_type==='petfood'?'pet':
 p.product_type==='food'?'food':'unknown'
 );
-
 return normalizeMatch(p,'Open Facts Universal',category,barcode);
 }
 
-/* UPCITEMDB PUBLIC TRIAL FALLBACK */
-
 async function fetchUPCItemDB(barcode){
 const data=await fetchJSON(
-UPCITEMDB_URL+encodeURIComponent(barcode),
-8500
+UPCITEMDB_URL+encodeURIComponent(barcode),8500
 );
-
 if(!data||!Array.isArray(data.items)||!data.items.length)return null;
-
 const item=data.items.find(x=>
 sameBarcode(x.upc||x.ean||x.gtin,barcode)
 );
-
 if(!item)return null;
 
 const product={
@@ -835,55 +850,142 @@ description:item.description||'',
 images:Array.isArray(item.images)?item.images:[],
 ingredients_text:''
 };
-
-return normalizeMatch(product,'UPCitemdb', 'unknown',barcode);
+return normalizeMatch(product,'UPCitemdb','unknown',barcode);
 }
-
-/* CONFIRMED PRODUCT IDENTITY FALLBACK */
 
 function fetchVerifiedIdentity(barcode){
 const entry=VERIFIED_IDENTITIES[normalizeBarcode(barcode)];
-
 if(!entry)return null;
-
 return normalizeMatch({
 ...entry,
 code:barcode
 },entry.source,entry.category,barcode);
 }
 
-/* MATCH QUALITY AND CONFLICT SAFETY */
+/* PRODUCT IDENTITY PROTECTION */
+
+function normalizeProductName(value){
+return clean(value).toLowerCase()
+.replace(/[^a-z0-9]+/g,' ')
+.replace(/\s+/g,' ').trim();
+}
+
+function productVariant(name,ingredients=''){
+const n=normalizeProductName(name);
+const t=clean(ingredients);
+
+const nondairy=/\b(non dairy|nondairy|dairy free|plant based|oat milk|oatmilk|almond milk|almondmilk|vegan)\b/i.test(n);
+const dairyIngredients=/\b(?:cream|skim milk|whole milk|milk fat|milkfat|egg yolks?|whey|buttermilk|dairy milk)\b/i.test(t);
+
+if(nondairy&&dairyIngredients)return 'internally-conflicting';
+if(nondairy)return 'non-dairy';
+if(dairyIngredients)return 'dairy';
+return 'unspecified';
+}
+
+function productFamily(name){
+const n=normalizeProductName(name)
+.replace(/\b(non dairy|nondairy|dairy free|plant based|vegan|oat milk|oatmilk|almond milk|almondmilk)\b/g,'')
+.replace(/\b(ice cream|frozen dessert)\b/g,'')
+.replace(/\s+/g,' ').trim();
+return n;
+}
 
 function sameProductIdentity(a,b){
-const an=clean(a.product.product_name).toLowerCase();
-const bn=clean(b.product.product_name).toLowerCase();
+const an=normalizeProductName(a.product.product_name);
+const bn=normalizeProductName(b.product.product_name);
+const ab=normalizeProductName(a.product.brands);
+const bb=normalizeProductName(b.product.brands);
 
-const ab=clean(a.product.brands).toLowerCase();
-const bb=clean(b.product.brands).toLowerCase();
+const af=productFamily(an),bf=productFamily(bn);
+const av=productVariant(an,productIngredients(a.product));
+const bv=productVariant(bn,productIngredients(b.product));
+
+if(av==='internally-conflicting'||bv==='internally-conflicting')return false;
+if(av!==bv&&av!=='unspecified'&&bv!=='unspecified')return false;
 
 const compatibleName=!an||!bn||
-an===bn||
-an.includes(bn)||
-bn.includes(an);
+an===bn||an.includes(bn)||bn.includes(an)||
+(af&&bf&&(af===bf||af.includes(bf)||bf.includes(af)));
 
 const compatibleBrand=!ab||!bb||
-ab===bb||
-ab.includes(bb)||
-bb.includes(ab);
+ab===bb||ab.includes(bb)||bb.includes(ab);
 
 return compatibleName&&compatibleBrand;
+}
+
+function cloudExternalConflict(cloud,match){
+if(!cloud||!match)return false;
+
+const cp={
+product_name:cloud.product_name||'',
+brands:cloud.brand||'',
+ingredients_text:cloud.ingredients||''
+};
+
+const ep=match.product;
+
+const cloudVariant=productVariant(
+cp.product_name,cp.ingredients_text
+);
+const externalVariant=productVariant(
+ep.product_name,productIngredients(ep)
+);
+
+if(cloudVariant==='internally-conflicting'||
+externalVariant==='internally-conflicting')return true;
+
+if(cloudVariant!=='unspecified'&&
+externalVariant!=='unspecified'&&
+cloudVariant!==externalVariant)return true;
+
+const cloudName=normalizeProductName(cp.product_name);
+const externalName=normalizeProductName(ep.product_name);
+const cloudBrand=normalizeProductName(cp.brands);
+const externalBrand=normalizeProductName(ep.brands);
+
+if(cloudBrand&&externalBrand&&
+cloudBrand!==externalBrand&&
+!cloudBrand.includes(externalBrand)&&
+!externalBrand.includes(cloudBrand))return true;
+
+if(cloudName&&externalName){
+const cf=productFamily(cloudName);
+const ef=productFamily(externalName);
+if(cf&&ef&&cf!==ef&&!cf.includes(ef)&&!ef.includes(cf)){
+return true;
+}
+}
+
+return false;
+}
+
+function findIdentityConflicts(cloud,matches){
+const conflicts=[];
+if(!cloud)return conflicts;
+
+for(const match of matches){
+if(cloudExternalConflict(cloud,match)){
+conflicts.push(
+match.sourceName+
+': '+(match.product.product_name||'Unnamed product')+
+' | Brand: '+(match.product.brands||'Unknown')+
+' | Ingredients: '+(productIngredients(match.product)||'Not provided')
+);
+}
+}
+
+return conflicts;
 }
 
 function combineMatches(matches){
 if(!matches.length)return null;
 
 const sorted=[...matches].sort((a,b)=>b.quality-a.quality);
-
 const best=sorted[0];
 const p={...best.product};
 
 const compatible=sorted.filter(x=>sameProductIdentity(best,x));
-
 const ingredientMatch=compatible.find(x=>productIngredients(x.product));
 
 if(!productIngredients(p)&&ingredientMatch)
@@ -901,7 +1003,6 @@ if(match)p.brands=match.product.brands;
 
 if(!extractImages(p,best.sourceName).length){
 const match=compatible.find(x=>extractImages(x.product,x.sourceName).length);
-
 if(match){
 p.image_front_url=match.product.image_front_url||
 match.product.image_url||
@@ -912,18 +1013,16 @@ match.product.images?.[0]||'';
 let category=detectProductCategory(p,best.category);
 
 if(category==='unknown'||category==='other'){
-const match=compatible.find(x=>
-!['unknown','other'].includes(x.category)
-);
+const match=compatible.find(x=>!['unknown','other'].includes(x.category));
 if(match)category=match.category;
 }
 
 const names=new Set(sorted.map(x=>
-clean(x.product.product_name).toLowerCase()
+normalizeProductName(x.product.product_name)
 ).filter(Boolean));
 
 const brands=new Set(sorted.map(x=>
-clean(x.product.brands).toLowerCase()
+normalizeProductName(x.product.brands)
 ).filter(Boolean));
 
 return {
@@ -949,7 +1048,7 @@ requests.push(fetchSource(code,source));
 requests.push(fetchUniversalFacts(code));
 }
 
-progress('Searching Open Facts worldwide databases…');
+progress('Searching worldwide product databases…');
 
 const results=await Promise.allSettled(requests);
 
@@ -958,42 +1057,30 @@ let found=results
 .map(r=>r.value);
 
 const confirmed=fetchVerifiedIdentity(barcode);
-
 if(confirmed)found.push(confirmed);
 
 const hasGoodIdentity=found.some(x=>
-clean(x.product.product_name)&&
-clean(x.product.brands)
+clean(x.product.product_name)&&clean(x.product.brands)
 );
 
 if(!hasGoodIdentity){
 progress('Checking additional international retail barcode sources…');
-
 for(const code of variants){
 const extra=await fetchUPCItemDB(code);
-
-if(extra){
-found.push(extra);
-break;
-}
+if(extra){found.push(extra);break}
 }
 }
 
-found=found.filter(x=>
-sameBarcode(x.barcode,barcode)
-);
+found=found.filter(x=>sameBarcode(x.barcode,barcode));
 
 const dedup=new Map();
-
 for(const match of found){
 const key=match.sourceName+'|'+normalizeBarcode(match.barcode);
-
 if(!dedup.has(key)||dedup.get(key).quality<match.quality)
 dedup.set(key,match);
 }
 
-found=[...dedup.values()]
-.sort((a,b)=>b.quality-a.quality);
+found=[...dedup.values()].sort((a,b)=>b.quality-a.quality);
 
 return {
 best:found[0]||null,
@@ -1044,7 +1131,6 @@ next();
 img.onload=()=>{
 if(done||request!==photoRequest)return;
 if(img.naturalWidth<20){fail();return}
-
 done=true;
 clearTimeout(timer);
 img.hidden=false;
@@ -1062,7 +1148,6 @@ next();
 
 function displayProductImages(barcode,cloudUrl='',matches=[]){
 resetPhoto();
-
 const candidates=[];
 
 if(/^https:\/\//i.test(cloudUrl))
@@ -1075,16 +1160,13 @@ for(const match of matches){
 candidates.push(...extractImages(match.product,match.sourceName));
 }
 
-const unique=[];
-const seen=new Set();
-
+const unique=[],seen=new Set();
 for(const candidate of candidates){
 if(!seen.has(candidate.url)){
 seen.add(candidate.url);
 unique.push(candidate);
 }
 }
-
 showPhotoCandidates(unique);
 }
 
@@ -1115,7 +1197,6 @@ try{
 const bitmap=await createImageBitmap(file);
 const canvas=document.createElement('canvas');
 const scale=Math.min(1,1200/Math.max(bitmap.width,bitmap.height));
-
 canvas.width=Math.round(bitmap.width*scale);
 canvas.height=Math.round(bitmap.height*scale);
 canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
@@ -1124,17 +1205,13 @@ bitmap.close();
 const blob=await new Promise(resolve=>
 canvas.toBlob(resolve,'image/jpeg',.78)
 );
-
 if(!blob)throw Error('Image conversion failed.');
 
 releaseSelectedPhoto();
-
 selectedPhotoFile=new File([blob],'product.jpg',{type:'image/jpeg'});
 selectedPhotoURL=URL.createObjectURL(blob);
-
 showPhoto(selectedPhotoURL,'Temporary preview');
 $('frontMessage').textContent='Picture ready. Tap Save Scan.';
-
 }catch(e){
 $('frontMessage').textContent=e.message;
 }
@@ -1143,7 +1220,7 @@ $('frontMessage').textContent=e.message;
 /* INGREDIENT CLASSIFICATION */
 
 const ANIMAL_RULES=[
-['Milk or dairy',/\b(milk|whey|casein|caseinate|lactose|lactalbumin|buttermilk|cheese|yogurt|yoghurt|ghee|milkfat|milk solids|butter oil|milk powder|cream powder)\b/i],
+['Milk or dairy',/\b(milk|whey|casein|caseinate|lactose|lactalbumin|buttermilk|cheese|yogurt|yoghurt|ghee|milkfat|milk fat|milk solids|butter oil|milk powder|cream powder|skim milk|whole milk|cream|butter)\b/i],
 ['Egg',/\b(egg|eggs|albumen|ovalbumin|egg whites?|egg yolks?)\b/i],
 ['Honey or bee products',/\b(honey|royal jelly|propolis|beeswax|cera alba|e901)\b/i],
 ['Gelatin',/\b(gelatin|gelatine|isinglass)\b/i],
@@ -1173,7 +1250,6 @@ const UNCERTAIN_NONFOOD=/\b(glycerin|glycerine|glycerol|stearic acid|stearate|gl
 function splitPackageText(raw){
 const source=String(raw||'').replace(/\r/g,'\n');
 const match=/\bingredients?\s*[:\-]?\s*/i.exec(source);
-
 let text=match?source.slice(match.index+match[0].length):source;
 
 const stops=[
@@ -1187,7 +1263,6 @@ const stops=[
 ];
 
 let end=text.length;
-
 for(const re of stops){
 const m=re.exec(text);
 if(m&&m.index<end)end=m.index;
@@ -1202,6 +1277,15 @@ mayContain:clean(source.match(/\bmay\s+(?:also\s+)?contain\s*:?\s+([^\n.]{2,120}
 };
 }
 
+function removePlantIngredientNames(text){
+return text
+.replace(/\b(?:almond|oat|soy|soya|coconut|rice|cashew|pea|hemp|flax|hazelnut|macadamia)\s+milk\b/gi,'plant beverage')
+.replace(/\b(?:almond|oat|soy|soya|coconut|cashew)\s+(?:cream|creamer|butter|yogurt|yoghurt|cheese)\b/gi,'plant alternative')
+.replace(/\b(?:cocoa|shea|peanut|almond|cashew|apple)\s+butter\b/gi,'plant fat')
+.replace(/\bcream of tartar\b/gi,'tartar')
+.replace(/\bcreamed coconut\b/gi,'coconut');
+}
+
 function classify(raw,category=productCategory){
 const t=splitPackageText(raw).ingredients;
 
@@ -1212,48 +1296,56 @@ explanation:'No readable ingredient list is available.',
 caution:'Photograph or enter the complete ingredients.'
 };
 
-if(category==='unknown')return {
-status:'Needs Verification',
-reasons:['Product category has not been identified.'],
-explanation:'Select the correct product category before verifying.',
-caution:'An unidentified product cannot be confirmed vegan.'
-};
-
-const nonfood=category!=='food';
+const nonfood=category!=='food'&&category!=='unknown';
 const rules=nonfood?[...ANIMAL_RULES,...NONFOOD_RULES]:ANIMAL_RULES;
+const screened=removePlantIngredientNames(t);
 
 const reasons=[...new Set(
-rules.filter(r=>r[1].test(t)).map(r=>r[0])
+rules.filter(r=>r[1].test(screened)).map(r=>r[0])
 )];
 
-const uncertain=nonfood&&UNCERTAIN_NONFOOD.test(t);
+if(reasons.length){
+return {
+status:'Not Vegan',
+reasons,
+explanation:'Animal-derived ingredients detected.',
+caution:'The result is based on the ingredient list shown. Confirm that it belongs to the scanned product.'
+};
+}
 
-const status=reasons.length?'Not Vegan':
-uncertain?'Needs Verification':'Vegan';
+if(category==='unknown'){
+return {
+status:'Needs Verification',
+reasons:['Product type has not been identified.'],
+explanation:'The ingredient list has no detected animal terms, but product identification is incomplete.',
+caution:'Check the package before assigning a final result.'
+};
+}
+
+if(nonfood&&UNCERTAIN_NONFOOD.test(t)){
+return {
+status:'Needs Verification',
+reasons:['Ingredient origin requires manufacturer verification.'],
+explanation:'Some ingredients may have plant, animal, or synthetic origins.',
+caution:'Animal testing and cruelty-free status have not been verified.'
+};
+}
 
 return {
-status,
-reasons:reasons.length?reasons:
-uncertain?['Ingredient origin requires manufacturer verification.']:
-['No explicitly animal-derived ingredients detected.'],
-explanation:reasons.length?
-'Animal-derived ingredients detected.':
-uncertain?
-'One or more ingredients may have animal, plant, or synthetic origins.':
-'No explicitly animal-derived ingredients found in this screening.',
+status:'Vegan',
+reasons:['No explicitly animal-derived ingredients detected.'],
+explanation:'Vegan by ingredient-text screening.',
 caution:nonfood?
-'Animal testing and cruelty-free status have not been verified. A Vegan screening result is not manufacturer certification.':
-'Ingredient screening is not manufacturer certification.'
+'Animal testing and cruelty-free status have not been verified.':
+'Ingredient screening is not manufacturer certification. Some ingredient origins and processing aids may require confirmation.'
 };
 }
 
 function updateAllergens(){
 $('containsText').textContent=
 allergens.contains?'Contains: '+allergens.contains:'';
-
 $('mayContainText').textContent=
 allergens.mayContain?'May contain: '+allergens.mayContain:'';
-
 $('allergenPanel').style.display=
 allergens.contains||allergens.mayContain?'block':'none';
 }
@@ -1268,7 +1360,6 @@ return parsed.ingredients;
 
 function showNutrition(n){
 currentNutrition=n||{};
-
 const fields=[
 ['Calories',n?.['energy-kcal_100g'],'kcal'],
 ['Protein',n?.proteins_100g,'g'],
@@ -1303,7 +1394,6 @@ salt_100g:p.salt_100g
 
 function nutritionPayload(n=currentNutrition){
 const result={};
-
 const keys={
 protein_100g:'proteins_100g',
 carb_100g:'carbohydrates_100g',
@@ -1315,13 +1405,10 @@ salt_100g:'salt_100g'
 
 for(const [key,source] of Object.entries(keys)){
 const value=n?.[source];
-
 result[key]=value!=null&&value!==''&&
 Number.isFinite(Number(value))?Number(value):null;
 }
-
 result.serving_size=currentServingSize||null;
-
 return result;
 }
 
@@ -1338,9 +1425,7 @@ const rows=await request(
 '/rest/v1/products?barcode=eq.'+
 encodeURIComponent(code)+'&select=*&limit=100'
 );
-
 records.push(...rows);
-if(rows.length)break;
 }
 
 const matches=records.filter(p=>sameBarcode(p.barcode,barcode));
@@ -1350,14 +1435,16 @@ const score=p=>
 (clean(p.ingredients)?10:0)+
 (clean(p.image_url)?5:0)+
 (clean(p.product_name)?2:0);
-
 return score(b)-score(a);
 });
 
-return {record:matches[0]||null,error:null};
-
+return {
+record:matches[0]||null,
+records:matches,
+error:null
+};
 }catch(e){
-return {record:null,error:e.message};
+return {record:null,records:[],error:e.message};
 }
 }
 
@@ -1380,7 +1467,6 @@ $('productName').value=p.product_name||'';
 displayBrand(p.brand,$('barcode').value);
 
 const ingredients=loadIngredients(p.ingredients||'');
-
 originalIngredients=ingredients;
 originalStatus=normalizeStatus(p.vegan_status);
 ingredientSource='database';
@@ -1397,14 +1483,12 @@ categories:p.category||''
 
 setCategory(category,'Supabase cloud');
 
-if(ingredients&&category!=='unknown'){
+if(ingredients){
 showResult(classify(ingredients,category));
 $('lookupMessage').textContent='Product loaded from Supabase.';
 }else{
 setStatus('Needs Verification');
-$('lookupMessage').textContent=ingredients?
-'Product found. Select its category and verify ingredients.':
-'Product found, but ingredients are missing.';
+$('lookupMessage').textContent='Product found, but ingredients are missing.';
 }
 
 $('autoSaveMessage').textContent='Already saved in Supabase.';
@@ -1413,14 +1497,14 @@ $('autoSaveMessage').textContent='Already saved in Supabase.';
 /* AUTOMATIC SAVE */
 
 async function automaticCloudSave(barcode,p,category,sourceName,serial){
-if(!p||!p.product_name&&!p.brands&&!productIngredients(p))return;
+if(!p||(!p.product_name&&!p.brands&&!productIngredients(p)))return;
+if(identityConflict)return;
 
 autoSaveBusy=true;
 $('autoSaveMessage').textContent='Saving new product to Supabase…';
 
 try{
 const existing=await findCloudRecord(barcode);
-
 if(existing.error)throw Error(existing.error);
 
 if(existing.record){
@@ -1435,7 +1519,6 @@ return;
 
 const ingredients=splitPackageText(productIngredients(p)).ingredients;
 const result=classify(ingredients,category);
-
 const image=extractImages(p,sourceName)[0]?.url||null;
 
 const payload={
@@ -1455,6 +1538,8 @@ for(const key of [
 'sugar_100g','fiber_100g','salt_100g','serving_size'
 ])payload[key]=null;
 }
+
+if(identityConflict||serial!==lookupNumber)return;
 
 const saved=await apiRequest('/rest/v1/products',{
 method:'POST',
@@ -1488,20 +1573,14 @@ const found=lookup.combined;
 const p=found.product;
 
 setCategory(found.category,found.sourceName);
-
 $('productName').value=p.product_name||'';
 displayBrand(p.brands,barcode);
 
 const nutrition=found.category==='food'?(p.nutriments||{}):{};
 showNutrition(nutrition);
-
 currentServingSize=found.category==='food'?(p.serving_size||''):'';
 
-displayProductImages(
-barcode,
-cloud?.image_url||'',
-lookup.all
-);
+displayProductImages(barcode,cloud?.image_url||'',lookup.all);
 
 const ingredients=loadIngredients(
 cloud?.ingredients||productIngredients(p)
@@ -1511,7 +1590,6 @@ originalIngredients=ingredients;
 ingredientSource='database';
 
 $('lookupSources').style.display='block';
-
 $('lookupSources').textContent=
 'Matching barcode sources: '+
 lookup.all.map(x=>x.sourceName)
@@ -1519,23 +1597,21 @@ lookup.all.map(x=>x.sourceName)
 
 if(found.conflictingNames||found.conflictingBrands){
 $('lookupSources').textContent+=
-' Some source details conflict. Check the product package.';
+' Some source details differ. Check the product package.';
 }
 
-if(ingredients&&found.category!=='unknown'){
+if(ingredients){
 showResult(classify(ingredients,found.category));
 $('lookupMessage').textContent=
 'Product found. Review the ingredient information.';
 }else{
 setStatus('Needs Verification');
-
-$('lookupMessage').textContent=ingredients?
-'Product found. Select its category and verify the ingredients.':
+$('lookupMessage').textContent=
 'Product identified, but no ingredient list is available. Take an ingredient picture.';
 }
 }
 
-/* EXPANDED WORLDWIDE LOOKUP */
+/* SUPABASE-FIRST LOOKUP WITH CONFLICT CHECK */
 
 async function lookupProduct(){
 const barcode=$('barcode').value.trim();
@@ -1546,7 +1622,6 @@ return;
 }
 
 if(lookupInProgress)return;
-
 lookupInProgress=true;
 
 const serial=++lookupNumber;
@@ -1554,6 +1629,7 @@ const session=productSession;
 
 stopCamera();
 clearResult();
+clearIdentityConflict();
 resetPhoto();
 releaseSelectedPhoto();
 
@@ -1575,6 +1651,7 @@ ingredientSource='none';
 searchEvidence=[];
 currentLookupMatches=[];
 autoSavePromise=null;
+lookupHadCloudError=false;
 
 showNutrition({});
 setCategory('unknown');
@@ -1584,37 +1661,19 @@ showProductView();
 const isCurrent=()=>serial===lookupNumber&&session===productSession;
 
 try{
-const cloud=await findCloudRecord(barcode,!!currentUser);
-
+const cloud=await findCloudRecord(barcode);
 if(!isCurrent())return;
 
 if(cloud.error){
+lookupHadCloudError=true;
 $('autoSaveMessage').textContent=
 'Cloud lookup unavailable: '+cloud.error;
 }
 
 if(cloud.record){
 loadCloudRecord(cloud.record);
-
-/*
-If a saved record is incomplete, continue searching.
-This prevents an incomplete cloud record from blocking
-better external product identification.
-*/
-
-const p=cloud.record;
-
-const category=detectProductCategory({
-product_name:p.product_name,
-categories:p.category||''
-},'unknown');
-
-if(p.ingredients&&p.product_name&&category!=='unknown'){
-return;
-}
-
 $('lookupMessage').textContent=
-'Checking additional sources for missing product information…';
+'Checking product identity against additional sources…';
 }
 
 const lookup=await fetchAllProducts(
@@ -1628,35 +1687,70 @@ if(!isCurrent())return;
 
 searchEvidence=lookup.all;
 currentLookupMatches=lookup.all;
-
 $('lookupProgress').textContent='';
 
-if(!lookup.best){
-if(!cloud.record){
-setCategory('unknown');
-setStatus('Needs Verification');
+const conflicts=findIdentityConflicts(
+cloud.record,lookup.all
+);
 
-$('lookupMessage').textContent=
-'No matching product record found in accessible databases. Add the product name, choose its category, and photograph its ingredients.';
+const duplicateConflicts=[];
 
-displayProductImages(barcode);
+if(cloud.records?.length>1){
+const base=cloud.records[0];
+
+for(const row of cloud.records.slice(1)){
+const match={
+product:{
+product_name:row.product_name||'',
+brands:row.brand||'',
+ingredients_text:row.ingredients||''
+}
+};
+
+if(cloudExternalConflict(base,match)){
+duplicateConflicts.push(
+'Supabase record '+String(row.id)+
+': '+(row.product_name||'Unnamed product')+
+' | Ingredients: '+(row.ingredients||'Not provided')
+);
+}
+}
 }
 
+if(conflicts.length||duplicateConflicts.length){
+if(cloud.record)loadCloudRecord(cloud.record);
+
+flagIdentityConflict(
+'The same barcode has conflicting product information. The app cannot safely decide whether the dairy or non-dairy information belongs to this package. No database record has been overwritten.',
+[
+'Barcode: '+barcode,
+...(cloud.record?[
+'Supabase: '+(cloud.record.product_name||'Unnamed product'),
+'Supabase ingredients: '+(cloud.record.ingredients||'Not provided')
+]:[]),
+...conflicts,
+...duplicateConflicts
+]
+);
+
+$('lookupMessage').textContent=
+'Check the exact package and correct the conflicting record through administrator review.';
 $('retryLookup').style.display='block';
 return;
 }
 
-const found=lookup.combined;
-const p=found.product;
-
 if(cloud.record){
 const saved=cloud.record;
 
+if(lookup.combined){
+const found=lookup.combined;
+
+const external=found.product;
 const merged={
-...p,
-product_name:saved.product_name||p.product_name,
-brands:saved.brand||p.brands,
-ingredients_text:saved.ingredients||productIngredients(p)
+...external,
+product_name:saved.product_name||external.product_name,
+brands:saved.brand||external.brands,
+ingredients_text:saved.ingredients||productIngredients(external)
 };
 
 const mergedLookup={
@@ -1664,33 +1758,72 @@ const mergedLookup={
 combined:{
 ...found,
 product:merged,
-category:detectProductCategory(
-merged,
-found.category
-)
+category:detectProductCategory(merged,found.category)
 }
 };
 
 displayLookupResult(mergedLookup,barcode,saved);
-
+rememberBaseline(saved);
+loadedCloudId=saved.id;
+cloudRecordExists=true;
+$('autoSaveMessage').textContent=
+'Existing Supabase record preserved.';
 }else{
-displayLookupResult(lookup,barcode);
+loadCloudRecord(saved);
+}
 
-if(!cloud.error){
-autoSavePromise=automaticCloudSave(
-barcode,p,found.category,found.sourceName,serial
+return;
+}
+
+if(!lookup.best){
+setCategory('unknown');
+setStatus('Needs Verification');
+
+$('lookupMessage').textContent=
+'No matching product found. Add the product name and photograph its ingredients.';
+displayProductImages(barcode);
+$('retryLookup').style.display='block';
+return;
+}
+
+const found=lookup.combined;
+
+if(found.conflictingNames||found.conflictingBrands){
+const incompatible=lookup.all.filter(x=>
+!sameProductIdentity(lookup.best,x)
 );
 
-await autoSavePromise;
+if(incompatible.length){
+displayLookupResult(lookup,barcode);
+
+flagIdentityConflict(
+'Multiple databases disagree about which product belongs to this barcode. Check the physical package before saving.',
+lookup.all.map(x=>
+x.sourceName+': '+
+(x.product.product_name||'Unnamed product')+
+' | '+(x.product.brands||'Unknown brand')+
+' | '+(productIngredients(x.product)||'Ingredients unavailable')
+)
+);
+
+return;
 }
+}
+
+displayLookupResult(lookup,barcode);
+
+if(!lookupHadCloudError){
+autoSavePromise=automaticCloudSave(
+barcode,found.product,found.category,
+found.sourceName,serial
+);
+await autoSavePromise;
 }
 
 }catch(e){
 if(!isCurrent())return;
-
 setStatus('Needs Verification');
 $('lookupMessage').textContent='Lookup failed: '+e.message;
-
 }finally{
 if(isCurrent()){
 lookupInProgress=false;
@@ -1700,13 +1833,12 @@ $('lookupProgress').textContent='';
 }
 
 $('lookup').onclick=lookupProduct;
-
 $('retryLookup').onclick=async()=>{
 if(lookupInProgress)return;
 await lookupProduct();
 };
 
-/* CAMERA — PRESERVED NATIVE DETECTOR */
+/* CAMERA */
 
 function stopCamera(){
 scanActive=false;
@@ -1721,11 +1853,8 @@ stream=null;
 }
 
 const video=$('video');
-
 try{video.pause()}catch(e){}
-
 video.srcObject=null;
-
 $('cameraPanel').style.display='none';
 $('startCamera').disabled=false;
 $('startCamera').textContent='📷 Scan Barcode';
@@ -1742,15 +1871,16 @@ return;
 }
 
 if(!('BarcodeDetector' in window)){
-alert('Built-in barcode detection unavailable. Use manual entry.');
 $('manualEntry').style.display='block';
+$('manualToggle').setAttribute('aria-expanded','true');
+$('manualToggle').textContent='Hide Manual Barcode Entry';
+$('scannerFeedback').textContent=
+'Built-in barcode detector unavailable. Enter barcode manually.';
 return;
 }
 
 scannerStarting=true;
-
 const session=++scannerSession;
-
 $('startCamera').disabled=true;
 $('startCamera').textContent='Opening camera…';
 
@@ -1772,17 +1902,13 @@ return;
 }
 
 stream=newStream;
-
 const video=$('video');
-
 video.srcObject=stream;
 $('cameraPanel').style.display='block';
-
 await video.play();
 
 scannerStarting=false;
 scanActive=true;
-
 $('startCamera').disabled=false;
 $('startCamera').textContent='📷 Scanner Running';
 
@@ -1815,7 +1941,6 @@ scan();
 }catch(e){
 if(newStream&&newStream!==stream)
 newStream.getTracks().forEach(t=>t.stop());
-
 stopCamera();
 alert('Camera error: '+e.message);
 }
@@ -1823,10 +1948,8 @@ alert('Camera error: '+e.message);
 
 $('startCamera').onclick=async()=>{
 if(savingContribution)return;
-
 resetProductData();
 showScannerView();
-
 await startBarcodeCamera();
 };
 
@@ -1871,9 +1994,7 @@ method:'POST',
 headers:headers(),
 body:JSON.stringify(body)
 });
-
 if(!response.ok)throw Error(await responseError(response));
-
 return response.json();
 }
 
@@ -1904,7 +2025,6 @@ $('authMessage').textContent='Account created.';
 }else{
 $('authMessage').textContent='Check your email to confirm your account.';
 }
-
 }catch(e){
 $('authMessage').textContent=e.message;
 }
@@ -1916,12 +2036,9 @@ const data=await authCall('token?grant_type=password',{
 email:$('authEmail').value.trim(),
 password:$('authPassword').value
 });
-
 saveSession(data);
 await initializeSignedInAccount();
-
 $('authMessage').textContent='Signed in successfully.';
-
 }catch(e){
 $('authMessage').textContent=e.message;
 }
@@ -1936,10 +2053,8 @@ await authCall(
 'recover?redirect_to='+encodeURIComponent(authRedirect()),
 {email}
 );
-
 $('authMessage').textContent=
 'Check your email for recovery instructions.';
-
 }catch(e){
 $('authMessage').textContent=e.message;
 }
@@ -1948,23 +2063,18 @@ $('authMessage').textContent=e.message;
 $('savePassword').onclick=async()=>{
 try{
 const password=$('newPassword').value;
-
 if(password.length<8)
 throw Error('Use at least 8 characters.');
 
 const token=await userToken();
-
 const response=await fetch(SUPABASE_URL+'/auth/v1/user',{
 method:'PUT',
 headers:headers(token),
 body:JSON.stringify({password})
 });
-
 if(!response.ok)throw Error(await responseError(response));
-
 $('passwordPanel').style.display='none';
 $('authMessage').textContent='Password updated.';
-
 }catch(e){
 $('authMessage').textContent=e.message;
 }
@@ -1998,7 +2108,6 @@ rows.some(x=>x.user_id===currentUser.id);
 updateAccountMode();
 
 if(adminAuthorized)await loadAdminPending();
-
 return adminAuthorized;
 
 }catch(e){
@@ -2037,26 +2146,20 @@ await loadRewards();
 
 async function restoreAuth(){
 const saved=readJSON(AUTHKEY,null);
-
 if(!saved?.access_token)return;
-
 saveSession(saved);
 
 try{
 const token=await userToken();
-
 const response=await fetch(SUPABASE_URL+'/auth/v1/user',{
 headers:headers(token)
 });
-
 if(!response.ok)throw Error('Session invalid.');
 
 currentUser=await response.json();
 authSession.user=currentUser;
-
 saveSession(authSession);
 await initializeSignedInAccount();
-
 }catch(e){
 saveSession(null);
 }
@@ -2090,17 +2193,14 @@ $('contributionHistory').textContent='No contributions yet.';
 contributions.forEach(c=>{
 const div=document.createElement('div');
 div.className='entry';
-
 div.textContent=
 String(c.contribution_type||'Contribution').replace(/_/g,' ')+
 ' • '+c.barcode+' • '+c.points+' points • '+c.status;
-
 $('contributionHistory').append(div);
 });
 
 $('rewardMessage').textContent=
 'Points are awarded after verification.';
-
 }catch(e){
 $('rewardMessage').textContent='Rewards unavailable: '+e.message;
 }
@@ -2112,7 +2212,6 @@ $('refreshRewards').onclick=loadRewards;
 
 async function loadMonthlyLeaderboard(){
 if(leaderboardLoading)return;
-
 leaderboardLoading=true;
 
 const date=new Date();
@@ -2120,9 +2219,7 @@ const month=date.getFullYear()+'-'+
 String(date.getMonth()+1).padStart(2,'0')+'-01';
 
 $('leaderboardMonth').textContent=
-date.toLocaleDateString('en-US',{
-month:'long',year:'numeric'
-});
+date.toLocaleDateString('en-US',{month:'long',year:'numeric'});
 
 try{
 const rows=await apiRequest(
@@ -2197,7 +2294,6 @@ if(!currentUser||!adminAuthorized||adminBusy)return;
 
 const box=$('adminPending');
 box.replaceChildren();
-
 $('adminMessage').textContent='Loading pending contributions…';
 
 try{
@@ -2314,7 +2410,6 @@ const ctx=cropCanvas.getContext('2d');
 $('takePhoto').onclick=()=>{
 if(!$('barcode').value.trim())
 return alert('Scan a product first.');
-
 photoInput.setAttribute('capture','environment');
 photoInput.value='';
 photoInput.click();
@@ -2323,7 +2418,6 @@ photoInput.click();
 $('choosePhoto').onclick=()=>{
 if(!$('barcode').value.trim())
 return alert('Scan a product first.');
-
 photoInput.removeAttribute('capture');
 photoInput.value='';
 photoInput.click();
@@ -2337,16 +2431,12 @@ ocrLoadPromise=(async()=>{
 if(!window.Tesseract){
 await new Promise((resolve,reject)=>{
 const script=document.createElement('script');
-script.src=
-'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-
+script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
 script.onload=resolve;
 script.onerror=()=>reject(Error('Text reader failed to load.'));
-
 document.head.append(script);
 });
 }
-
 return Tesseract.createWorker('eng');
 })();
 }
@@ -2356,28 +2446,18 @@ return ocrWorker;
 }
 
 function makeCanvas(bitmap,max=2400){
-const scale=Math.min(
-1,max/Math.max(bitmap.width,bitmap.height)
-);
-
+const scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));
 const canvas=document.createElement('canvas');
-
 canvas.width=Math.max(1,Math.round(bitmap.width*scale));
 canvas.height=Math.max(1,Math.round(bitmap.height*scale));
-
-canvas.getContext('2d').drawImage(
-bitmap,0,0,canvas.width,canvas.height
-);
-
+canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
 return canvas;
 }
 
 function ocrScore(text,confidence){
 const parsed=splitPackageText(text);
 const words=parsed.ingredients.match(/[A-Za-z]{3,}/g)||[];
-
 const heading=/ingredients?\s*:/i.test(text);
-
 const meaningful=/\b(water|sugar|salt|oil|acid|extract|glycerin|sodium|fragrance|alcohol|protein|stearate|milk|coconut)\b/i.test(text);
 
 return words.length*2+
@@ -2391,16 +2471,13 @@ const worker=await getWorker();
 const variants=[canvas];
 
 const contrast=document.createElement('canvas');
-
 contrast.width=canvas.width;
 contrast.height=canvas.height;
 
 const c=contrast.getContext('2d',{willReadFrequently:true});
 c.drawImage(canvas,0,0);
 
-const image=c.getImageData(
-0,0,contrast.width,contrast.height
-);
+const image=c.getImageData(0,0,contrast.width,contrast.height);
 
 for(let i=0;i<image.data.length;i+=4){
 const gray=Math.round(
@@ -2408,9 +2485,7 @@ const gray=Math.round(
 .587*image.data[i+1]+
 .114*image.data[i+2]
 );
-
 const v=Math.max(0,Math.min(255,(gray-128)*1.4+128));
-
 image.data[i]=v;
 image.data[i+1]=v;
 image.data[i+2]=v;
@@ -2429,7 +2504,6 @@ $('ocrProgress').style.display='block';
 $('ocrProgressBar').style.width=(20+i*40)+'%';
 
 const result=await worker.recognize(variants[i]);
-
 const text=result.data?.text||'';
 const confidence=Number(result.data?.confidence)||0;
 const score=ocrScore(text,confidence);
@@ -2443,17 +2517,14 @@ $('ocrProgressBar').style.width='100%';
 if(!best||best.score<35||best.confidence<30){
 ocrRejected=true;
 ingredientSource='ocr';
-
 $('ocrMessage').textContent=
 'Text unclear. Try a clearer photo or manually select the ingredient area.';
-
 $('manualCropButton').style.display='block';
 setStatus('Needs Verification');
 return;
 }
 
 loadIngredients(best.text);
-
 ingredientSource='ocr';
 ocrRejected=false;
 $('confirmed').checked=false;
@@ -2471,7 +2542,6 @@ behavior:'smooth',block:'center'
 
 photoInput.onchange=async()=>{
 const file=photoInput.files?.[0];
-
 if(!file||ocrBusy)return;
 
 ocrBusy=true;
@@ -2479,14 +2549,11 @@ $('check').disabled=true;
 
 try{
 if(photoBitmap)photoBitmap.close();
-
 photoBitmap=await createImageBitmap(file);
 
 const canvas=makeCanvas(photoBitmap);
-
 cropCanvas.width=canvas.width;
 cropCanvas.height=canvas.height;
-
 ctx.drawImage(canvas,0,0);
 
 const preview=$('ingredientPreview');
@@ -2499,13 +2566,11 @@ preview.style.display='block';
 
 cropRect=null;
 $('manualCropButton').style.display='block';
-
 await readIngredientsCanvas(canvas);
 
 }catch(e){
 $('ocrMessage').textContent=
 'Photo reading failed: '+e.message;
-
 ocrRejected=true;
 }finally{
 ocrBusy=false;
@@ -2523,9 +2588,7 @@ photoBitmap,0,0,cropCanvas.width,cropCanvas.height
 if(cropRect){
 ctx.strokeStyle='#00e676';
 ctx.lineWidth=5;
-ctx.strokeRect(
-cropRect.x,cropRect.y,cropRect.w,cropRect.h
-);
+ctx.strokeRect(cropRect.x,cropRect.y,cropRect.w,cropRect.h);
 }
 }
 
@@ -2537,7 +2600,6 @@ $('cropPanel').scrollIntoView({behavior:'smooth'});
 
 function cropPoint(e){
 const r=cropCanvas.getBoundingClientRect();
-
 return {
 x:(e.clientX-r.left)*cropCanvas.width/r.width,
 y:(e.clientY-r.top)*cropCanvas.height/r.height
@@ -2551,16 +2613,13 @@ cropCanvas.setPointerCapture(e.pointerId);
 
 cropCanvas.onpointermove=e=>{
 if(!dragStart)return;
-
 const p=cropPoint(e);
-
 cropRect={
 x:Math.min(dragStart.x,p.x),
 y:Math.min(dragStart.y,p.y),
 w:Math.abs(p.x-dragStart.x),
 h:Math.abs(p.y-dragStart.y)
 };
-
 drawCrop();
 };
 
@@ -2574,21 +2633,17 @@ drawCrop();
 
 $('readCrop').onclick=async()=>{
 if(!photoBitmap||ocrBusy)return;
-
 ocrBusy=true;
 
 try{
 const r=cropRect||{
-x:0,y:0,
-w:cropCanvas.width,
-h:cropCanvas.height
+x:0,y:0,w:cropCanvas.width,h:cropCanvas.height
 };
 
 const sx=photoBitmap.width/cropCanvas.width;
 const sy=photoBitmap.height/cropCanvas.height;
 
 const canvas=document.createElement('canvas');
-
 canvas.width=Math.max(1,Math.round(r.w*sx));
 canvas.height=Math.max(1,Math.round(r.h*sy));
 
@@ -2599,7 +2654,6 @@ r.x*sx,r.y*sy,r.w*sx,r.h*sy,
 );
 
 await readIngredientsCanvas(canvas);
-
 }catch(e){
 $('ocrMessage').textContent=e.message;
 }finally{
@@ -2612,16 +2666,20 @@ if(ocrRejected){
 ocrRejected=false;
 ingredientSource='manual';
 }
-
 if(ingredientSource==='ocr')
 $('confirmed').checked=false;
-
 clearResult();
 setStatus('Needs Verification');
 };
 
 $('check').onclick=()=>{
 if(ocrBusy)return;
+
+if(identityConflict){
+$('ocrMessage').textContent=
+'The barcode has conflicting product identities. Confirm the exact product before saving.';
+return;
+}
 
 if(ocrRejected)
 return alert('Correct the unreadable ingredients first.');
@@ -2630,13 +2688,9 @@ if(ingredientSource==='ocr'&&!$('confirmed').checked)
 return alert('Check the ingredient list against the package first.');
 
 const parsed=splitPackageText($('ingredients').value);
-
 $('ingredients').value=parsed.ingredients;
 
-showResult(classify(
-parsed.ingredients,
-productCategory
-));
+showResult(classify(parsed.ingredients,productCategory));
 
 $('result').scrollIntoView({
 behavior:'smooth',block:'start'
@@ -2646,9 +2700,7 @@ behavior:'smooth',block:'start'
 /* CLOUD PHOTO UPLOAD */
 
 async function uploadProductPhoto(file,barcode){
-const filename=normalizeBarcode(barcode)+
-'-'+Date.now()+'.jpg';
-
+const filename=normalizeBarcode(barcode)+'-'+Date.now()+'.jpg';
 const token=currentUser?await userToken():null;
 
 const response=await fetch(
@@ -2677,7 +2729,6 @@ encodeURIComponent(filename);
 async function submitContribution(type,barcode,imageUrl,ingredients){
 if(!currentUser)
 throw Error('Sign in to earn rewards.');
-
 if(adminAuthorized)
 throw Error('Administrators do not earn rewards.');
 
@@ -2702,6 +2753,12 @@ p_ingredients:ingredients||null
 $('save').onclick=async()=>{
 if(savingContribution)return;
 
+if(identityConflict){
+$('saveMessage').textContent=
+'❌ Product identity conflict. This barcode must be reviewed before any changes are saved.';
+return;
+}
+
 if(!lastResult)
 return alert('Verify ingredients first.');
 
@@ -2717,28 +2774,47 @@ if(ingredientSource==='ocr'&&!$('confirmed').checked)
 return alert('Confirm the ingredient list first.');
 
 const fresh=classify(
-$('ingredients').value,
-productCategory
+$('ingredients').value,productCategory
 );
 
 if(fresh.status!==lastResult.status)
 return alert('Ingredients changed. Verify them again.');
 
 savingContribution=true;
-
 $('save').disabled=true;
 $('saveMessage').textContent='Saving…';
 
 try{
 if(autoSavePromise)await autoSavePromise;
-
 if(currentUser)await checkAdminAccess();
 
-const found=await findCloudRecord(
-barcode,!!currentUser
+const found=await findCloudRecord(barcode,!!currentUser);
+if(found.error)throw Error(found.error);
+
+if(found.records.length>1){
+const base=found.records[0];
+
+const conflict=found.records.slice(1).some(row=>
+cloudExternalConflict(base,{
+product:{
+product_name:row.product_name||'',
+brands:row.brand||'',
+ingredients_text:row.ingredients||''
+}
+})
 );
 
-if(found.error)throw Error(found.error);
+if(conflict){
+flagIdentityConflict(
+'Multiple conflicting Supabase records exist for this barcode. Administrator review is required.',
+found.records.map(row=>
+'Record '+row.id+': '+(row.product_name||'Unnamed')+
+' | '+(row.ingredients||'No ingredients')
+)
+);
+throw Error('Conflicting cloud records. Save blocked.');
+}
+}
 
 const existing=found.record;
 const ingredients=clean($('ingredients').value);
@@ -2778,13 +2854,9 @@ else if(ingredients&&!existing.ingredients)
 type='ingredients';
 
 if(newPhoto)
-uploadedPhoto=await uploadProductPhoto(
-selectedPhotoFile,barcode
-);
+uploadedPhoto=await uploadProductPhoto(selectedPhotoFile,barcode);
 
-await submitContribution(
-type,barcode,uploadedPhoto,ingredients
-);
+await submitContribution(type,barcode,uploadedPhoto,ingredients);
 
 $('saveMessage').textContent=
 '✅ Contribution submitted. Points pending approval.';
@@ -2803,10 +2875,7 @@ vegan_reason:fresh.reasons.join('; ')
 };
 
 if(newPhoto){
-uploadedPhoto=await uploadProductPhoto(
-selectedPhotoFile,barcode
-);
-
+uploadedPhoto=await uploadProductPhoto(selectedPhotoFile,barcode);
 payload.image_url=uploadedPhoto;
 }
 
@@ -2858,9 +2927,7 @@ newPhoto?'product_photo':
 ingredients?'ingredients':'correction',
 barcode,uploadedPhoto,ingredients
 );
-
 await loadRewards();
-
 }catch(e){
 $('saveMessage').textContent=
 'Product saved, but reward submission failed: '+e.message;
@@ -2883,7 +2950,6 @@ $('saveMessage').textContent=
 }finally{
 savingContribution=false;
 $('save').disabled=false;
-
 $('save').textContent=adminAuthorized?
 '💾 Save Scan — Administrator':
 '💾 Save Scan / Submit Contribution';
@@ -2893,18 +2959,13 @@ $('save').textContent=adminAuthorized?
 /* AUTH RETURN */
 
 async function handleAuthReturn(){
-const hash=new URLSearchParams(
-location.hash.slice(1)
-);
-
+const hash=new URLSearchParams(location.hash.slice(1));
 const access=hash.get('access_token');
 const refresh=hash.get('refresh_token');
 
 if(!access||!refresh)return;
 
-history.replaceState(
-null,'',location.pathname+location.search
-);
+history.replaceState(null,'',location.pathname+location.search);
 
 const response=await fetch(
 SUPABASE_URL+'/auth/v1/user',{
@@ -2966,7 +3027,6 @@ $('authMessage').textContent=
 })();
 
 </script>
-
 <script src="verified-vegan-phone-scanner.js"></script>
 </body>
 </html>
