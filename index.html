@@ -21,6 +21,7 @@ header p{margin:5px}
 main{max-width:720px;margin:auto;padding:14px}
 section{background:white;border-radius:16px;padding:17px;margin-bottom:15px;box-shadow:0 2px 12px #1232}
 h2{font-size:20px;margin:0 0 12px}
+h3{font-size:17px}
 input,textarea,button{font:inherit;width:100%;padding:12px;border-radius:10px;margin:5px 0}
 input,textarea{border:1px solid #a9c2b2}
 textarea{min-height:120px}
@@ -76,56 +77,16 @@ label{display:block;margin-top:9px}
 #contactSupport .copyright{font-size:13px;color:#617469}
 #nutrition{line-height:1.8}
 #lookupMessage,#saveMessage,#autoSaveMessage,#authMessage,#rewardMessage,#adminMessage{overflow-wrap:anywhere}
-
-/* SMALLER INGREDIENT PHOTO SELECTION */
-#cropPanel{
- background:#f1f7f2;
- border:1px solid #d7e8dc;
- border-radius:14px;
- padding:12px;
- margin:12px 0;
-}
-#cropViewport{
- width:100%;
- height:250px;
- max-height:34vh;
- min-height:175px;
- overflow:auto;
- overscroll-behavior:contain;
- border:1px solid #a9c2b2;
- border-radius:10px;
- background:#e9efe9;
- touch-action:pan-y;
-}
-#cropCanvas{
- display:block;
- width:100%;
- height:auto;
- touch-action:none;
- user-select:none;
- -webkit-user-select:none;
-}
-#cropControls{
- display:grid;
- grid-template-columns:1fr 1fr;
- gap:8px;
- margin:8px 0;
-}
+#cropPanel{background:#f1f7f2;border:1px solid #d7e8dc;border-radius:14px;padding:12px;margin:12px 0}
+#cropViewport{width:100%;height:250px;max-height:34vh;min-height:175px;overflow:auto;overscroll-behavior:contain;border:1px solid #a9c2b2;border-radius:10px;background:#e9efe9;touch-action:pan-y}
+#cropCanvas{display:block;width:100%;height:auto;touch-action:none;user-select:none;-webkit-user-select:none}
+#cropControls{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
 #cropControls button{margin:0}
-#ingredientPreview{
- display:none;
- max-width:100%;
- max-height:180px;
- object-fit:contain;
- margin:12px auto;
- border-radius:10px;
-}
-#cropHint{
- font-size:13px;
- color:#426755;
- margin:8px 0;
-}
-#cropSelectionStatus{font-size:13px;color:#426755}
+#ingredientPreview{max-width:100%;max-height:180px;object-fit:contain;margin:12px auto;border-radius:10px}
+#cropHint,#cropSelectionStatus{font-size:13px;color:#426755}
+#lookupSources{background:#f1f7f2;padding:10px;border-radius:10px;margin:10px 0}
+#lookupSources div{padding:5px 0;border-bottom:1px solid #d7e8dc}
+#lookupSources div:last-child{border:0}
 @media(max-width:480px){
  #cropViewport{height:215px;max-height:31vh}
  #cropPanel{padding:10px}
@@ -298,7 +259,7 @@ Fill the picture with the ingredient label, avoid nutrition facts, keep the came
 
 <div id="cropPanel">
 <h2>Select Ingredient Area</h2>
-<p id="cropHint">The picture is smaller so you can scroll. Use two fingers to scroll the picture, or drag one finger to select the ingredients.</p>
+<p id="cropHint">The picture is smaller so you can scroll. Drag one finger to select the ingredients.</p>
 <div id="cropViewport">
 <canvas id="cropCanvas"></canvas>
 </div>
@@ -358,6 +319,7 @@ const $=id=>document.getElementById(id);
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
 const digits=s=>String(s??'').replace(/\D/g,'');
 const validBarcode=s=>/^\d{8,14}$/.test(digits(s));
+const norm=s=>clean(s).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 
 function sameBarcode(a,b){
  const x=digits(a),y=digits(b);
@@ -369,6 +331,7 @@ function barcodeVariants(b){
  if(x.length===12)out.add('0'+x);
  if(x.length===13&&x.startsWith('0'))out.add(x.slice(1));
  if(x.length===14&&x.startsWith('0'))out.add(x.slice(1));
+ if(x.length===8)out.add(x);
  return [...out].filter(validBarcode);
 }
 
@@ -388,7 +351,7 @@ let contributionBaseline=null,originalIngredients='';
 let identityConflict=false,identityConflictDetails=[];
 let savingContribution=false,adminBusy=false,leaderboardLoading=false;
 let currentSourceRecords=[],ingredientImportBlocked=false;
-let photoSession=0;
+let photoSession=0,lookupBusyBarcode='';
 
 const ANIMAL_RULES=[
  ['Milk or dairy',/\b(?:milk|whey|casein|caseinate|lactose|lactalbumin|buttermilk|cheese|yogurt|yoghurt|ghee|milkfat|milk fat|milk solids|butter oil|milk powder|cream powder|skim milk|whole milk|cream|butter|dairy|milk chocolate|custard|sour cream|half and half)\b/i],
@@ -407,10 +370,183 @@ const SINGLE_INGREDIENTS=new Set(
 'cornstarch|corn starch|maize starch|red pepper|crushed red pepper|red pepper flakes|onion|onion powder|granulated onion|dehydrated onion|garlic|granulated garlic|garlic powder|black pepper|white pepper|paprika|cayenne pepper|cinnamon|turmeric|ginger|cumin|oregano|basil|thyme|rosemary|parsley|sea salt|salt|iodized salt|sugar|organic cane sugar|cane sugar|brown sugar|almonds|almond butter|peanuts|peanut butter|cashews|walnuts|pecans|oats|rolled oats|white rice|brown rice|rice|quinoa|chia seeds|flax seeds|sesame seeds|olive oil|extra virgin olive oil|coconut oil|avocado oil|sunflower oil|canola oil|corn oil|vegetable oil|cocoa powder|baking soda|potato starch|tapioca starch|arrowroot powder'.split('|')
 );
 
+const RECIPE_SIGNALS=[
+ /\b(?:recipe|recipes|serving suggestion|suggested recipe)\b/i,
+ /\b(?:chicken marsala|chicken cutlets?|preheat oven|cook until|simmer for)\b/i,
+ /\b(?:in a skillet|in a saucepan|heat a skillet)\b/i,
+ /\b(?:tablespoons?|teaspoons?|tbsp|tsp)\b/i,
+ /\b(?:directions|preparation instructions|cooking instructions)\b/i,
+ /\b(?:add the chicken|stir in|bring to a boil|serve with)\b/i
+];
+
+function removePlantIngredientNames(t){
+ return String(t)
+ .replace(/\b(?:almond|oat|soy|soya|coconut|rice|cashew|pea|hemp|flax|hazelnut|macadamia)\s+milk\b/gi,'plant beverage')
+ .replace(/\b(?:almond|oat|soy|soya|coconut|cashew)\s+(?:cream|creamer|butter|yogurt|yoghurt|cheese)\b/gi,'plant alternative')
+ .replace(/\b(?:cocoa|shea|peanut|almond|cashew|apple)\s+butter\b/gi,'plant fat')
+ .replace(/\bcream of tartar\b/gi,'tartar')
+ .replace(/\bcreamed coconut\b/gi,'coconut');
+}
+
+function looksLikeRecipe(t){
+ const s=clean(t);
+ if(!s)return false;
+ const hits=RECIPE_SIGNALS.filter(r=>r.test(s)).length;
+ return hits>=2||
+  (hits>=1&&/\b(?:cutlets?|breasts?|skillet|saute|sauté|broth|marsala|tablespoons?|teaspoons?)\b/i.test(s));
+}
+
+function looksLikeNutrition(t){
+ return [
+  'nutrition facts','serving size','calories','total fat',
+  'saturated fat','cholesterol','total carbohydrate',
+  'dietary fiber','daily value','added sugars','vitamin d'
+ ].filter(s=>clean(t).toLowerCase().includes(s)).length>=3;
+}
+
+function splitPackageText(raw){
+ const source=String(raw||'').replace(/\r/g,'\n').replace(/[ \t]+/g,' ');
+ const heading=/\bingredients?\s*[:\-]\s*/i.exec(source);
+ let text=heading?source.slice(heading.index+heading[0].length):source;
+ let end=text.length;
+
+ for(const re of [
+  /\bmay\s+(?:also\s+)?contain\s*:?\s+/i,
+  /\bcontains\s*:?\s+(?=[a-z])/i,
+  /\bmade\s+in\s+a\s+facility\b/i,
+  /\b(?:nutrition facts|nutrition information|distributed by|manufactured by|packed for|visit us at|www\.)\b/i,
+  /\b(?:recipe|directions|preparation instructions|serving suggestion)\b/i,
+  /\b(?:total fat|saturated fat|cholesterol|total carbohydrate|dietary fiber|total sugars|added sugars|daily value)\s*[:\d]/i
+ ]){
+  const m=re.exec(text);
+  if(m)end=Math.min(end,m.index);
+ }
+
+ return {
+  ingredients:clean(text.slice(0,end))
+   .replace(/^[\s:;.,\-]+|[\s:;.,\-]+$/g,'')
+   .slice(0,3500),
+  contains:clean(source.match(/\bcontains\s*:?\s+([^\n.]{2,120})/i)?.[1]||''),
+  mayContain:clean(source.match(/\bmay\s+(?:also\s+)?contain\s*:?\s+([^\n.]{2,120})/i)?.[1]||''),
+  hadHeading:!!heading
+ };
+}
+
+function ingredientTextQuality(raw){
+ const t=clean(raw);
+ if(!t||t.length>3500||looksLikeRecipe(t)||looksLikeNutrition(t))return false;
+ if(/\b(?:distributed by|wholesale|customer service|manufactured by|www\.)\b/i.test(t))return false;
+ const lower=t.toLowerCase().replace(/^ingredients?\s*:\s*/,'').replace(/[.!]+$/,'').trim();
+ if(SINGLE_INGREDIENTS.has(lower))return true;
+ const words=t.match(/[A-Za-z]{2,}/g)||[];
+ if(!words.length)return false;
+ const symbols=(t.match(/[^A-Za-z0-9\s,().:%\-']/g)||[]).length;
+ if(symbols>t.length*.2)return false;
+ return t.length<18?/^[a-z][a-z\s-]*$/i.test(t):words.length>=2;
+}
+
+const FOOD_WORDS=new Set(
+'granulated ground powder powdered dried dehydrated organic pure natural original seasoning spice spices herb herbs fine coarse whole crushed chopped minced flakes flake premium gourmet fresh classic food foods product'.split(' ')
+);
+
+function nameTokens(s){
+ return norm(s).split(' ').filter(w=>w.length>1&&!FOOD_WORDS.has(w));
+}
+
+function productType(name){
+ const n=norm(name);
+ if(/\b(?:onion|onions)\b/.test(n)&&/\b(?:granulated|powder|dried|dehydrated)\b/.test(n))return 'onion seasoning';
+ if(/\bgarlic\b/.test(n)&&/\b(?:granulated|powder|dried|dehydrated)\b/.test(n))return 'garlic seasoning';
+ if(/\bpaprika\b/.test(n))return 'paprika';
+ if(/\bcinnamon\b/.test(n))return 'cinnamon';
+ if(/\bblack pepper\b/.test(n))return 'black pepper';
+ if(/\bturmeric\b/.test(n))return 'turmeric';
+ if(/\boregano\b/.test(n))return 'oregano';
+ if(/\bcumin\b/.test(n))return 'cumin';
+ return '';
+}
+
+const SINGLE_SPICE_EXPECTED={
+ 'onion seasoning':/\b(?:onion|onions)\b/i,
+ 'garlic seasoning':/\bgarlic\b/i,
+ 'paprika':/\bpaprika\b/i,
+ 'cinnamon':/\bcinnamon\b/i,
+ 'black pepper':/\b(?:black pepper|pepper)\b/i,
+ 'turmeric':/\bturmeric\b/i,
+ 'oregano':/\boregano\b/i,
+ 'cumin':/\bcumin\b/i
+};
+
+function suspiciousIngredientIdentity(name,ingredients){
+ const t=clean(ingredients);
+ if(!t)return false;
+ if(looksLikeRecipe(t)||looksLikeNutrition(t))return true;
+ const type=productType(name);
+ if(type){
+  const expected=SINGLE_SPICE_EXPECTED[type];
+  if(!expected.test(t))return true;
+  const animal=removePlantIngredientNames(t);
+  if(/\b(?:chicken|beef|pork|turkey|fish|shrimp|cutlets?|broth|marsala|skillet|tablespoons?|teaspoons?)\b/i.test(animal))return true;
+  if(t.split(',').length>5)return true;
+ }
+ return false;
+}
+
+function productIngredients(p){
+ const candidates=[
+  p.ingredients_text_en,
+  p.ingredients_text,
+  typeof p.ingredients==='string'?p.ingredients:'',
+  p.ingredient_text,
+  p.ingredient_list,
+  p.ingredients_text_fr,
+  p.ingredients_text_es,
+  p.ingredients_text_de,
+  p.ingredients_text_it,
+  p.ingredients_text_pt
+ ];
+ return clean(candidates.find(v=>typeof v==='string'&&clean(v))||'');
+}
+
+function classify(raw){
+ const t=splitPackageText(raw).ingredients;
+ if(!ingredientTextQuality(t)){
+  return {
+   status:'Needs Verification',
+   reasons:[],
+   explanation:'No reliable ingredient list is available.',
+   caution:'Photograph or enter the complete package ingredients.'
+  };
+ }
+
+ const screened=removePlantIngredientNames(t);
+ const reasons=[...new Set(
+  ANIMAL_RULES.filter(x=>x[1].test(screened)).map(x=>x[0])
+ )];
+
+ if(reasons.length){
+  return {
+   status:'Not Vegan',
+   reasons,
+   explanation:'Animal-derived ingredients detected in the ingredient list.',
+   caution:'Confirm the list belongs to this exact product.'
+  };
+ }
+
+ return {
+  status:'Vegan',
+  reasons:['No explicitly animal-derived ingredients detected.'],
+  explanation:'Vegan by ingredient-text screening.',
+  caution:'Ingredient screening is not manufacturer certification. Some ingredient origins may require additional verification.'
+ };
+}
+
 function setStatus(status){
  const e=$('productStatus');
  e.textContent=status;
- e.className=status==='Vegan'?'vegan':status==='Not Vegan'?'notvegan':status==='Needs Verification'?'unknown':'pending';
+ e.className=status==='Vegan'?'vegan':
+  status==='Not Vegan'?'notvegan':
+  status==='Needs Verification'?'unknown':'pending';
 }
 
 function clearResult(){
@@ -437,7 +573,11 @@ function displayBrand(b){
  $('brand').value=clean(b);
  $('brandDisplay').textContent=clean(b)?'Brand: '+clean(b):'';
 }
-$('brand').oninput=()=>displayBrand($('brand').value);
+
+$('brand').oninput=()=>{
+ $('brandDisplay').textContent=clean($('brand').value)?
+  'Brand: '+clean($('brand').value):'';
+};
 
 function setSource(s){
  $('productSourceDisplay').textContent=s?'Source: '+s:'';
@@ -475,112 +615,64 @@ $('showConflictDetails').onclick=()=>{
  box.style.display='block';
 };
 
-function releaseSelectedPhoto(){
- if(selectedPhotoURL)URL.revokeObjectURL(selectedPhotoURL);
- selectedPhotoURL='';
- selectedPhotoFile=null;
+function updateAllergens(){
+ $('containsText').textContent=allergens.contains?'Contains: '+allergens.contains:'';
+ $('mayContainText').textContent=allergens.mayContain?'May contain: '+allergens.mayContain:'';
+ $('allergenPanel').style.display=allergens.contains||allergens.mayContain?'block':'none';
 }
 
-function resetPhoto(){
- ++photoRequest;
- currentPhoto='';
- const i=$('productPhoto');
- i.onload=i.onerror=null;
- i.hidden=true;
- i.removeAttribute('src');
- $('photoPlaceholder').style.display='block';
- $('photoPlaceholder').textContent='Product picture appears here';
- $('photoSource').textContent='';
-}
-
-function resetProductData(){
- ++lookupSerial;
- ++photoSession;
- currentBarcode='';
- loadedCloudId=null;
- cloudRecordExists=false;
- contributionBaseline=null;
- originalIngredients='';
- currentNutrition={};
- currentServingSize='';
- ingredientSource='none';
- ocrRejected=false;
- verifiedByPackage=false;
- lookupInProgress=false;
- currentSourceRecords=[];
- ingredientImportBlocked=false;
- clearIdentityConflict();
- releaseSelectedPhoto();
- resetPhoto();
- $('barcode').value='';
- $('productName').value='';
- displayBrand('');
- $('ingredients').value='';
- $('confirmed').checked=false;
- $('frontInput').value='';
- $('photoInput').value='';
- $('lookupMessage').textContent='';
- $('lookupProgress').textContent='';
- $('autoSaveMessage').textContent='';
- $('frontMessage').textContent='Pictures are uploaded when a contribution is submitted.';
- $('lookupSources').style.display='none';
- $('retryLookup').style.display='none';
- $('ingredientPreview').style.display='none';
- $('cropPanel').style.display='none';
- $('manualCropButton').style.display='none';
- $('ingredientWarning').style.display='none';
- $('ocrMessage').textContent='No ingredient picture selected yet.';
- $('ocrProgress').style.display='none';
- cropRect=null;
- if(photoBitmap){
-  try{photoBitmap.close();}catch{}
-  photoBitmap=null;
- }
- allergens={contains:'',mayContain:''};
+function loadIngredients(raw){
+ const p=splitPackageText(raw);
+ $('ingredients').value=p.ingredients;
+ allergens={contains:p.contains,mayContain:p.mayContain};
  updateAllergens();
- showNutrition({});
- clearResult();
- setSource('');
- setStatus('Scan a product');
+ return p.ingredients;
 }
 
-function showProductView(){
- $('scannerView').style.display='none';
- $('productDetails').style.display='block';
- $('productBarcode').textContent='Barcode: '+currentBarcode;
- $('scannerSection').scrollIntoView({behavior:'smooth',block:'start'});
+function showNutrition(n){
+ currentNutrition=n||{};
+ const fields=[
+  ['Calories',n?.['energy-kcal_100g'],'kcal'],
+  ['Protein',n?.proteins_100g,'g'],
+  ['Carbohydrates',n?.carbohydrates_100g,'g'],
+  ['Sugar',n?.sugars_100g,'g'],
+  ['Fat',n?.fat_100g,'g'],
+  ['Fiber',n?.fiber_100g,'g'],
+  ['Salt',n?.salt_100g,'g']
+ ];
+ const vals=fields.filter(x=>x[1]!=null&&x[1]!==''&&Number.isFinite(Number(x[1])));
+ $('nutrition').textContent=vals.length?
+  'Per 100 g: '+vals.map(x=>x[0]+': '+Number(x[1]).toFixed(1)+' '+x[2]).join(' • '):
+  'Nutrition information not available.';
 }
 
-function showScannerView(){
- $('scannerView').style.display='block';
- $('productDetails').style.display='none';
+function nutritionFromCloud(p){
+ return {
+  proteins_100g:p.protein_100g,
+  carbohydrates_100g:p.carb_100g,
+  fat_100g:p.fat_100g,
+  sugars_100g:p.sugar_100g,
+  fiber_100g:p.fiber_100g,
+  salt_100g:p.salt_100g
+ };
 }
 
-$('scanAnother').onclick=async()=>{
- if(savingContribution)return;
- await stopCamera();
- resetProductData();
- showScannerView();
- await startBarcodeCamera();
-};
-
-$('manualToggle').onclick=()=>{
- const p=$('manualEntry'),open=p.style.display!=='block';
- p.style.display=open?'block':'none';
- $('manualToggle').setAttribute('aria-expanded',String(open));
- $('manualToggle').textContent=open?'Hide Manual Barcode Entry':"Can't Scan? Enter Barcode";
- if(open){
-  stopCamera();
-  $('barcode').focus();
+function nutritionPayload(){
+ const map={
+  protein_100g:'proteins_100g',
+  carb_100g:'carbohydrates_100g',
+  fat_100g:'fat_100g',
+  sugar_100g:'sugars_100g',
+  fiber_100g:'fiber_100g',
+  salt_100g:'salt_100g'
+ };
+ const out={serving_size:currentServingSize||null};
+ for(const [k,v] of Object.entries(map)){
+  const x=currentNutrition?.[v];
+  out[k]=x!=null&&x!==''&&Number.isFinite(Number(x))?Number(x):null;
  }
-};
-
-$('barcode').onkeydown=e=>{
- if(e.key==='Enter'){
-  e.preventDefault();
-  lookupProduct();
- }
-};
+ return out;
+}
 
 function headers(token){
  return {
@@ -661,265 +753,177 @@ async function userRequest(path,options={}){
  return t?JSON.parse(t):null;
 }
 
-/* INGREDIENT SCREENING */
-
-function removePlantIngredientNames(t){
- return String(t)
- .replace(/\b(?:almond|oat|soy|soya|coconut|rice|cashew|pea|hemp|flax|hazelnut|macadamia)\s+milk\b/gi,'plant beverage')
- .replace(/\b(?:almond|oat|soy|soya|coconut|cashew)\s+(?:cream|creamer|butter|yogurt|yoghurt|cheese)\b/gi,'plant alternative')
- .replace(/\b(?:cocoa|shea|peanut|almond|cashew|apple)\s+butter\b/gi,'plant fat')
- .replace(/\bcream of tartar\b/gi,'tartar')
- .replace(/\bcreamed coconut\b/gi,'coconut');
+function releaseSelectedPhoto(){
+ if(selectedPhotoURL)URL.revokeObjectURL(selectedPhotoURL);
+ selectedPhotoURL='';
+ selectedPhotoFile=null;
 }
 
-const RECIPE_SIGNALS=[
- /\b(?:recipe|recipes|serving suggestion|suggested recipe)\b/i,
- /\b(?:chicken marsala|chicken cutlets?|preheat oven|cook until|simmer for)\b/i,
- /\b(?:in a skillet|in a saucepan|heat a skillet)\b/i,
- /\b(?:tablespoons?|teaspoons?|tbsp|tsp)\b/i,
- /\b(?:directions|preparation instructions|cooking instructions)\b/i,
- /\b(?:add the chicken|stir in|bring to a boil|serve with)\b/i
-];
-
-function looksLikeRecipe(t){
- const s=clean(t);
- if(!s)return false;
- const hits=RECIPE_SIGNALS.filter(r=>r.test(s)).length;
- return hits>=2||
-  (hits>=1&&/\b(?:cutlets?|breasts?|skillet|saute|sauté|broth|marsala|tablespoons?|teaspoons?)\b/i.test(s));
+function resetPhoto(){
+ ++photoRequest;
+ currentPhoto='';
+ const i=$('productPhoto');
+ i.onload=i.onerror=null;
+ i.hidden=true;
+ i.removeAttribute('src');
+ $('photoPlaceholder').style.display='block';
+ $('photoPlaceholder').textContent='Product picture appears here';
+ $('photoSource').textContent='';
 }
 
-function looksLikeNutrition(t){
- return [
-  'nutrition facts','serving size','calories','total fat',
-  'saturated fat','cholesterol','total carbohydrate',
-  'dietary fiber','daily value','added sugars','vitamin d'
- ].filter(s=>clean(t).toLowerCase().includes(s)).length>=3;
-}
-
-function splitPackageText(raw){
- const source=String(raw||'')
-  .replace(/\r/g,'\n')
-  .replace(/[ \t]+/g,' ');
- const heading=/\bingredients?\s*[:\-]\s*/i.exec(source);
- let text=heading?source.slice(heading.index+heading[0].length):source;
- let end=text.length;
- for(const re of [
-  /\bmay\s+(?:also\s+)?contain\s*:?\s+/i,
-  /\bcontains\s*:?\s+(?=[a-z])/i,
-  /\bmade\s+in\s+a\s+facility\b/i,
-  /\b(?:nutrition facts|nutrition information|distributed by|manufactured by|packed for|visit us at|www\.)\b/i,
-  /\b(?:recipe|directions|preparation instructions|serving suggestion)\b/i,
-  /\b(?:total fat|saturated fat|cholesterol|total carbohydrate|dietary fiber|total sugars|added sugars|daily value)\s*[:\d]/i
- ]){
-  const m=re.exec(text);
-  if(m)end=Math.min(end,m.index);
+function resetProductData(){
+ ++lookupSerial;
+ ++photoSession;
+ currentBarcode='';
+ loadedCloudId=null;
+ cloudRecordExists=false;
+ contributionBaseline=null;
+ originalIngredients='';
+ currentNutrition={};
+ currentServingSize='';
+ ingredientSource='none';
+ ocrRejected=false;
+ verifiedByPackage=false;
+ lookupInProgress=false;
+ lookupBusyBarcode='';
+ currentSourceRecords=[];
+ ingredientImportBlocked=false;
+ clearIdentityConflict();
+ releaseSelectedPhoto();
+ resetPhoto();
+ $('barcode').value='';
+ $('productName').value='';
+ displayBrand('');
+ $('ingredients').value='';
+ $('confirmed').checked=false;
+ $('frontInput').value='';
+ $('photoInput').value='';
+ $('lookupMessage').textContent='';
+ $('lookupProgress').textContent='';
+ $('autoSaveMessage').textContent='';
+ $('frontMessage').textContent='Pictures are uploaded when a contribution is submitted.';
+ $('lookupSources').style.display='none';
+ $('lookupSources').replaceChildren();
+ $('retryLookup').style.display='none';
+ $('ingredientPreview').style.display='none';
+ $('cropPanel').style.display='none';
+ $('manualCropButton').style.display='none';
+ $('ingredientWarning').style.display='none';
+ $('ocrMessage').textContent='No ingredient picture selected yet.';
+ $('ocrProgress').style.display='none';
+ cropRect=null;
+ if(photoBitmap){
+  try{photoBitmap.close();}catch{}
+  photoBitmap=null;
  }
- return {
-  ingredients:clean(text.slice(0,end))
-   .replace(/^[\s:;.,\-]+|[\s:;.,\-]+$/g,'')
-   .slice(0,3500),
-  contains:clean(source.match(/\bcontains\s*:?\s+([^\n.]{2,120})/i)?.[1]||''),
-  mayContain:clean(source.match(/\bmay\s+(?:also\s+)?contain\s*:?\s+([^\n.]{2,120})/i)?.[1]||''),
-  hadHeading:!!heading
- };
+ allergens={contains:'',mayContain:''};
+ updateAllergens();
+ showNutrition({});
+ clearResult();
+ setSource('');
+ setStatus('Scan a product');
 }
 
-function ingredientTextQuality(raw){
- const t=clean(raw);
- if(!t||t.length>3500||looksLikeRecipe(t)||looksLikeNutrition(t))return false;
- if(/\b(?:distributed by|wholesale|customer service|manufactured by|www\.)\b/i.test(t))return false;
- const lower=t.toLowerCase().replace(/^ingredients?\s*:\s*/,'').replace(/[.!]+$/,'').trim();
- if(SINGLE_INGREDIENTS.has(lower))return true;
- const words=t.match(/[A-Za-z]{2,}/g)||[];
- if(!words.length)return false;
- const symbols=(t.match(/[^A-Za-z0-9\s,().:%\-']/g)||[]).length;
- if(symbols>t.length*.2)return false;
- return t.length<18?/^[a-z][a-z\s-]*$/i.test(t):words.length>=2;
+function showProductView(){
+ $('scannerView').style.display='none';
+ $('productDetails').style.display='block';
+ $('productBarcode').textContent='Barcode: '+currentBarcode;
+ $('scannerSection').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-function normalizeName(s){
- return clean(s).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+function showScannerView(){
+ $('scannerView').style.display='block';
+ $('productDetails').style.display='none';
 }
 
-const FOOD_WORDS=new Set(
-'granulated ground powder powdered dried dehydrated organic pure natural original seasoning spice spices herb herbs fine coarse whole crushed chopped minced flakes flake premium gourmet fresh classic food foods product'.split(' ')
-);
-
-function nameTokens(s){
- return normalizeName(s).split(' ')
-  .filter(w=>w.length>1&&!FOOD_WORDS.has(w));
-}
-
-function productType(name){
- const n=normalizeName(name);
- if(/\b(?:onion|onions)\b/.test(n)&&/\b(?:granulated|powder|dried|dehydrated)\b/.test(n))return 'onion seasoning';
- if(/\bgarlic\b/.test(n)&&/\b(?:granulated|powder|dried|dehydrated)\b/.test(n))return 'garlic seasoning';
- if(/\bpaprika\b/.test(n))return 'paprika';
- if(/\bcinnamon\b/.test(n))return 'cinnamon';
- if(/\bblack pepper\b/.test(n))return 'black pepper';
- if(/\bturmeric\b/.test(n))return 'turmeric';
- if(/\boregano\b/.test(n))return 'oregano';
- if(/\bcumin\b/.test(n))return 'cumin';
- return '';
-}
-
-const SINGLE_SPICE_EXPECTED={
- 'onion seasoning':/\b(?:onion|onions)\b/i,
- 'garlic seasoning':/\bgarlic\b/i,
- 'paprika':/\bpaprika\b/i,
- 'cinnamon':/\bcinnamon\b/i,
- 'black pepper':/\b(?:black pepper|pepper)\b/i,
- 'turmeric':/\bturmeric\b/i,
- 'oregano':/\boregano\b/i,
- 'cumin':/\bcumin\b/i
+$('scanAnother').onclick=async()=>{
+ if(savingContribution)return;
+ await stopCamera();
+ resetProductData();
+ showScannerView();
+ await startBarcodeCamera();
 };
 
-function suspiciousIngredientIdentity(name,ingredients){
- const t=clean(ingredients);
- if(!t)return false;
- if(looksLikeRecipe(t)||looksLikeNutrition(t))return true;
- const type=productType(name);
- if(type){
-  const expected=SINGLE_SPICE_EXPECTED[type];
-  if(!expected.test(t))return true;
-  const animal=removePlantIngredientNames(t);
-  if(/\b(?:chicken|beef|pork|turkey|fish|shrimp|cutlets?|broth|marsala|skillet|tablespoons?|teaspoons?)\b/i.test(animal))return true;
-  if(t.split(',').length>5)return true;
+$('manualToggle').onclick=()=>{
+ const p=$('manualEntry');
+ const open=p.style.display!=='block';
+ p.style.display=open?'block':'none';
+ $('manualToggle').setAttribute('aria-expanded',String(open));
+ $('manualToggle').textContent=open?'Hide Manual Barcode Entry':"Can't Scan? Enter Barcode";
+ if(open){
+  stopCamera();
+  $('barcode').focus();
  }
- return false;
+};
+
+$('barcode').onkeydown=e=>{
+ if(e.key==='Enter'){
+  e.preventDefault();
+  lookupProduct();
+ }
+};
+
+/* IMPROVED MULTI-SOURCE PRODUCT LOOKUP */
+
+function externalName(p){
+ return clean(
+  p.product_name_en||
+  p.product_name||
+  p.generic_name_en||
+  p.product_name_fr||
+  p.product_name_es||
+  p.title||
+  ''
+ );
 }
 
-function productIngredients(p){
- return clean([
-  p.ingredients_text_en,
-  p.ingredients_text,
-  typeof p.ingredients==='string'?p.ingredients:'',
-  p.ingredient_text,
-  p.ingredient_list,
-  p.ingredients_text_fr,
-  p.ingredients_text_es,
-  p.ingredients_text_de,
-  p.ingredients_text_it,
-  p.ingredients_text_pt
- ].find(v=>typeof v==='string'&&clean(v))||'');
+function externalBrand(p){
+ return clean(p.brands||p.brand||p.manufacturer||'');
+}
+
+function externalCode(p){
+ return digits(p.code||p.barcode||p.upc||p.ean||p.gtin||'');
 }
 
 function compatibleIdentity(a,b){
- const an=normalizeName(a.product_name||a.product_name_en||a.title||'');
- const bn=normalizeName(b.product_name||b.product_name_en||b.title||'');
- const ab=normalizeName(a.brands||a.brand||'');
- const bb=normalizeName(b.brands||b.brand||'');
- if(ab&&bb&&ab!==bb&&!ab.includes(bb)&&!bb.includes(ab))return false;
+ const an=norm(externalName(a));
+ const bn=norm(externalName(b));
+ const ab=norm(externalBrand(a));
+ const bb=norm(externalBrand(b));
+
+ if(ab&&bb&&ab!==bb&&!ab.includes(bb)&&!bb.includes(ab)){
+  return false;
+ }
+
  if(an&&bn){
   const at=nameTokens(an),bt=nameTokens(bn);
   const common=at.filter(w=>bt.includes(w));
-  if(!common.length&&an!==bn&&!an.includes(bn)&&!bn.includes(an))return false;
+  if(!common.length&&an!==bn&&!an.includes(bn)&&!bn.includes(an)){
+   return false;
+  }
   const typeA=productType(an),typeB=productType(bn);
   if(typeA&&typeB&&typeA!==typeB)return false;
  }
+
  return true;
 }
 
 function trustedExternalIngredients(p,barcode){
- const code=digits(p.code||p.barcode||'');
- const name=clean(p.product_name||p.product_name_en||p.title||'');
+ const code=externalCode(p);
+ const name=externalName(p);
  const t=productIngredients(p);
+
  return !!code&&sameBarcode(code,barcode)&&!!name&&
-  ingredientTextQuality(t)&&!suspiciousIngredientIdentity(name,t);
+  ingredientTextQuality(t)&&
+  !suspiciousIngredientIdentity(name,t);
 }
 
 function trustedCloudIngredients(p,barcode){
  return sameBarcode(p.barcode,barcode)&&
-  !!clean(p.product_name)&&!!clean(p.brand)&&
+  !!clean(p.product_name)&&
+  !!clean(p.brand)&&
   ingredientTextQuality(p.ingredients)&&
   !suspiciousIngredientIdentity(p.product_name,p.ingredients);
-}
-
-function classify(raw){
- const t=splitPackageText(raw).ingredients;
- if(!ingredientTextQuality(t)){
-  return {
-   status:'Needs Verification',
-   reasons:[],
-   explanation:'No reliable ingredient list is available.',
-   caution:'Photograph or enter the complete package ingredients.'
-  };
- }
- const screened=removePlantIngredientNames(t);
- const reasons=[...new Set(ANIMAL_RULES.filter(x=>x[1].test(screened)).map(x=>x[0]))];
- if(reasons.length){
-  return {
-   status:'Not Vegan',
-   reasons,
-   explanation:'Animal-derived ingredients detected in the ingredient list.',
-   caution:'Confirm the list belongs to this exact product.'
-  };
- }
- return {
-  status:'Vegan',
-  reasons:['No explicitly animal-derived ingredients detected.'],
-  explanation:'Vegan by ingredient-text screening.',
-  caution:'Ingredient screening is not manufacturer certification. Some ingredient origins may require additional verification.'
- };
-}
-
-function updateAllergens(){
- $('containsText').textContent=allergens.contains?'Contains: '+allergens.contains:'';
- $('mayContainText').textContent=allergens.mayContain?'May contain: '+allergens.mayContain:'';
- $('allergenPanel').style.display=allergens.contains||allergens.mayContain?'block':'none';
-}
-
-function loadIngredients(raw){
- const p=splitPackageText(raw);
- $('ingredients').value=p.ingredients;
- allergens={contains:p.contains,mayContain:p.mayContain};
- updateAllergens();
- return p.ingredients;
-}
-
-function showNutrition(n){
- currentNutrition=n||{};
- const fields=[
-  ['Calories',n?.['energy-kcal_100g'],'kcal'],
-  ['Protein',n?.proteins_100g,'g'],
-  ['Carbohydrates',n?.carbohydrates_100g,'g'],
-  ['Sugar',n?.sugars_100g,'g'],
-  ['Fat',n?.fat_100g,'g'],
-  ['Fiber',n?.fiber_100g,'g'],
-  ['Salt',n?.salt_100g,'g']
- ];
- const vals=fields.filter(x=>x[1]!=null&&x[1]!==''&&Number.isFinite(Number(x[1])));
- $('nutrition').textContent=vals.length?
-  'Per 100 g: '+vals.map(x=>x[0]+': '+Number(x[1]).toFixed(1)+' '+x[2]).join(' • '):
-  'Nutrition information not available.';
-}
-
-function nutritionFromCloud(p){
- return {
-  proteins_100g:p.protein_100g,
-  carbohydrates_100g:p.carb_100g,
-  fat_100g:p.fat_100g,
-  sugars_100g:p.sugar_100g,
-  fiber_100g:p.fiber_100g,
-  salt_100g:p.salt_100g
- };
-}
-
-function nutritionPayload(){
- const map={
-  protein_100g:'proteins_100g',
-  carb_100g:'carbohydrates_100g',
-  fat_100g:'fat_100g',
-  sugar_100g:'sugars_100g',
-  fiber_100g:'fiber_100g',
-  salt_100g:'salt_100g'
- },out={serving_size:currentServingSize||null};
- for(const [k,v] of Object.entries(map)){
-  const x=currentNutrition?.[v];
-  out[k]=x!=null&&x!==''&&Number.isFinite(Number(x))?Number(x):null;
- }
- return out;
 }
 
 function extractImages(p,source){
@@ -930,8 +934,21 @@ function extractImages(p,source){
    out.push({url:u,source});
   }
  };
- [p.image_front_url,p.image_front_small_url,p.image_url,p.image_small_url].forEach(add);
- if(Array.isArray(p.images))p.images.forEach(add);
+
+ [
+  p.image_front_url,
+  p.image_front_small_url,
+  p.image_url,
+  p.image_small_url,
+  p.image_front_thumb_url
+ ].forEach(add);
+
+ if(Array.isArray(p.images)){
+  p.images.forEach(v=>{
+   if(typeof v==='string')add(v);
+  });
+ }
+
  const selected=p.selected_images?.front;
  if(selected){
   for(const size of ['display','small','thumb']){
@@ -940,12 +957,14 @@ function extractImages(p,source){
    }
   }
  }
+
  return out;
 }
 
-async function fetchJSON(url,timeout=8500){
+async function fetchJSON(url,timeout=9000){
  const controller=new AbortController();
  const timer=setTimeout(()=>controller.abort(),timeout);
+
  try{
   const r=await fetch(url,{
    signal:controller.signal,
@@ -959,77 +978,176 @@ async function fetchJSON(url,timeout=8500){
  }
 }
 
+function normalizeUPCItem(item,barcode){
+ return {
+  code:digits(item.upc||item.ean||item.gtin||barcode),
+  product_name:clean(item.title||item.name||''),
+  brands:clean(item.brand||''),
+  images:Array.isArray(item.images)?item.images:[],
+  ingredients_text:''
+ };
+}
+
 async function fetchAllProducts(barcode){
+ const codes=barcodeVariants(barcode);
  const requests=[];
- for(const code of barcodeVariants(barcode)){
+
+ for(const code of codes){
   requests.push((async()=>{
-   const j=await fetchJSON('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json');
+   const j=await fetchJSON(
+    'https://world.openfoodfacts.org/api/v2/product/'+
+    encodeURIComponent(code)+
+    '.json?fields=code,product_name,product_name_en,brands,ingredients_text,ingredients_text_en,ingredients_text_fr,ingredients_text_es,ingredients_text_de,ingredients_text_it,ingredients_text_pt,image_url,image_front_url,image_front_small_url,selected_images,nutriments,serving_size'
+   );
    return j?.product&&j.status!==0?
     {product:j.product,source:'Open Food Facts'}:null;
   })());
+
   requests.push((async()=>{
-   const j=await fetchJSON('https://world.openfoodfacts.org/api/v3/product/'+encodeURIComponent(code)+'?product_type=all');
+   const j=await fetchJSON(
+    'https://world.openfoodfacts.org/api/v3/product/'+
+    encodeURIComponent(code)+
+    '?product_type=all'
+   );
    return j?.product?
     {product:j.product,source:'Open Facts Universal'}:null;
   })());
- }
- const settled=await Promise.allSettled(requests);
- const found=settled
-  .filter(x=>x.status==='fulfilled'&&x.value)
-  .map(x=>x.value)
-  .filter(x=>sameBarcode(x.product.code,barcode));
 
- if(!found.some(x=>clean(x.product.product_name))){
-  const j=await fetchJSON('https://api.upcitemdb.com/prod/trial/lookup?upc='+encodeURIComponent(barcode));
-  const item=j?.items?.find(x=>sameBarcode(x.upc||x.ean||x.gtin,barcode));
-  if(item){
-   found.push({
-    product:{
-     code:barcode,
-     product_name:item.title,
-     brands:item.brand,
-     images:item.images||[]
-    },
+  requests.push((async()=>{
+   const j=await fetchJSON(
+    'https://world.openfoodfacts.org/cgi/search.pl?search_terms='+
+    encodeURIComponent(code)+
+    '&search_simple=1&action=process&json=1&page_size=20'
+   );
+   const products=Array.isArray(j?.products)?j.products:[];
+   return products
+    .filter(p=>sameBarcode(externalCode(p),barcode))
+    .map(product=>({product,source:'Open Food Facts Search'}));
+  })());
+ }
+
+ requests.push((async()=>{
+  const j=await fetchJSON(
+   'https://api.upcitemdb.com/prod/trial/lookup?upc='+
+   encodeURIComponent(barcode)
+  );
+  return (Array.isArray(j?.items)?j.items:[])
+   .filter(x=>sameBarcode(x.upc||x.ean||x.gtin,barcode))
+   .map(x=>({
+    product:normalizeUPCItem(x,barcode),
     source:'UPCitemdb'
-   });
+   }));
+ })());
+
+ const settled=await Promise.allSettled(requests);
+ const found=[];
+
+ for(const r of settled){
+  if(r.status!=='fulfilled'||!r.value)continue;
+  const values=Array.isArray(r.value)?r.value:[r.value];
+
+  for(const m of values){
+   if(m?.product&&sameBarcode(externalCode(m.product),barcode)){
+    found.push(m);
+   }
   }
  }
- return found;
+
+ const unique=new Map();
+
+ for(const m of found){
+  const p=m.product;
+  const key=[
+   m.source,
+   externalCode(p),
+   norm(externalName(p)),
+   norm(externalBrand(p)),
+   productIngredients(p)
+  ].join('|');
+
+  if(!unique.has(key))unique.set(key,m);
+ }
+
+ return [...unique.values()];
+}
+
+function sourceScore(m,barcode){
+ const p=m.product;
+ let score=0;
+
+ if(sameBarcode(externalCode(p),barcode))score+=100;
+ if(externalName(p))score+=35;
+ if(externalBrand(p))score+=20;
+ if(trustedExternalIngredients(p,barcode))score+=70;
+ if(extractImages(p,m.source).length)score+=15;
+ if(p.nutriments)score+=5;
+
+ return score;
 }
 
 function chooseExternal(matches,barcode){
  if(!matches.length)return null;
- const sorted=[...matches].sort((a,b)=>{
-  const score=x=>
-   (trustedExternalIngredients(x.product,barcode)?100:0)+
-   (clean(x.product.product_name)?20:0)+
-   (extractImages(x.product,x.source).length?10:0);
-  return score(b)-score(a);
- });
- const primary=sorted[0];
- const compatible=sorted.filter(x=>compatibleIdentity(primary.product,x.product));
- const incompatible=sorted.filter(x=>!compatibleIdentity(primary.product,x.product));
- const p={...primary.product};
- const trusted=compatible.filter(x=>trustedExternalIngredients(x.product,barcode));
 
- if(trusted.length){
-  const first=trusted[0];
-  if(!trustedExternalIngredients(p,barcode)){
-   p.ingredients_text=productIngredients(first.product);
-   p.ingredients_text_en='';
-   p.ingredients='';
-  }
+ const sorted=[...matches].sort(
+  (a,b)=>sourceScore(b,barcode)-sourceScore(a,barcode)
+ );
+
+ const primary=sorted[0];
+ const compatible=sorted.filter(x=>
+  compatibleIdentity(primary.product,x.product)
+ );
+ const incompatible=sorted.filter(x=>
+  !compatibleIdentity(primary.product,x.product)
+ );
+
+ const p={...primary.product};
+
+ if(!externalName(p)){
+  const m=compatible.find(x=>externalName(x.product));
+  if(m)p.product_name=externalName(m.product);
+ }
+
+ if(!externalBrand(p)){
+  const m=compatible.find(x=>externalBrand(x.product));
+  if(m)p.brands=externalBrand(m.product);
+ }
+
+ const trusted=compatible.filter(x=>
+  trustedExternalIngredients(x.product,barcode)
+ );
+
+ const conflictingIngredients=trusted.some(x=>
+  trusted.some(y=>
+   x!==y&&norm(productIngredients(x.product))!==
+    norm(productIngredients(y.product))
+  )
+ );
+
+ if(trusted.length&&!conflictingIngredients){
+  const t=productIngredients(trusted[0].product);
+  p.ingredients_text_en=t;
+  p.ingredients_text=t;
+  p.ingredients='';
  }else{
-  p.ingredients_text='';
   p.ingredients_text_en='';
+  p.ingredients_text='';
   p.ingredients='';
   p.ingredient_text='';
   p.ingredient_list='';
  }
 
  if(!extractImages(p,primary.source).length){
-  const m=compatible.find(x=>extractImages(x.product,x.source).length);
-  if(m)p.image_url=extractImages(m.product,m.source)[0].url;
+  const m=compatible.find(x=>
+   extractImages(x.product,x.source).length
+  );
+  if(m){
+   p.image_url=extractImages(m.product,m.source)[0].url;
+  }
+ }
+
+ if(!p.nutriments){
+  const m=compatible.find(x=>x.product.nutriments);
+  if(m)p.nutriments=m.product.nutriments;
  }
 
  return {
@@ -1037,7 +1155,8 @@ function chooseExternal(matches,barcode){
   source:primary.source,
   compatible,
   incompatible,
-  ingredientTrusted:trusted.length>0,
+  ingredientTrusted:trusted.length>0&&!conflictingIngredients,
+  conflictingIngredients,
   rejected:matches.filter(x=>
    !!productIngredients(x.product)&&
    !trustedExternalIngredients(x.product,barcode)
@@ -1045,13 +1164,39 @@ function chooseExternal(matches,barcode){
  };
 }
 
+function showLookupSources(matches){
+ const box=$('lookupSources');
+ box.replaceChildren();
+
+ if(!matches.length){
+  box.style.display='none';
+  return;
+ }
+
+ const heading=document.createElement('strong');
+ heading.textContent='Product databases checked';
+ box.append(heading);
+
+ for(const m of matches.slice(0,8)){
+  const row=document.createElement('div');
+  row.textContent=m.source+': '+
+   (externalName(m.product)||'Unnamed product')+
+   (externalBrand(m.product)?' — '+externalBrand(m.product):'');
+  box.append(row);
+ }
+
+ box.style.display='block';
+}
+
 function showPhotoCandidates(candidates){
- const req=++photoRequest,img=$('productPhoto');
+ const req=++photoRequest;
+ const img=$('productPhoto');
  let index=0;
  currentPhoto='';
 
  function next(){
   if(req!==photoRequest)return;
+
   if(index>=candidates.length){
    img.hidden=true;
    $('photoPlaceholder').style.display='block';
@@ -1059,13 +1204,17 @@ function showPhotoCandidates(candidates){
    $('photoSource').textContent='You can contribute a picture';
    return;
   }
+
   const c=candidates[index++];
+
   if(!c.url||!(/^https:\/\//.test(c.url)||c.url.startsWith('blob:'))){
    next();
    return;
   }
+
   let done=false;
   const timer=setTimeout(fail,5000);
+
   function fail(){
    if(done||req!==photoRequest)return;
    done=true;
@@ -1073,6 +1222,7 @@ function showPhotoCandidates(candidates){
    img.onload=img.onerror=null;
    next();
   }
+
   img.onload=()=>{
    if(done||req!==photoRequest)return;
    if(img.naturalWidth<20){
@@ -1086,20 +1236,28 @@ function showPhotoCandidates(candidates){
    $('photoSource').textContent=c.source;
    currentPhoto=c.url;
   };
+
   img.onerror=fail;
   img.src=c.url;
  }
+
  next();
 }
 
 function displayProductImages(cloudUrl,matches=[]){
  resetPhoto();
  const list=[];
+
  if(/^https:\/\//.test(cloudUrl||'')){
   list.push({url:cloudUrl,source:'Supabase cloud picture'});
  }
- for(const m of matches)list.push(...extractImages(m.product,m.source));
+
+ for(const m of matches){
+  list.push(...extractImages(m.product,m.source));
+ }
+
  const seen=new Set();
+
  showPhotoCandidates(list.filter(x=>{
   if(seen.has(x.url))return false;
   seen.add(x.url);
@@ -1116,17 +1274,32 @@ async function findCloudRecord(barcode,authenticated=false){
  try{
   const request=authenticated&&currentUser?userRequest:apiRequest;
   const records=[];
+
   for(const code of barcodeVariants(barcode)){
    const rows=await request(
-    '/rest/v1/products?barcode=eq.'+encodeURIComponent(code)+'&select=*&limit=100'
+    '/rest/v1/products?barcode=eq.'+
+    encodeURIComponent(code)+'&select=*&limit=100'
    );
    records.push(...(Array.isArray(rows)?rows:[]));
   }
-  const matches=records.filter(x=>sameBarcode(x.barcode,barcode));
+
+  const seen=new Set();
+  const matches=records.filter(x=>{
+   if(!sameBarcode(x.barcode,barcode))return false;
+   const key=String(x.id??x.barcode+'|'+x.product_name);
+   if(seen.has(key))return false;
+   seen.add(key);
+   return true;
+  });
+
   const score=p=>
    (trustedCloudIngredients(p,barcode)?100:0)+
+   (clean(p.product_name)?20:0)+
+   (clean(p.brand)?10:0)+
    (p.image_url?5:0);
+
   matches.sort((a,b)=>score(b)-score(a));
+
   return {record:matches[0]||null,records:matches,error:null};
  }catch(e){
   return {record:null,records:[],error:e.message};
@@ -1151,31 +1324,38 @@ function blockImportedIngredients(message,details=[]){
  $('confirmed').checked=false;
  verifiedByPackage=false;
  clearResult();
+
  flagConflict(message,details);
+
  $('ingredientWarning').style.display='block';
  $('ingredientWarning').textContent=
-  '⚠️ Imported ingredients were rejected because they may belong to a different product. Photograph the actual package or enter its ingredients. No incorrect vegan classification will be saved.';
+  '⚠️ Imported ingredients were rejected because they may belong to a different product. Photograph the actual package or enter its ingredients.';
 }
 
-function loadCloudRecord(p){
+function loadCloudRecord(p,externalMatches=[]){
  loadedCloudId=p.id??null;
  cloudRecordExists=true;
  rememberBaseline(p);
+
  $('productName').value=p.product_name||'';
  displayBrand(p.brand);
  showNutrition(nutritionFromCloud(p));
  currentServingSize=p.serving_size||'';
- displayProductImages(p.image_url||'');
+ displayProductImages(p.image_url||'',externalMatches);
  setSource('Supabase cloud');
 
  if(!trustedCloudIngredients(p,currentBarcode)){
   blockImportedIngredients(
    'The saved ingredient information cannot be trusted for this exact product.',
-   ['Saved product: '+clean(p.product_name),
+   [
+    'Saved product: '+clean(p.product_name),
     'Saved brand: '+clean(p.brand),
-    'Rejected ingredients: '+clean(p.ingredients)]
+    'Rejected ingredients: '+clean(p.ingredients)
+   ]
   );
-  $('lookupMessage').textContent='Saved product found, but its ingredients need correction.';
+
+  $('lookupMessage').textContent=
+   'Saved product found, but its ingredients need correction.';
   return;
  }
 
@@ -1183,26 +1363,34 @@ function loadCloudRecord(p){
  originalIngredients=loadIngredients(p.ingredients);
  ingredientSource='database';
  showResult(classify(originalIngredients));
- $('lookupMessage').textContent='Product loaded from Supabase. Check the physical package.';
+
+ $('lookupMessage').textContent=
+  'Product loaded from Supabase. Check the physical package.';
 }
 
 function displayExternal(found,matches){
  const p=found.product;
- $('productName').value=p.product_name||p.product_name_en||'';
- displayBrand(p.brands);
+
+ $('productName').value=externalName(p);
+ displayBrand(externalBrand(p));
  showNutrition(p.nutriments||{});
  currentServingSize=p.serving_size||'';
- displayProductImages('',matches);
+ displayProductImages('',found.compatible);
  setSource(found.source);
 
  if(!found.ingredientTrusted){
   blockImportedIngredients(
-   'No trustworthy ingredient list was found for this exact barcode.',
+   found.conflictingIngredients?
+    'Product databases disagree about the ingredients for this barcode.':
+    'No trustworthy ingredient list was found for this exact barcode.',
    found.rejected.map(x=>
-    x.source+': '+clean(x.product.product_name)+' | '+productIngredients(x.product)
+    x.source+': '+externalName(x.product)+
+    ' | '+productIngredients(x.product)
    )
   );
-  $('lookupMessage').textContent='Product identified. Photograph the actual ingredient label to verify it.';
+
+  $('lookupMessage').textContent=
+   'Product identified. Photograph the actual ingredient label to verify it.';
   return;
  }
 
@@ -1210,35 +1398,49 @@ function displayExternal(found,matches){
  originalIngredients=loadIngredients(productIngredients(p));
  ingredientSource='database';
  showResult(classify(originalIngredients));
- $('lookupMessage').textContent='Product information found. Check the physical package.';
+
+ $('lookupMessage').textContent=
+  'Product information found. Check the physical package.';
 }
+
+/* IMPORTANT: NEVER SUBSTITUTE ANOTHER BARCODE'S PRODUCT */
 
 async function lookupProduct(){
  const barcode=digits($('barcode').value);
+
  if(!validBarcode(barcode)){
   alert('Enter a valid 8–14 digit barcode.');
   return;
  }
+
  if(lookupInProgress)return;
 
  lookupInProgress=true;
+ lookupBusyBarcode=barcode;
  const serial=++lookupSerial;
+
  await stopCamera();
- if(serial!==lookupSerial)return;
+
+ if(serial!==lookupSerial){
+  lookupInProgress=false;
+  return;
+ }
 
  currentBarcode=barcode;
  clearResult();
  clearIdentityConflict();
  resetPhoto();
  releaseSelectedPhoto();
+
  $('productName').value='';
  displayBrand('');
  $('ingredients').value='';
  $('confirmed').checked=false;
  $('autoSaveMessage').textContent='';
- $('lookupMessage').textContent='Checking Supabase…';
+ $('lookupMessage').textContent='Checking product databases…';
  $('lookupProgress').textContent='';
  $('lookupSources').style.display='none';
+ $('lookupSources').replaceChildren();
  $('retryLookup').style.display='none';
  $('ingredientWarning').style.display='none';
 
@@ -1250,6 +1452,8 @@ async function lookupProduct(){
  verifiedByPackage=false;
  ingredientImportBlocked=false;
  currentSourceRecords=[];
+ allergens={contains:'',mayContain:''};
+ updateAllergens();
  showNutrition({});
  setSource('');
  setStatus('Looking up…');
@@ -1258,70 +1462,124 @@ async function lookupProduct(){
  const current=()=>serial===lookupSerial;
 
  try{
-  const cloud=await findCloudRecord(barcode);
-  if(!current())return;
+  const [cloud,matches]=await Promise.all([
+   findCloudRecord(barcode,!!currentUser),
+   fetchAllProducts(barcode)
+  ]);
 
-  if(cloud.error){
-   $('autoSaveMessage').textContent='Cloud lookup unavailable: '+cloud.error;
-  }
-
-  if(cloud.record)loadCloudRecord(cloud.record);
-
-  $('lookupProgress').textContent='Checking outside product sources…';
-  const matches=await fetchAllProducts(barcode);
   if(!current())return;
 
   currentSourceRecords=matches;
+  showLookupSources(matches);
+
   const external=chooseExternal(matches,barcode);
-  $('lookupProgress').textContent='';
+
+  if(cloud.error){
+   $('autoSaveMessage').textContent=
+    'Cloud lookup unavailable: '+cloud.error;
+  }
 
   if(cloud.record){
-   loadCloudRecord(cloud.record);
+   const compatibleMatches=external?
+    external.compatible.filter(x=>
+     compatibleIdentity(
+      {
+       product_name:cloud.record.product_name,
+       brands:cloud.record.brand
+      },
+      x.product
+     )
+    ):[];
+
+   loadCloudRecord(cloud.record,compatibleMatches);
 
    if(external){
-    const conflicts=matches.filter(x=>
-     !compatibleIdentity({
-      product_name:cloud.record.product_name,
-      brands:cloud.record.brand
-     },x.product)
+    const cloudIdentity={
+     product_name:cloud.record.product_name,
+     brands:cloud.record.brand
+    };
+
+    const matching=matches.filter(x=>
+     compatibleIdentity(cloudIdentity,x.product)
     );
 
-    if(conflicts.length){
+    const conflicting=matches.filter(x=>
+     !compatibleIdentity(cloudIdentity,x.product)
+    );
+
+    if(conflicting.length&&matching.length===0){
      flagConflict(
       'Outside sources disagree with the saved product identity. Confirm the physical package.',
-      conflicts.map(x=>
-       x.source+': '+clean(x.product.product_name)+' | '+productIngredients(x.product)
+      conflicting.map(x=>
+       x.source+': '+externalName(x.product)+
+       ' | '+productIngredients(x.product)
       )
      );
-    }else if(!cloud.record.image_url){
-     displayProductImages('',external.compatible);
     }
 
-    if(!trustedCloudIngredients(cloud.record,barcode)){
-     blockImportedIngredients(
-      'The Supabase record contains suspicious or unrelated ingredients.',
-      ['Saved ingredients: '+clean(cloud.record.ingredients)]
+    if(!clean(cloud.record.product_name)&&matching.length){
+     $('productName').value=externalName(matching[0].product);
+    }
+
+    if(!clean(cloud.record.brand)&&matching.length){
+     displayBrand(externalBrand(matching[0].product));
+    }
+
+    if(!trustedCloudIngredients(cloud.record,barcode)&&
+       matching.length){
+
+     const trusted=matching.find(x=>
+      trustedExternalIngredients(x.product,barcode)
      );
+
+     if(trusted){
+      originalIngredients=loadIngredients(
+       productIngredients(trusted.product)
+      );
+      ingredientImportBlocked=false;
+      ingredientSource='database';
+      $('ingredientWarning').style.display='none';
+      clearIdentityConflict();
+      showResult(classify(originalIngredients));
+      $('lookupMessage').textContent=
+       'Ingredients recovered from a matching barcode source. Check the physical package.';
+     }
+    }
+
+    if(!cloud.record.image_url&&matching.length){
+     displayProductImages('',matching);
+    }
+
+    if(!Object.values(currentNutrition).some(v=>v!=null)&&
+       external.product.nutriments){
+     showNutrition(external.product.nutriments);
     }
    }
 
    if(cloud.records.length>1){
     const incompatible=cloud.records.slice(1).filter(x=>
-     !compatibleIdentity({
-      product_name:cloud.record.product_name,
-      brands:cloud.record.brand
-     },{
-      product_name:x.product_name,
-      brands:x.brand
-     })
+     !compatibleIdentity(
+      {
+       product_name:cloud.record.product_name,
+       brands:cloud.record.brand
+      },
+      {
+       product_name:x.product_name,
+       brands:x.brand
+      }
+     )
     );
+
     if(incompatible.length){
      flagConflict(
       'Conflicting Supabase records use this barcode. Administrator review is needed.',
-      incompatible.map(x=>clean(x.product_name)+' | '+clean(x.ingredients))
+      incompatible.map(x=>
+       clean(x.product_name)+' | '+clean(x.ingredients)
+      )
      );
     }
    }
+
   }else if(external){
    displayExternal(external,matches);
 
@@ -1329,57 +1587,74 @@ async function lookupProduct(){
     flagConflict(
      'Multiple databases disagree about this barcode. Verify the physical package.',
      matches.map(x=>
-      x.source+': '+clean(x.product.product_name)+' | '+productIngredients(x.product)
+      x.source+': '+externalName(x.product)+
+      ' | '+productIngredients(x.product)
      )
     );
    }
+
   }else{
    setStatus('Needs Verification');
-   $('lookupMessage').textContent='No matching product found. Add its name and photograph the ingredients.';
+   $('lookupMessage').textContent=
+    'Barcode scanned correctly, but no matching product was found in the available databases. Enter the product name and brand, then photograph the actual ingredients.';
+
+   $('ingredientWarning').style.display='block';
+   $('ingredientWarning').textContent=
+    'No ingredients were returned. Verified Vegan will not guess a product or invent ingredients.';
   }
 
   if(!cloud.record&&cloud.error){
-   $('autoSaveMessage').textContent='Cloud unavailable. Automatic save was not attempted.';
+   $('autoSaveMessage').textContent=
+    'Cloud unavailable. Automatic save was not attempted.';
   }else{
-   $('autoSaveMessage').textContent='Lookup complete. Verified package corrections can be saved.';
+   $('autoSaveMessage').textContent=
+    'Lookup complete. Package-verified information can be saved.';
   }
 
-  if(!cloud.record||identityConflict||ingredientImportBlocked){
-   $('retryLookup').style.display='block';
-  }
+  $('retryLookup').style.display='block';
 
  }catch(e){
   if(current()){
    clearResult();
    setStatus('Needs Verification');
    $('lookupMessage').textContent='Lookup failed: '+e.message;
+   $('retryLookup').style.display='block';
   }
  }finally{
   if(current()){
    lookupInProgress=false;
+   lookupBusyBarcode='';
    $('lookupProgress').textContent='';
   }
  }
 }
 
 $('lookup').onclick=lookupProduct;
-$('retryLookup').onclick=lookupProduct;
 
-/* AUTOMATIC BARCODE CAMERA */
+$('retryLookup').onclick=()=>{
+ if(lookupInProgress)return;
+ $('barcode').value=currentBarcode;
+ lookupProduct();
+};
+
+/* BARCODE CAMERA */
 
 function loadScannerLibrary(){
  if(window.Html5Qrcode)return Promise.resolve();
  if(scannerLibraryPromise)return scannerLibraryPromise;
+
  scannerLibraryPromise=new Promise((resolve,reject)=>{
   const s=document.createElement('script');
   s.src='https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
-  s.onload=()=>window.Html5Qrcode?resolve():reject(Error('Scanner library unavailable.'));
+  s.onload=()=>window.Html5Qrcode?
+   resolve():reject(Error('Scanner library unavailable.'));
   s.onerror=()=>reject(Error('Unable to load scanner library.'));
   document.head.append(s);
  }).catch(e=>{
   scannerLibraryPromise=null;
   throw e;
  });
+
  return scannerLibraryPromise;
 }
 
@@ -1387,23 +1662,29 @@ async function stopCamera(){
  scanActive=false;
  scannerStarting=false;
  ++scannerSession;
+
  if(scanTimer){
   clearTimeout(scanTimer);
   scanTimer=null;
  }
+
  const old=scanner;
  scanner=null;
+
  if(old){
   try{await old.stop();}catch{}
   try{await old.clear();}catch{}
  }
+
  if(stream){
   stream.getTracks().forEach(t=>t.stop());
   stream=null;
  }
+
  const v=$('video');
  try{v.pause();}catch{}
  v.srcObject=null;
+
  $('cameraPanel').style.display='none';
  $('startCamera').disabled=false;
  $('startCamera').textContent='📷 Scan Barcode';
@@ -1413,10 +1694,13 @@ $('stopCamera').onclick=stopCamera;
 
 async function processScannedBarcode(raw,session){
  if(!scanActive||session!==scannerSession)return;
+
  const b=digits(raw);
  if(!validBarcode(b))return;
+
  scanActive=false;
  try{navigator.vibrate?.(80);}catch{}
+
  await stopCamera();
  $('barcode').value=b;
  await lookupProduct();
@@ -1426,10 +1710,15 @@ async function startNativeScanner(session){
  const formats=['ean_13','ean_8','upc_a','upc_e'];
  const supported=typeof BarcodeDetector.getSupportedFormats==='function'?
   await BarcodeDetector.getSupportedFormats():formats;
+
  const allowed=formats.filter(f=>supported.includes(f));
- if(!allowed.length)throw Error('Native barcode formats unavailable.');
+
+ if(!allowed.length){
+  throw Error('Native barcode formats unavailable.');
+ }
 
  detector=new BarcodeDetector({formats:allowed});
+
  const s=await navigator.mediaDevices.getUserMedia({
   video:{
    facingMode:{ideal:'environment'},
@@ -1449,19 +1738,23 @@ async function startNativeScanner(session){
  v.srcObject=s;
  $('cameraPanel').style.display='block';
  await v.play();
+
  if(session!==scannerSession)return;
 
  scannerStarting=false;
  scanActive=true;
  $('startCamera').disabled=false;
  $('startCamera').textContent='📷 Scanner Running';
- $('scannerFeedback').textContent='Point at the barcode. It scans automatically.';
+ $('scannerFeedback').textContent=
+  'Point at the barcode. It scans automatically.';
 
  async function scan(){
   if(!scanActive||session!==scannerSession)return;
+
   try{
    if(v.readyState>=2){
     const hits=await detector.detect(v);
+
     for(const h of hits){
      if(validBarcode(h.rawValue)){
       await processScannedBarcode(h.rawValue,session);
@@ -1470,10 +1763,12 @@ async function startNativeScanner(session){
     }
    }
   }catch{}
+
   if(scanActive&&session===scannerSession){
    scanTimer=setTimeout(scan,150);
   }
  }
+
  scan();
 }
 
@@ -1522,23 +1817,27 @@ async function startFallbackScanner(session){
  }
 
  if(session!==scannerSession)return;
+
  scannerStarting=false;
  $('startCamera').disabled=false;
  $('startCamera').textContent='📷 Scanner Running';
- $('scannerFeedback').textContent='Point at the barcode. It scans automatically.';
+ $('scannerFeedback').textContent=
+  'Point at the barcode. It scans automatically.';
 }
 
 async function startBarcodeCamera(){
  if(scanActive||scannerStarting)return;
 
  if(!navigator.mediaDevices?.getUserMedia){
-  $('cameraError').textContent='Camera access requires HTTPS and browser permission.';
+  $('cameraError').textContent=
+   'Camera access requires HTTPS and browser permission.';
   $('manualEntry').style.display='block';
   return;
  }
 
  scannerStarting=true;
  const session=++scannerSession;
+
  $('startCamera').disabled=true;
  $('startCamera').textContent='Opening camera…';
  $('cameraError').textContent='';
@@ -1548,6 +1847,7 @@ async function startBarcodeCamera(){
 
  try{
   const safari=/^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
   if('BarcodeDetector' in window&&!safari){
    try{
     await startNativeScanner(session);
@@ -1559,10 +1859,13 @@ async function startBarcodeCamera(){
     }
    }
   }
+
   await startFallbackScanner(session);
+
  }catch(e){
   await stopCamera();
-  $('cameraError').textContent='Camera could not start: '+e.message;
+  $('cameraError').textContent=
+   'Camera could not start: '+e.message;
   $('manualEntry').style.display='block';
   $('manualToggle').setAttribute('aria-expanded','true');
  }
@@ -1576,7 +1879,7 @@ $('startCamera').onclick=async()=>{
  await startBarcodeCamera();
 };
 
-/* PRODUCT PICTURES */
+/* PRODUCT PHOTOGRAPHS */
 
 $('takeFront').onclick=()=>{
  if(!currentBarcode)return alert('Scan a product first.');
@@ -1594,12 +1897,15 @@ $('chooseFront').onclick=()=>{
 
 async function imageFileToCanvas(file,max=1400){
  const bitmap=await createImageBitmap(file);
+
  try{
   const scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));
   const canvas=document.createElement('canvas');
   canvas.width=Math.max(1,Math.round(bitmap.width*scale));
   canvas.height=Math.max(1,Math.round(bitmap.height*scale));
-  canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+  canvas.getContext('2d').drawImage(
+   bitmap,0,0,canvas.width,canvas.height
+  );
   return canvas;
  }finally{
   bitmap.close();
@@ -1609,21 +1915,31 @@ async function imageFileToCanvas(file,max=1400){
 $('frontInput').onchange=async()=>{
  const f=$('frontInput').files?.[0];
  if(!f)return;
+
  try{
   const canvas=await imageFileToCanvas(f,1200);
-  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.78));
+  const blob=await new Promise(resolve=>
+   canvas.toBlob(resolve,'image/jpeg',.78)
+  );
+
   if(!blob)throw Error('Image conversion failed.');
+
   releaseSelectedPhoto();
-  selectedPhotoFile=new File([blob],'product.jpg',{type:'image/jpeg'});
+  selectedPhotoFile=new File(
+   [blob],'product.jpg',{type:'image/jpeg'}
+  );
   selectedPhotoURL=URL.createObjectURL(blob);
   showPhoto(selectedPhotoURL,'Temporary preview');
-  $('frontMessage').textContent='Picture ready. It will be submitted when you save the verified scan.';
+
+  $('frontMessage').textContent=
+   'Picture ready. It will be submitted when you save the verified scan.';
+
  }catch(e){
   $('frontMessage').textContent=e.message;
  }
 };
 
-/* IMPROVED INGREDIENT PHOTO OCR */
+/* SMALL INGREDIENT PHOTO AND OCR */
 
 const photoInput=$('photoInput');
 const cropCanvas=$('cropCanvas');
@@ -1645,6 +1961,7 @@ $('choosePhoto').onclick=()=>{
 
 async function getWorker(){
  if(ocrWorker)return ocrWorker;
+
  if(!ocrPromise){
   ocrPromise=(async()=>{
    if(!window.Tesseract){
@@ -1659,6 +1976,7 @@ async function getWorker(){
    return Tesseract.createWorker('eng');
   })();
  }
+
  try{
   ocrWorker=await ocrPromise;
   return ocrWorker;
@@ -1673,7 +1991,9 @@ function makeCanvas(bitmap,max=2400){
  const c=document.createElement('canvas');
  c.width=Math.max(1,Math.round(bitmap.width*scale));
  c.height=Math.max(1,Math.round(bitmap.height*scale));
- c.getContext('2d').drawImage(bitmap,0,0,c.width,c.height);
+ c.getContext('2d').drawImage(
+  bitmap,0,0,c.width,c.height
+ );
  return c;
 }
 
@@ -1681,8 +2001,10 @@ function enhanceCanvas(canvas,contrast=1.5){
  const c=document.createElement('canvas');
  c.width=canvas.width;
  c.height=canvas.height;
+
  const context=c.getContext('2d',{willReadFrequently:true});
  context.drawImage(canvas,0,0);
+
  const image=context.getImageData(0,0,c.width,c.height);
 
  for(let i=0;i<image.data.length;i+=4){
@@ -1691,9 +2013,11 @@ function enhanceCanvas(canvas,contrast=1.5){
    .587*image.data[i+1]+
    .114*image.data[i+2]
   );
+
   const v=Math.max(0,Math.min(255,(g-128)*contrast+128));
   image.data[i]=image.data[i+1]=image.data[i+2]=v;
  }
+
  context.putImageData(image,0,0);
  return c;
 }
@@ -1714,6 +2038,7 @@ function textScore(text,confidence){
  const t=parsed.ingredients;
  const words=(t.match(/[A-Za-z]{3,}/g)||[]).length;
  const punctuation=(t.match(/[,;()]/g)||[]).length;
+
  return words*2+
   punctuation*.5+
   confidence*.35+
@@ -1732,18 +2057,22 @@ async function readIngredientsCanvas(canvas,session){
   enhanceCanvas(canvas,1.5),
   sharpenCanvas(canvas)
  ];
+
  let best=null;
+
  $('ocrProgress').style.display='block';
  $('ocrProgressBar').style.width='5%';
 
  for(let i=0;i<variants.length;i++){
   if(session!==photoSession)return;
+
   $('ocrMessage').textContent=
    'Reading ingredients ('+(i+1)+' of '+variants.length+')…';
   $('ocrProgressBar').style.width=(10+i*28)+'%';
 
   const result=await worker.recognize(variants[i]);
   if(session!==photoSession)return;
+
   const text=result.data?.text||'';
   const confidence=Number(result.data?.confidence)||0;
   const score=textScore(text,confidence);
@@ -1754,6 +2083,7 @@ async function readIngredientsCanvas(canvas,session){
  }
 
  if(session!==photoSession)return;
+
  $('ocrProgressBar').style.width='100%';
  const parsed=splitPackageText(best?.text||'');
 
@@ -1766,11 +2096,14 @@ async function readIngredientsCanvas(canvas,session){
  ){
   ocrRejected=true;
   ingredientSource='ocr';
+
   $('ocrMessage').textContent=
    'Text was unclear or incomplete. Adjust the selection to include the entire ingredient list, or enter it manually.';
+
   $('ingredientWarning').style.display='block';
   $('ingredientWarning').textContent=
    '⚠️ Unreliable text. No vegan result assigned.';
+
   $('cropPanel').style.display='block';
   clearResult();
   setStatus('Needs Verification');
@@ -1782,22 +2115,31 @@ async function readIngredientsCanvas(canvas,session){
  ocrRejected=false;
  verifiedByPackage=false;
  $('confirmed').checked=false;
+
  clearResult();
  setStatus('Needs Verification');
  $('ingredientWarning').style.display='none';
+
  $('ocrMessage').textContent=
   'Ingredients detected. Check that the ENTIRE list was captured, correct mistakes, then confirm.';
- $('ingredients').scrollIntoView({behavior:'smooth',block:'center'});
+
+ $('ingredients').scrollIntoView({
+  behavior:'smooth',block:'center'
+ });
 }
 
 function drawCrop(){
  if(!photoBitmap)return;
+
  ctx.clearRect(0,0,cropCanvas.width,cropCanvas.height);
- ctx.drawImage(photoBitmap,0,0,cropCanvas.width,cropCanvas.height);
+ ctx.drawImage(
+  photoBitmap,0,0,cropCanvas.width,cropCanvas.height
+ );
 
  if(cropRect){
   ctx.fillStyle='rgba(0,0,0,.28)';
   ctx.fillRect(0,0,cropCanvas.width,cropCanvas.height);
+
   ctx.drawImage(
    photoBitmap,
    cropRect.x*photoBitmap.width/cropCanvas.width,
@@ -1806,19 +2148,27 @@ function drawCrop(){
    cropRect.h*photoBitmap.height/cropCanvas.height,
    cropRect.x,cropRect.y,cropRect.w,cropRect.h
   );
+
   ctx.strokeStyle='#00e676';
   ctx.lineWidth=Math.max(3,cropCanvas.width/180);
-  ctx.strokeRect(cropRect.x,cropRect.y,cropRect.w,cropRect.h);
+  ctx.strokeRect(
+   cropRect.x,cropRect.y,cropRect.w,cropRect.h
+  );
  }
 }
 
 function cropPoint(e){
  const r=cropCanvas.getBoundingClientRect();
+
  return {
-  x:Math.max(0,Math.min(cropCanvas.width,
-   (e.clientX-r.left)*cropCanvas.width/r.width)),
-  y:Math.max(0,Math.min(cropCanvas.height,
-   (e.clientY-r.top)*cropCanvas.height/r.height))
+  x:Math.max(0,Math.min(
+   cropCanvas.width,
+   (e.clientX-r.left)*cropCanvas.width/r.width
+  )),
+  y:Math.max(0,Math.min(
+   cropCanvas.height,
+   (e.clientY-r.top)*cropCanvas.height/r.height
+  ))
  };
 }
 
@@ -1831,14 +2181,18 @@ cropCanvas.onpointerdown=e=>{
 
 cropCanvas.onpointermove=e=>{
  if(!dragStart)return;
+
  const p=cropPoint(e);
+
  cropRect={
   x:Math.min(dragStart.x,p.x),
   y:Math.min(dragStart.y,p.y),
   w:Math.abs(p.x-dragStart.x),
   h:Math.abs(p.y-dragStart.y)
  };
+
  drawCrop();
+
  $('cropSelectionStatus').textContent=
   'Selection ready. Make sure the entire ingredient list is inside the green box.';
 };
@@ -1846,6 +2200,7 @@ cropCanvas.onpointermove=e=>{
 function endCrop(){
  dragStart=null;
 }
+
 cropCanvas.onpointerup=endCrop;
 cropCanvas.onpointercancel=endCrop;
 
@@ -1858,11 +2213,13 @@ $('resetCrop').onclick=()=>{
 
 $('selectFull').onclick=()=>{
  if(!photoBitmap)return;
+
  cropRect={
   x:0,y:0,
   w:cropCanvas.width,
   h:cropCanvas.height
  };
+
  drawCrop();
  $('cropSelectionStatus').textContent=
   'Entire photograph selected.';
@@ -1872,7 +2229,9 @@ $('manualCropButton').onclick=()=>{
  if(!photoBitmap)return;
  $('cropPanel').style.display='block';
  drawCrop();
- $('cropPanel').scrollIntoView({behavior:'smooth',block:'start'});
+ $('cropPanel').scrollIntoView({
+  behavior:'smooth',block:'start'
+ });
 };
 
 photoInput.onchange=async()=>{
@@ -1882,11 +2241,13 @@ photoInput.onchange=async()=>{
  const session=++photoSession;
  ocrBusy=true;
  $('check').disabled=true;
- $('ocrMessage').textContent='Preparing ingredient photograph…';
+ $('ocrMessage').textContent=
+  'Preparing ingredient photograph…';
 
  try{
   if(photoBitmap)photoBitmap.close();
   photoBitmap=await createImageBitmap(file);
+
   if(session!==photoSession)return;
 
   const canvas=makeCanvas(photoBitmap,1600);
@@ -1896,24 +2257,34 @@ photoInput.onchange=async()=>{
   drawCrop();
 
   const preview=$('ingredientPreview');
-  if(preview.src.startsWith('blob:'))URL.revokeObjectURL(preview.src);
+
+  if(preview.src.startsWith('blob:')){
+   URL.revokeObjectURL(preview.src);
+  }
+
   preview.src=URL.createObjectURL(file);
   preview.style.display='block';
 
   $('cropPanel').style.display='block';
   $('manualCropButton').style.display='block';
+
   $('cropSelectionStatus').textContent=
    'Drag around the complete ingredient list, or use the full picture.';
+
   $('ocrMessage').textContent=
    'Select the ingredient area in the smaller picture below.';
+
   $('ingredientWarning').style.display='none';
   ocrRejected=true;
   verifiedByPackage=false;
   $('confirmed').checked=false;
+
   clearResult();
   setStatus('Needs Verification');
+
  }catch(e){
-  $('ocrMessage').textContent='Photo preparation failed: '+e.message;
+  $('ocrMessage').textContent=
+   'Photo preparation failed: '+e.message;
  }finally{
   ocrBusy=false;
   $('check').disabled=false;
@@ -1941,10 +2312,12 @@ $('readCrop').onclick=async()=>{
 
   const sourceX=Math.max(0,Math.floor(r.x*sx));
   const sourceY=Math.max(0,Math.floor(r.y*sy));
+
   const sourceW=Math.min(
    photoBitmap.width-sourceX,
    Math.ceil(r.w*sx)
   );
+
   const sourceH=Math.min(
    photoBitmap.height-sourceY,
    Math.ceil(r.h*sy)
@@ -1954,10 +2327,14 @@ $('readCrop').onclick=async()=>{
    throw Error('The selected area is too small.');
   }
 
-  const scale=Math.min(1,2600/Math.max(sourceW,sourceH));
+  const scale=Math.min(
+   1,2600/Math.max(sourceW,sourceH)
+  );
+
   const c=document.createElement('canvas');
   c.width=Math.max(1,Math.round(sourceW*scale));
   c.height=Math.max(1,Math.round(sourceH*scale));
+
   c.getContext('2d').drawImage(
    photoBitmap,
    sourceX,sourceY,sourceW,sourceH,
@@ -1965,6 +2342,7 @@ $('readCrop').onclick=async()=>{
   );
 
   await readIngredientsCanvas(c,session);
+
  }catch(e){
   $('ocrMessage').textContent=e.message;
  }finally{
@@ -1983,10 +2361,11 @@ $('ingredients').oninput=()=>{
  setStatus('Needs Verification');
 };
 
-/* PACKAGE VERIFICATION */
+/* VERIFY ACTUAL PACKAGE INGREDIENTS */
 
 async function verifyIngredients(){
  if(ocrBusy)return;
+
  if(ocrRejected){
   alert('Correct unreadable ingredients or enter them manually first.');
   return;
@@ -2000,7 +2379,9 @@ async function verifyIngredients(){
  }
 
  if(!$('confirmed').checked){
-  alert('Check the complete list against the package and tick the confirmation box.');
+  alert(
+   'Check the complete list against the package and tick the confirmation box.'
+  );
   return;
  }
 
@@ -2009,11 +2390,22 @@ async function verifyIngredients(){
   return;
  }
 
+ const name=clean($('productName').value);
+
+ if(suspiciousIngredientIdentity(name,p.ingredients)){
+  alert(
+   'These ingredients may be from a recipe or a different product. Check the actual package.'
+  );
+  return;
+ }
+
  $('ingredients').value=p.ingredients;
+
  allergens={
   contains:p.contains||allergens.contains,
   mayContain:p.mayContain||allergens.mayContain
  };
+
  updateAllergens();
 
  verifiedByPackage=true;
@@ -2026,10 +2418,12 @@ async function verifyIngredients(){
  if(identityConflict||ingredientImportBlocked){
   $('ingredientWarning').style.display='block';
   $('ingredientWarning').textContent=
-   'Package ingredients verified. Confirm the product name and brand. Existing incorrect records require administrator correction or contribution review.';
+   'Package ingredients verified. Confirm the product name and brand before saving.';
  }
 
- $('result').scrollIntoView({behavior:'smooth',block:'start'});
+ $('result').scrollIntoView({
+  behavior:'smooth',block:'start'
+ });
 
  if(lastResult&&verifiedByPackage){
   await persistVerifiedScan();
@@ -2038,10 +2432,12 @@ async function verifyIngredients(){
 
 $('check').onclick=verifyIngredients;
 
-/* ACCOUNTS AND REWARDS */
+/* ACCOUNT AND REWARDS */
 
 function updateAccountMode(){
- const signed=!!currentUser,admin=signed&&adminAuthorized;
+ const signed=!!currentUser;
+ const admin=signed&&adminAuthorized;
+
  $('signedOutPanel').style.display=signed?'none':'block';
  $('signedInPanel').style.display=signed?'block':'none';
  $('myRewards').style.display=signed&&!admin?'block':'none';
@@ -2049,8 +2445,11 @@ function updateAccountMode(){
  $('contributionSteps').style.display=admin?'none':'block';
  $('adminNotice').style.display=admin?'block':'none';
  $('refreshRewards').style.display=admin?'none':'block';
+
  $('welcomeUser').textContent=signed?
-  'Signed in: '+(currentUser.email||'Contributor')+(admin?' — Administrator':''):'';
+  'Signed in: '+(currentUser.email||'Contributor')+
+  (admin?' — Administrator':''):'';
+
  $('save').textContent=admin?
   '💾 Save Scan — Administrator':
   '💾 Save Scan / Submit Contribution';
@@ -2063,18 +2462,26 @@ function authRedirect(){
 $('signUp').onclick=async()=>{
  const email=$('authEmail').value.trim();
  const password=$('authPassword').value;
+
  if(!email||password.length<8){
-  $('authMessage').textContent='Enter an email and password of at least 8 characters.';
+  $('authMessage').textContent=
+   'Enter an email and password of at least 8 characters.';
   return;
  }
+
  try{
-  const s=await authCall('signup?redirect_to='+encodeURIComponent(authRedirect()),{email,password});
+  const s=await authCall(
+   'signup?redirect_to='+encodeURIComponent(authRedirect()),
+   {email,password}
+  );
+
   if(s.access_token){
    saveSession(s);
    await initializeSignedInAccount();
    $('authMessage').textContent='Account created.';
   }else{
-   $('authMessage').textContent='Check your email to confirm your account.';
+   $('authMessage').textContent=
+    'Check your email to confirm your account.';
   }
  }catch(e){
   $('authMessage').textContent=e.message;
@@ -2083,13 +2490,18 @@ $('signUp').onclick=async()=>{
 
 $('signIn').onclick=async()=>{
  try{
-  const s=await authCall('token?grant_type=password',{
-   email:$('authEmail').value.trim(),
-   password:$('authPassword').value
-  });
+  const s=await authCall(
+   'token?grant_type=password',
+   {
+    email:$('authEmail').value.trim(),
+    password:$('authPassword').value
+   }
+  );
+
   saveSession(s);
   await initializeSignedInAccount();
   $('authMessage').textContent='Signed in successfully.';
+
  }catch(e){
   $('authMessage').textContent=e.message;
  }
@@ -2098,9 +2510,14 @@ $('signIn').onclick=async()=>{
 $('resetPassword').onclick=async()=>{
  const email=$('authEmail').value.trim();
  if(!email)return;
+
  try{
-  await authCall('recover?redirect_to='+encodeURIComponent(authRedirect()),{email});
-  $('authMessage').textContent='Check your email for recovery instructions.';
+  await authCall(
+   'recover?redirect_to='+encodeURIComponent(authRedirect()),
+   {email}
+  );
+  $('authMessage').textContent=
+   'Check your email for recovery instructions.';
  }catch(e){
   $('authMessage').textContent=e.message;
  }
@@ -2110,14 +2527,18 @@ $('savePassword').onclick=async()=>{
  try{
   const password=$('newPassword').value;
   if(password.length<8)throw Error('Use at least 8 characters.');
+
   const r=await fetch(SUPABASE_URL+'/auth/v1/user',{
    method:'PUT',
    headers:headers(await userToken()),
    body:JSON.stringify({password})
   });
+
   if(!r.ok)throw Error(await responseError(r));
+
   $('passwordPanel').style.display='none';
   $('authMessage').textContent='Password updated.';
+
  }catch(e){
   $('authMessage').textContent=e.message;
  }
@@ -2132,34 +2553,46 @@ $('logout').onclick=()=>{
 async function checkAdminAccess(){
  const serial=++adminCheckSerial;
  adminAuthorized=false;
+
  if(!currentUser)return false;
+
  try{
   const rows=await userRequest(
    '/rest/v1/vv_admins?user_id=eq.'+
    encodeURIComponent(currentUser.id)+
    '&select=user_id&limit=1'
   );
+
   if(serial!==adminCheckSerial)return false;
+
   adminAuthorized=Array.isArray(rows)&&
    rows.some(x=>x.user_id===currentUser.id);
+
   updateAccountMode();
+
   if(adminAuthorized)await loadAdminPending();
+
   return adminAuthorized;
+
  }catch(e){
-  $('authMessage').textContent='Administrator check: '+e.message;
+  $('authMessage').textContent=
+   'Administrator check: '+e.message;
   return false;
  }
 }
 
 async function initializeSignedInAccount(){
  if(!currentUser)return;
+
  await checkAdminAccess();
+
  if(!adminAuthorized){
   try{
    const rows=await userRequest(
     '/rest/v1/vv_profiles?user_id=eq.'+
     encodeURIComponent(currentUser.id)+'&select=user_id'
    );
+
    if(!rows.length){
     await userRequest('/rest/v1/vv_profiles',{
      method:'POST',
@@ -2170,26 +2603,35 @@ async function initializeSignedInAccount(){
     });
    }
   }catch{}
+
   await loadRewards();
  }
 }
 
 async function restoreAuth(){
  let saved=null;
+
  try{
   saved=JSON.parse(localStorage.getItem(AUTHKEY)||'null');
  }catch{}
+
  if(!saved?.access_token)return;
+
  saveSession(saved);
+
  try{
   const r=await fetch(SUPABASE_URL+'/auth/v1/user',{
    headers:headers(await userToken())
   });
+
   if(!r.ok)throw Error('Session invalid.');
+
   currentUser=await r.json();
   authSession.user=currentUser;
   saveSession(authSession);
+
   await initializeSignedInAccount();
+
  }catch{
   saveSession(null);
  }
@@ -2197,35 +2639,52 @@ async function restoreAuth(){
 
 async function loadRewards(){
  if(!currentUser||adminAuthorized)return;
+
  try{
   const id=encodeURIComponent(currentUser.id);
+
   const totals=await userRequest(
-   '/rest/v1/vv_my_rewards?user_id=eq.'+id+'&select=*'
+   '/rest/v1/vv_my_rewards?user_id=eq.'+
+   id+'&select=*'
   );
-  $('earnedPoints').textContent=totals[0]?.earned_points??0;
-  $('pendingPoints').textContent=totals[0]?.pending_points??0;
+
+  $('earnedPoints').textContent=
+   totals[0]?.earned_points??0;
+  $('pendingPoints').textContent=
+   totals[0]?.pending_points??0;
 
   const contributions=await userRequest(
-   '/rest/v1/vv_contributions?user_id=eq.'+id+
-   '&select=barcode,contribution_type,points,status,created_at&order=created_at.desc&limit=30'
+   '/rest/v1/vv_contributions?user_id=eq.'+
+   id+
+   '&select=barcode,contribution_type,points,status,created_at'+
+   '&order=created_at.desc&limit=30'
   );
 
   $('contributionHistory').replaceChildren();
+
   if(!contributions.length){
-   $('contributionHistory').textContent='No contributions yet.';
+   $('contributionHistory').textContent=
+    'No contributions yet.';
   }
+
   contributions.forEach(c=>{
    const div=document.createElement('div');
    div.className='entry';
+
    div.textContent=
     String(c.contribution_type||'Contribution').replace(/_/g,' ')+
     ' • '+c.barcode+
     ' • '+c.points+' points • '+c.status;
+
    $('contributionHistory').append(div);
   });
-  $('rewardMessage').textContent='Points are awarded after verification.';
+
+  $('rewardMessage').textContent=
+   'Points are awarded after verification.';
+
  }catch(e){
-  $('rewardMessage').textContent='Rewards unavailable: '+e.message;
+  $('rewardMessage').textContent=
+   'Rewards unavailable: '+e.message;
  }
 }
 
@@ -2234,52 +2693,77 @@ $('refreshRewards').onclick=loadRewards;
 async function loadMonthlyLeaderboard(){
  if(leaderboardLoading)return;
  leaderboardLoading=true;
+
  const date=new Date();
  const month=date.getFullYear()+'-'+
   String(date.getMonth()+1).padStart(2,'0')+'-01';
- $('leaderboardMonth').textContent=date.toLocaleDateString('en-US',{
-  month:'long',year:'numeric'
- });
+
+ $('leaderboardMonth').textContent=
+  date.toLocaleDateString('en-US',{
+   month:'long',year:'numeric'
+  });
 
  try{
-  const rows=await apiRequest('/rest/v1/rpc/vv_monthly_leaderboard',{
-   method:'POST',
-   body:JSON.stringify({p_month:month})
-  });
+  const rows=await apiRequest(
+   '/rest/v1/rpc/vv_monthly_leaderboard',
+   {
+    method:'POST',
+    body:JSON.stringify({p_month:month})
+   }
+  );
+
   const box=$('leaderboardList');
   box.replaceChildren();
+
   const top=(Array.isArray(rows)?rows:[])
-   .sort((a,b)=>Number(b.approved_points)-Number(a.approved_points))
+   .sort((a,b)=>
+    Number(b.approved_points)-Number(a.approved_points)
+   )
    .slice(0,3);
 
   if(!top.length){
-   $('leaderboardMessage').textContent='No approved contributions yet this month.';
+   $('leaderboardMessage').textContent=
+    'No approved contributions yet this month.';
    return;
   }
 
   top.forEach((r,i)=>{
    const div=document.createElement('div');
    div.className='leaderboardEntry';
+
    const medal=document.createElement('div');
    medal.textContent=['🥇','🥈','🥉'][i];
+
    const person=document.createElement('div');
    const name=document.createElement('strong');
    const detail=document.createElement('div');
    const points=document.createElement('div');
-   name.textContent=clean(r.contributor_name)||'Vegan Contributor';
+
+   name.textContent=clean(r.contributor_name)||
+    'Vegan Contributor';
+
    detail.className='small muted';
-   detail.textContent=(r.approved_contributions||0)+' approved contributions';
+   detail.textContent=
+    (r.approved_contributions||0)+' approved contributions';
+
    person.append(name,detail);
+
    points.className='leaderboardPoints';
    points.textContent=r.approved_points||0;
+
    div.append(medal,person,points);
    box.append(div);
   });
 
-  $('leaderboardMessage').textContent='Current approved rankings.';
-  $('leaderboardUpdated').textContent='Updated: '+new Date().toLocaleString();
+  $('leaderboardMessage').textContent=
+   'Current approved rankings.';
+
+  $('leaderboardUpdated').textContent=
+   'Updated: '+new Date().toLocaleString();
+
  }catch(e){
-  $('leaderboardMessage').textContent='Leaderboard unavailable: '+e.message;
+  $('leaderboardMessage').textContent=
+   'Leaderboard unavailable: '+e.message;
  }finally{
   leaderboardLoading=false;
  }
@@ -2287,32 +2771,46 @@ async function loadMonthlyLeaderboard(){
 
 $('refreshLeaderboard').onclick=loadMonthlyLeaderboard;
 
-/* ADMINISTRATOR */
+/* ADMINISTRATOR DASHBOARD */
 
 async function loadAdminPending(){
  if(!currentUser||!adminAuthorized||adminBusy)return;
+
  const box=$('adminPending');
  box.replaceChildren();
- $('adminMessage').textContent='Loading pending contributions…';
+
+ $('adminMessage').textContent=
+  'Loading pending contributions…';
 
  try{
   const rows=await userRequest(
-   '/rest/v1/vv_contributions?status=eq.pending&select=*&order=created_at.asc&limit=100'
+   '/rest/v1/vv_contributions?status=eq.pending'+
+   '&select=*&order=created_at.asc&limit=100'
   );
+
   const pending=rows.filter(c=>c.user_id!==currentUser.id);
+
   if(!pending.length){
-   $('adminMessage').textContent='✅ No contributions awaiting review.';
+   $('adminMessage').textContent=
+    '✅ No contributions awaiting review.';
    return;
   }
-  $('adminMessage').textContent=pending.length+' pending contribution(s).';
+
+  $('adminMessage').textContent=
+   pending.length+' pending contribution(s).';
 
   for(const c of pending){
    const card=document.createElement('div');
    card.className='adminCard';
+
    const h=document.createElement('h3');
-   h.textContent=String(c.contribution_type||'Contribution').replace(/_/g,' ');
+   h.textContent=
+    String(c.contribution_type||'Contribution').replace(/_/g,' ');
+
    const d=document.createElement('p');
-   d.textContent='Barcode: '+c.barcode+' • Points: '+c.points;
+   d.textContent=
+    'Barcode: '+c.barcode+' • Points: '+c.points;
+
    card.append(h,d);
 
    for(const [label,value] of [
@@ -2339,32 +2837,54 @@ async function loadAdminPending(){
    for(const approve of [true,false]){
     const b=document.createElement('button');
     b.textContent=approve?'✅ Approve':'❌ Reject';
+
     if(!approve)b.className='danger';
+
     b.onclick=()=>reviewContribution(c,approve);
     actions.append(b);
    }
+
    card.append(actions);
    box.append(card);
   }
+
  }catch(e){
-  $('adminMessage').textContent='Unable to load reviews: '+e.message;
+  $('adminMessage').textContent=
+   'Unable to load reviews: '+e.message;
  }
 }
 
 async function reviewContribution(c,approve){
- if(adminBusy||!adminAuthorized||
-  !confirm('Confirm '+(approve?'approval':'rejection')+' for '+c.barcode+'?'))return;
+ if(
+  adminBusy||
+  !adminAuthorized||
+  !confirm(
+   'Confirm '+(approve?'approval':'rejection')+
+   ' for '+c.barcode+'?'
+  )
+ )return;
 
  adminBusy=true;
+
  try{
-  await userRequest('/rest/v1/rpc/vv_review_contribution',{
-   method:'POST',
-   body:JSON.stringify({p_id:c.id,p_approve:approve})
-  });
+  await userRequest(
+   '/rest/v1/rpc/vv_review_contribution',
+   {
+    method:'POST',
+    body:JSON.stringify({
+     p_id:c.id,
+     p_approve:approve
+    })
+   }
+  );
+
   $('adminMessage').textContent=approve?
-   'Contribution approved.':'Contribution rejected.';
+   'Contribution approved.':
+   'Contribution rejected.';
+
  }catch(e){
-  $('adminMessage').textContent='Review failed: '+e.message;
+  $('adminMessage').textContent=
+   'Review failed: '+e.message;
  }finally{
   adminBusy=false;
   await loadAdminPending();
@@ -2374,13 +2894,16 @@ async function reviewContribution(c,approve){
 
 $('refreshAdmin').onclick=loadAdminPending;
 
-/* CLOUD PICTURES AND CONTRIBUTIONS */
+/* CLOUD PHOTOS AND CONTRIBUTIONS */
 
 async function uploadProductPhoto(file,barcode){
  const filename=digits(barcode)+'-'+Date.now()+'.jpg';
  const token=currentUser?await userToken():null;
+
  const r=await fetch(
-  SUPABASE_URL+'/storage/v1/object/product-images/'+encodeURIComponent(filename),
+  SUPABASE_URL+
+  '/storage/v1/object/product-images/'+
+  encodeURIComponent(filename),
   {
    method:'POST',
    headers:{
@@ -2392,47 +2915,72 @@ async function uploadProductPhoto(file,barcode){
    body:file
   }
  );
+
  if(!r.ok)throw Error(await responseError(r));
- return SUPABASE_URL+'/storage/v1/object/public/product-images/'+encodeURIComponent(filename);
+
+ return SUPABASE_URL+
+  '/storage/v1/object/public/product-images/'+
+  encodeURIComponent(filename);
 }
 
-async function submitContribution(type,barcode,imageUrl,ingredients){
+async function submitContribution(
+ type,barcode,imageUrl,ingredients
+){
  if(!currentUser)throw Error('Sign in to earn rewards.');
- if(adminAuthorized)throw Error('Administrators do not earn rewards.');
- return userRequest('/rest/v1/rpc/vv_submit_contribution',{
-  method:'POST',
-  body:JSON.stringify({
-   p_barcode:barcode,
-   p_type:type,
-   p_description:type==='product_photo'?
-    'Contributed product packaging picture':
-    type==='ingredients'?
-    'Contributed ingredients':
-    'Corrected product information',
-   p_image_url:imageUrl||null,
-   p_ingredients:ingredients||null
-  })
- });
+ if(adminAuthorized){
+  throw Error('Administrators do not earn rewards.');
+ }
+
+ return userRequest(
+  '/rest/v1/rpc/vv_submit_contribution',
+  {
+   method:'POST',
+   body:JSON.stringify({
+    p_barcode:barcode,
+    p_type:type,
+    p_description:type==='product_photo'?
+     'Contributed product packaging picture':
+     type==='ingredients'?
+     'Contributed ingredients':
+     'Corrected product information',
+    p_image_url:imageUrl||null,
+    p_ingredients:ingredients||null
+   })
+  }
+ );
 }
 
 /* AUTOMATIC VERIFIED CLOUD SAVING */
 
 async function persistVerifiedScan(){
  if(savingContribution)return;
- if(!lastResult||!verifiedByPackage||
-  !$('confirmed').checked||!validBarcode(currentBarcode))return;
+
+ if(
+  !lastResult||
+  !verifiedByPackage||
+  !$('confirmed').checked||
+  !validBarcode(currentBarcode)
+ )return;
 
  const fresh=classify($('ingredients').value);
- if(fresh.status==='Needs Verification'||fresh.status!==lastResult.status)return;
+
+ if(
+  fresh.status==='Needs Verification'||
+  fresh.status!==lastResult.status
+ )return;
 
  savingContribution=true;
  $('save').disabled=true;
- $('saveMessage').textContent='Saving verified scan automatically…';
+ $('saveMessage').textContent=
+  'Saving verified scan automatically…';
 
  try{
   if(currentUser)await checkAdminAccess();
 
-  const found=await findCloudRecord(currentBarcode,!!currentUser);
+  const found=await findCloudRecord(
+   currentBarcode,!!currentUser
+  );
+
   if(found.error)throw Error(found.error);
 
   const existing=found.record;
@@ -2441,11 +2989,15 @@ async function persistVerifiedScan(){
   const name=clean($('productName').value);
 
   if(!name||!brand){
-   throw Error('Enter the correct product name and brand before saving.');
+   throw Error(
+    'Enter the correct product name and brand before saving.'
+   );
   }
 
   if(suspiciousIngredientIdentity(name,ingredients)){
-   throw Error('The ingredient list does not appear to match this product. Check the physical package.');
+   throw Error(
+    'The ingredient list does not appear to match this product. Check the physical package.'
+   );
   }
 
   const baseline=existing?{
@@ -2464,17 +3016,24 @@ async function persistVerifiedScan(){
   let uploadedPhoto='';
 
   if(existing&&!changed){
-   $('saveMessage').textContent='✅ Verified scan already stored in Supabase.';
+   $('saveMessage').textContent=
+    '✅ Verified scan already stored in Supabase.';
+   $('autoSaveMessage').textContent=
+    'Cloud record already exists.';
    return;
   }
 
   if(existing&&!adminAuthorized){
    if(!currentUser){
-    throw Error('This product already exists. Sign in to submit the correction for review. The existing record was not overwritten.');
+    throw Error(
+     'This product already exists. Sign in to submit the correction for review. The existing record was not overwritten.'
+    );
    }
 
    if(selectedPhotoFile){
-    uploadedPhoto=await uploadProductPhoto(selectedPhotoFile,currentBarcode);
+    uploadedPhoto=await uploadProductPhoto(
+     selectedPhotoFile,currentBarcode
+    );
    }
 
    const type=selectedPhotoFile&&!existing.image_url?
@@ -2482,14 +3041,21 @@ async function persistVerifiedScan(){
     ingredients&&!existing.ingredients?
     'ingredients':'correction';
 
-   await submitContribution(type,currentBarcode,uploadedPhoto,ingredients);
-   $('saveMessage').textContent='✅ Correction submitted for administrator review. Points pending approval.';
+   await submitContribution(
+    type,currentBarcode,uploadedPhoto,ingredients
+   );
+
+   $('saveMessage').textContent=
+    '✅ Correction submitted for administrator review. Points pending approval.';
+
    await loadRewards();
    return;
   }
 
   if(identityConflict&&!adminAuthorized){
-   throw Error('Product identity requires administrator review.');
+   throw Error(
+    'Product identity requires administrator review.'
+   );
   }
 
   const payload={
@@ -2502,7 +3068,9 @@ async function persistVerifiedScan(){
   };
 
   if(selectedPhotoFile){
-   uploadedPhoto=await uploadProductPhoto(selectedPhotoFile,currentBarcode);
+   uploadedPhoto=await uploadProductPhoto(
+    selectedPhotoFile,currentBarcode
+   );
    payload.image_url=uploadedPhoto;
   }else if(!existing&&/^https:\/\//.test(currentPhoto)){
    payload.image_url=currentPhoto;
@@ -2511,25 +3079,40 @@ async function persistVerifiedScan(){
   if(existing){
    const patch={...payload};
    delete patch.barcode;
+
    const saved=await userRequest(
-    '/rest/v1/products?id=eq.'+encodeURIComponent(existing.id),
+    '/rest/v1/products?id=eq.'+
+    encodeURIComponent(existing.id),
     {
      method:'PATCH',
      headers:{Prefer:'return=representation'},
      body:JSON.stringify(patch)
     }
    );
-   if(!saved?.length)throw Error('Database update not confirmed.');
+
+   if(!saved?.length){
+    throw Error('Database update not confirmed.');
+   }
+
    rememberBaseline(saved[0]);
+
   }else{
    Object.assign(payload,nutritionPayload());
+
    const request=currentUser?userRequest:apiRequest;
-   const saved=await request('/rest/v1/products',{
-    method:'POST',
-    headers:{Prefer:'return=representation'},
-    body:JSON.stringify(payload)
-   });
-   if(!saved?.length)throw Error('Database insert not confirmed.');
+
+   const saved=await request(
+    '/rest/v1/products',
+    {
+     method:'POST',
+     headers:{Prefer:'return=representation'},
+     body:JSON.stringify(payload)
+    }
+   );
+
+   if(!saved?.length){
+    throw Error('Database insert not confirmed.');
+   }
 
    rememberBaseline(saved[0]);
    loadedCloudId=saved[0].id;
@@ -2543,9 +3126,12 @@ async function persistVerifiedScan(){
       uploadedPhoto,
       ingredients
      );
+
      await loadRewards();
+
     }catch(e){
-     $('saveMessage').textContent='Product saved, but reward submission failed: '+e.message;
+     $('saveMessage').textContent=
+      'Product saved, but reward submission failed: '+e.message;
      return;
     }
    }
@@ -2556,13 +3142,18 @@ async function persistVerifiedScan(){
    releaseSelectedPhoto();
   }
 
-  $('saveMessage').textContent='✅ Verified scan saved automatically to Supabase.';
-  $('autoSaveMessage').textContent='Cloud save confirmed.';
+  $('saveMessage').textContent=
+   '✅ Verified scan saved automatically to Supabase.';
+
+  $('autoSaveMessage').textContent=
+   'Cloud save confirmed.';
+
   ingredientImportBlocked=false;
   clearIdentityConflict();
 
  }catch(e){
-  $('saveMessage').textContent='❌ Automatic save failed: '+e.message;
+  $('saveMessage').textContent=
+   '❌ Automatic save failed: '+e.message;
  }finally{
   savingContribution=false;
   $('save').disabled=false;
@@ -2577,13 +3168,18 @@ async function handleAuthReturn(){
  const hash=new URLSearchParams(location.hash.slice(1));
  const access=hash.get('access_token');
  const refresh=hash.get('refresh_token');
+
  if(!access||!refresh)return;
 
- history.replaceState(null,'',location.pathname+location.search);
+ history.replaceState(
+  null,'',location.pathname+location.search
+ );
 
- const r=await fetch(SUPABASE_URL+'/auth/v1/user',{
-  headers:headers(access)
- });
+ const r=await fetch(
+  SUPABASE_URL+'/auth/v1/user',
+  {headers:headers(access)}
+ );
+
  if(!r.ok)throw Error(await responseError(r));
 
  const user=await r.json();
@@ -2601,21 +3197,24 @@ async function handleAuthReturn(){
   $('passwordPanel').style.display='block';
   return;
  }
+
  await initializeSignedInAccount();
 }
 
 window.addEventListener('pagehide',()=>{
  stopCamera();
  releaseSelectedPhoto();
+
  if(photoBitmap){
   try{photoBitmap.close();}catch{}
  }
+
  if(ocrWorker){
   ocrWorker.terminate().catch(()=>{});
  }
 });
 
-/* START APPLICATION */
+/* START VERIFIED VEGAN */
 
 (async()=>{
  resetProductData();
@@ -2629,7 +3228,8 @@ window.addEventListener('pagehide',()=>{
    await restoreAuth();
   }
  }catch(e){
-  $('authMessage').textContent='Authentication: '+e.message;
+  $('authMessage').textContent=
+   'Authentication: '+e.message;
  }
 })();
 </script>
