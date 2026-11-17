@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -12,6 +13,7 @@
 <title>Verified Vegan</title>
 <style>
 *{box-sizing:border-box}
+html{scroll-behavior:smooth}
 body{margin:0;background:#f4faf5;color:#173b2a;font-family:system-ui,Arial}
 header{background:#126c42;color:white;text-align:center;padding:20px 12px}
 h1{margin:0}
@@ -57,8 +59,6 @@ label{display:block;margin-top:9px}
 #cameraPanel,#productDetails,#result,#cropPanel,#ingredientPreview,#allergenPanel,#signedInPanel,#myRewards,#passwordPanel,#adminSection,#adminNotice,#manualEntry,#identityWarning,#retryLookup,#lookupSources,#ocrProgress{display:none}
 #frontInput,#photoInput{display:none}
 #brandDisplay{font-size:20px;font-weight:800;color:#126c42}
-#cropCanvas{width:100%;height:auto;touch-action:none;border-radius:10px;border:1px solid #a9c2b2}
-#ingredientPreview{max-width:100%;max-height:290px;object-fit:contain;margin:12px auto}
 #confirmedRow{display:flex;gap:10px;align-items:flex-start;margin:12px 0}
 #confirmedRow input{width:24px;height:24px;flex:none;margin:0}
 #confirmedRow label{margin:0}
@@ -76,6 +76,61 @@ label{display:block;margin-top:9px}
 #contactSupport .copyright{font-size:13px;color:#617469}
 #nutrition{line-height:1.8}
 #lookupMessage,#saveMessage,#autoSaveMessage,#authMessage,#rewardMessage,#adminMessage{overflow-wrap:anywhere}
+
+/* SMALLER INGREDIENT PHOTO SELECTION */
+#cropPanel{
+ background:#f1f7f2;
+ border:1px solid #d7e8dc;
+ border-radius:14px;
+ padding:12px;
+ margin:12px 0;
+}
+#cropViewport{
+ width:100%;
+ height:250px;
+ max-height:34vh;
+ min-height:175px;
+ overflow:auto;
+ overscroll-behavior:contain;
+ border:1px solid #a9c2b2;
+ border-radius:10px;
+ background:#e9efe9;
+ touch-action:pan-y;
+}
+#cropCanvas{
+ display:block;
+ width:100%;
+ height:auto;
+ touch-action:none;
+ user-select:none;
+ -webkit-user-select:none;
+}
+#cropControls{
+ display:grid;
+ grid-template-columns:1fr 1fr;
+ gap:8px;
+ margin:8px 0;
+}
+#cropControls button{margin:0}
+#ingredientPreview{
+ display:none;
+ max-width:100%;
+ max-height:180px;
+ object-fit:contain;
+ margin:12px auto;
+ border-radius:10px;
+}
+#cropHint{
+ font-size:13px;
+ color:#426755;
+ margin:8px 0;
+}
+#cropSelectionStatus{font-size:13px;color:#426755}
+@media(max-width:480px){
+ #cropViewport{height:215px;max-height:31vh}
+ #cropPanel{padding:10px}
+ #cropControls button{font-size:14px;padding:10px 5px}
+}
 </style>
 </head>
 <body>
@@ -96,7 +151,7 @@ label{display:block;margin-top:9px}
 <div id="scanGuide"></div>
 <div id="html5Reader" style="display:none"></div>
 </div>
-<p id="scannerFeedback" class="muted">Hold the barcode steady inside the green frame.</p>
+<p id="scannerFeedback" class="muted">Point your camera at the barcode. Scanning is automatic.</p>
 <p id="cameraError" class="warning"></p>
 <button id="stopCamera" class="secondary">Stop Camera</button>
 </div>
@@ -170,7 +225,6 @@ label{display:block;margin-top:9px}
 <h2>🏆 Community Rewards</h2>
 <p>Help improve Verified Vegan and earn points for approved contributions.</p>
 <p class="muted">Scanning is free without signing in. Accounts are only for rewards.</p>
-
 <div id="signedOutPanel">
 <h3>Create Account or Log In</h3>
 <label for="authEmail">Email address</label>
@@ -181,13 +235,11 @@ label{display:block;margin-top:9px}
 <button id="signIn" class="secondary">Log In</button>
 <button id="resetPassword" class="secondary">Forgot Password?</button>
 </div>
-
 <div id="passwordPanel">
 <h3>Set New Password</h3>
 <input id="newPassword" type="password" autocomplete="new-password" placeholder="New password, at least 8 characters">
 <button id="savePassword">Save New Password</button>
 </div>
-
 <div id="signedInPanel">
 <p id="welcomeUser"></p>
 <button id="refreshRewards">🏆 My Rewards</button>
@@ -246,10 +298,16 @@ Fill the picture with the ingredient label, avoid nutrition facts, keep the came
 
 <div id="cropPanel">
 <h2>Select Ingredient Area</h2>
-<p>Drag a rectangle around ONLY the ingredient list, then tap Read Selected Ingredients.</p>
+<p id="cropHint">The picture is smaller so you can scroll. Use two fingers to scroll the picture, or drag one finger to select the ingredients.</p>
+<div id="cropViewport">
 <canvas id="cropCanvas"></canvas>
-<button id="readCrop">🔎 Read Selected Ingredients</button>
+</div>
+<p id="cropSelectionStatus">Select the complete ingredient list.</p>
+<div id="cropControls">
+<button id="selectFull" class="secondary">Use Full Picture</button>
 <button id="resetCrop" class="secondary">Reset Selection</button>
+</div>
+<button id="readCrop">🔎 Read Selected Ingredients</button>
 </div>
 <button id="manualCropButton" class="secondary" style="display:none">✂️ Select Ingredient Area Again</button>
 
@@ -329,8 +387,8 @@ let lastResult=null,loadedCloudId=null,cloudRecordExists=false;
 let contributionBaseline=null,originalIngredients='';
 let identityConflict=false,identityConflictDetails=[];
 let savingContribution=false,adminBusy=false,leaderboardLoading=false;
-let productSession=0,externalIdentity=null,externalIngredientTrusted=false;
 let currentSourceRecords=[],ingredientImportBlocked=false;
+let photoSession=0;
 
 const ANIMAL_RULES=[
  ['Milk or dairy',/\b(?:milk|whey|casein|caseinate|lactose|lactalbumin|buttermilk|cheese|yogurt|yoghurt|ghee|milkfat|milk fat|milk solids|butter oil|milk powder|cream powder|skim milk|whole milk|cream|butter|dairy|milk chocolate|custard|sour cream|half and half)\b/i],
@@ -436,8 +494,8 @@ function resetPhoto(){
 }
 
 function resetProductData(){
- ++productSession;
  ++lookupSerial;
+ ++photoSession;
  currentBarcode='';
  loadedCloudId=null;
  cloudRecordExists=false;
@@ -449,8 +507,6 @@ function resetProductData(){
  ocrRejected=false;
  verifiedByPackage=false;
  lookupInProgress=false;
- externalIdentity=null;
- externalIngredientTrusted=false;
  currentSourceRecords=[];
  ingredientImportBlocked=false;
  clearIdentityConflict();
@@ -474,6 +530,12 @@ function resetProductData(){
  $('manualCropButton').style.display='none';
  $('ingredientWarning').style.display='none';
  $('ocrMessage').textContent='No ingredient picture selected yet.';
+ $('ocrProgress').style.display='none';
+ cropRect=null;
+ if(photoBitmap){
+  try{photoBitmap.close();}catch{}
+  photoBitmap=null;
+ }
  allergens={contains:'',mayContain:''};
  updateAllergens();
  showNutrition({});
@@ -676,8 +738,6 @@ function ingredientTextQuality(raw){
  return t.length<18?/^[a-z][a-z\s-]*$/i.test(t):words.length>=2;
 }
 
-/* NEW: PRODUCT/INGREDIENT IDENTITY PROTECTION */
-
 function normalizeName(s){
  return clean(s).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 }
@@ -694,13 +754,13 @@ function nameTokens(s){
 function productType(name){
  const n=normalizeName(name);
  if(/\b(?:onion|onions)\b/.test(n)&&/\b(?:granulated|powder|dried|dehydrated)\b/.test(n))return 'onion seasoning';
- if(/\b(?:garlic)\b/.test(n)&&/\b(?:granulated|powder|dried|dehydrated)\b/.test(n))return 'garlic seasoning';
- if(/\b(?:paprika)\b/.test(n))return 'paprika';
- if(/\b(?:cinnamon)\b/.test(n))return 'cinnamon';
- if(/\b(?:black pepper)\b/.test(n))return 'black pepper';
- if(/\b(?:turmeric)\b/.test(n))return 'turmeric';
- if(/\b(?:oregano)\b/.test(n))return 'oregano';
- if(/\b(?:cumin)\b/.test(n))return 'cumin';
+ if(/\bgarlic\b/.test(n)&&/\b(?:granulated|powder|dried|dehydrated)\b/.test(n))return 'garlic seasoning';
+ if(/\bpaprika\b/.test(n))return 'paprika';
+ if(/\bcinnamon\b/.test(n))return 'cinnamon';
+ if(/\bblack pepper\b/.test(n))return 'black pepper';
+ if(/\bturmeric\b/.test(n))return 'turmeric';
+ if(/\boregano\b/.test(n))return 'oregano';
+ if(/\bcumin\b/.test(n))return 'cumin';
  return '';
 }
 
@@ -745,14 +805,6 @@ function productIngredients(p){
  ].find(v=>typeof v==='string'&&clean(v))||'');
 }
 
-function sourceIdentity(p){
- return {
-  name:clean(p.product_name||p.product_name_en||p.title||''),
-  brand:clean(p.brands||p.brand||''),
-  code:digits(p.code||p.barcode||'')
- };
-}
-
 function compatibleIdentity(a,b){
  const an=normalizeName(a.product_name||a.product_name_en||a.title||'');
  const bn=normalizeName(b.product_name||b.product_name_en||b.title||'');
@@ -770,21 +822,18 @@ function compatibleIdentity(a,b){
 }
 
 function trustedExternalIngredients(p,barcode){
- const id=sourceIdentity(p);
+ const code=digits(p.code||p.barcode||'');
+ const name=clean(p.product_name||p.product_name_en||p.title||'');
  const t=productIngredients(p);
- if(!id.code||!sameBarcode(id.code,barcode))return false;
- if(!id.name)return false;
- if(!ingredientTextQuality(t))return false;
- if(suspiciousIngredientIdentity(id.name,t))return false;
- return true;
+ return !!code&&sameBarcode(code,barcode)&&!!name&&
+  ingredientTextQuality(t)&&!suspiciousIngredientIdentity(name,t);
 }
 
 function trustedCloudIngredients(p,barcode){
- if(!sameBarcode(p.barcode,barcode))return false;
- if(!clean(p.product_name)||!clean(p.brand))return false;
- if(!ingredientTextQuality(p.ingredients))return false;
- if(suspiciousIngredientIdentity(p.product_name,p.ingredients))return false;
- return true;
+ return sameBarcode(p.barcode,barcode)&&
+  !!clean(p.product_name)&&!!clean(p.brand)&&
+  ingredientTextQuality(p.ingredients)&&
+  !suspiciousIngredientIdentity(p.product_name,p.ingredients);
 }
 
 function classify(raw){
@@ -948,11 +997,8 @@ async function fetchAllProducts(barcode){
  return found;
 }
 
-/* NEW: DO NOT MERGE INGREDIENTS FROM UNRELATED PRODUCTS */
-
 function chooseExternal(matches,barcode){
  if(!matches.length)return null;
-
  const sorted=[...matches].sort((a,b)=>{
   const score=x=>
    (trustedExternalIngredients(x.product,barcode)?100:0)+
@@ -960,11 +1006,9 @@ function chooseExternal(matches,barcode){
    (extractImages(x.product,x.source).length?10:0);
   return score(b)-score(a);
  });
-
  const primary=sorted[0];
  const compatible=sorted.filter(x=>compatibleIdentity(primary.product,x.product));
  const incompatible=sorted.filter(x=>!compatibleIdentity(primary.product,x.product));
-
  const p={...primary.product};
  const trusted=compatible.filter(x=>trustedExternalIngredients(x.product,barcode));
 
@@ -972,6 +1016,8 @@ function chooseExternal(matches,barcode){
   const first=trusted[0];
   if(!trustedExternalIngredients(p,barcode)){
    p.ingredients_text=productIngredients(first.product);
+   p.ingredients_text_en='';
+   p.ingredients='';
   }
  }else{
   p.ingredients_text='';
@@ -1077,12 +1123,10 @@ async function findCloudRecord(barcode,authenticated=false){
    records.push(...(Array.isArray(rows)?rows:[]));
   }
   const matches=records.filter(x=>sameBarcode(x.barcode,barcode));
-  matches.sort((a,b)=>
-   (trustedCloudIngredients(b,barcode)?100:0)+
-   (b.image_url?5:0)-
-   (trustedCloudIngredients(a,barcode)?100:0)-
-   (a.image_url?5:0)
-  );
+  const score=p=>
+   (trustedCloudIngredients(p,barcode)?100:0)+
+   (p.image_url?5:0);
+  matches.sort((a,b)=>score(b)-score(a));
   return {record:matches[0]||null,records:matches,error:null};
  }catch(e){
   return {record:null,records:[],error:e.message};
@@ -1294,15 +1338,6 @@ async function lookupProduct(){
    $('lookupMessage').textContent='No matching product found. Add its name and photograph the ingredients.';
   }
 
-  if(sameBarcode(barcode,'076840674442')){
-   blockImportedIngredients(
-    'This barcode previously returned conflicting dairy and non-dairy information.',
-    matches.map(x=>
-     x.source+': '+clean(x.product.product_name)+' | '+productIngredients(x.product)
-    )
-   );
-  }
-
   if(!cloud.record&&cloud.error){
    $('autoSaveMessage').textContent='Cloud unavailable. Automatic save was not attempted.';
   }else{
@@ -1330,7 +1365,7 @@ async function lookupProduct(){
 $('lookup').onclick=lookupProduct;
 $('retryLookup').onclick=lookupProduct;
 
-/* BARCODE CAMERA */
+/* AUTOMATIC BARCODE CAMERA */
 
 function loadScannerLibrary(){
  if(window.Html5Qrcode)return Promise.resolve();
@@ -1420,7 +1455,7 @@ async function startNativeScanner(session){
  scanActive=true;
  $('startCamera').disabled=false;
  $('startCamera').textContent='📷 Scanner Running';
- $('scannerFeedback').textContent='Center the barcode and adjust distance until sharp.';
+ $('scannerFeedback').textContent='Point at the barcode. It scans automatically.';
 
  async function scan(){
   if(!scanActive||session!==scannerSession)return;
@@ -1490,7 +1525,7 @@ async function startFallbackScanner(session){
  scannerStarting=false;
  $('startCamera').disabled=false;
  $('startCamera').textContent='📷 Scanner Running';
- $('scannerFeedback').textContent='Scanner running. Center the barcode and adjust distance until sharp.';
+ $('scannerFeedback').textContent='Point at the barcode. It scans automatically.';
 }
 
 async function startBarcodeCamera(){
@@ -1588,7 +1623,7 @@ $('frontInput').onchange=async()=>{
  }
 };
 
-/* INGREDIENT PHOTO OCR */
+/* IMPROVED INGREDIENT PHOTO OCR */
 
 const photoInput=$('photoInput');
 const cropCanvas=$('cropCanvas');
@@ -1624,8 +1659,13 @@ async function getWorker(){
    return Tesseract.createWorker('eng');
   })();
  }
- ocrWorker=await ocrPromise;
- return ocrWorker;
+ try{
+  ocrWorker=await ocrPromise;
+  return ocrWorker;
+ }catch(e){
+  ocrPromise=null;
+  throw e;
+ }
 }
 
 function makeCanvas(bitmap,max=2400){
@@ -1637,7 +1677,7 @@ function makeCanvas(bitmap,max=2400){
  return c;
 }
 
-function enhanceCanvas(canvas){
+function enhanceCanvas(canvas,contrast=1.5){
  const c=document.createElement('canvas');
  c.width=canvas.width;
  c.height=canvas.height;
@@ -1651,41 +1691,69 @@ function enhanceCanvas(canvas){
    .587*image.data[i+1]+
    .114*image.data[i+2]
   );
-  const v=Math.max(0,Math.min(255,(g-128)*1.5+128));
+  const v=Math.max(0,Math.min(255,(g-128)*contrast+128));
   image.data[i]=image.data[i+1]=image.data[i+2]=v;
  }
  context.putImageData(image,0,0);
  return c;
 }
 
-async function readIngredientsCanvas(canvas){
+function sharpenCanvas(source){
+ const c=document.createElement('canvas');
+ c.width=source.width;
+ c.height=source.height;
+ const context=c.getContext('2d');
+ context.filter='contrast(140%) grayscale(100%)';
+ context.drawImage(source,0,0);
+ context.filter='none';
+ return c;
+}
+
+function textScore(text,confidence){
+ const parsed=splitPackageText(text);
+ const t=parsed.ingredients;
+ const words=(t.match(/[A-Za-z]{3,}/g)||[]).length;
+ const punctuation=(t.match(/[,;()]/g)||[]).length;
+ return words*2+
+  punctuation*.5+
+  confidence*.35+
+  (parsed.hadHeading?35:0)-
+  (looksLikeRecipe(text)?100:0)-
+  (looksLikeNutrition(t)?60:0)-
+  (!ingredientTextQuality(t)?60:0);
+}
+
+async function readIngredientsCanvas(canvas,session){
  const worker=await getWorker();
- const variants=[canvas,enhanceCanvas(canvas)];
+ if(session!==photoSession)return;
+
+ const variants=[
+  canvas,
+  enhanceCanvas(canvas,1.5),
+  sharpenCanvas(canvas)
+ ];
  let best=null;
  $('ocrProgress').style.display='block';
+ $('ocrProgressBar').style.width='5%';
 
  for(let i=0;i<variants.length;i++){
-  $('ocrMessage').textContent='Reading ingredients ('+(i+1)+' of '+variants.length+')…';
-  $('ocrProgressBar').style.width=(15+i*40)+'%';
+  if(session!==photoSession)return;
+  $('ocrMessage').textContent=
+   'Reading ingredients ('+(i+1)+' of '+variants.length+')…';
+  $('ocrProgressBar').style.width=(10+i*28)+'%';
 
   const result=await worker.recognize(variants[i]);
+  if(session!==photoSession)return;
   const text=result.data?.text||'';
   const confidence=Number(result.data?.confidence)||0;
-  const parsed=splitPackageText(text);
-  const words=(parsed.ingredients.match(/[A-Za-z]{3,}/g)||[]).length;
-  const score=
-   words*2+
-   confidence*.25+
-   (parsed.hadHeading?30:0)-
-   (looksLikeRecipe(text)?80:0)-
-   (looksLikeNutrition(parsed.ingredients)?40:0)-
-   (ingredientTextQuality(parsed.ingredients)?0:45);
+  const score=textScore(text,confidence);
 
   if(!best||score>best.score){
    best={text,confidence,score};
   }
  }
 
+ if(session!==photoSession)return;
  $('ocrProgressBar').style.width='100%';
  const parsed=splitPackageText(best?.text||'');
 
@@ -1698,9 +1766,11 @@ async function readIngredientsCanvas(canvas){
  ){
   ocrRejected=true;
   ingredientSource='ocr';
-  $('ocrMessage').textContent='Text was unclear. Select only the ingredient list or enter it manually.';
+  $('ocrMessage').textContent=
+   'Text was unclear or incomplete. Adjust the selection to include the entire ingredient list, or enter it manually.';
   $('ingredientWarning').style.display='block';
-  $('ingredientWarning').textContent='⚠️ Unreliable text. No vegan result assigned.';
+  $('ingredientWarning').textContent=
+   '⚠️ Unreliable text. No vegan result assigned.';
   $('cropPanel').style.display='block';
   clearResult();
   setStatus('Needs Verification');
@@ -1715,70 +1785,48 @@ async function readIngredientsCanvas(canvas){
  clearResult();
  setStatus('Needs Verification');
  $('ingredientWarning').style.display='none';
- $('ocrMessage').textContent='Ingredients detected. Check every word against the package, correct mistakes, then confirm.';
+ $('ocrMessage').textContent=
+  'Ingredients detected. Check that the ENTIRE list was captured, correct mistakes, then confirm.';
  $('ingredients').scrollIntoView({behavior:'smooth',block:'center'});
 }
 
-photoInput.onchange=async()=>{
- const file=photoInput.files?.[0];
- if(!file||ocrBusy)return;
- ocrBusy=true;
- $('check').disabled=true;
-
- try{
-  if(photoBitmap)photoBitmap.close();
-  photoBitmap=await createImageBitmap(file);
-  const canvas=makeCanvas(photoBitmap);
-  cropCanvas.width=canvas.width;
-  cropCanvas.height=canvas.height;
-  ctx.drawImage(canvas,0,0);
-
-  const preview=$('ingredientPreview');
-  if(preview.src.startsWith('blob:'))URL.revokeObjectURL(preview.src);
-  preview.src=URL.createObjectURL(file);
-  preview.style.display='block';
-  cropRect=null;
-  $('manualCropButton').style.display='block';
-  $('cropPanel').style.display='block';
-  $('ocrMessage').textContent='Select ONLY the ingredients below.';
-  ocrRejected=true;
-  clearResult();
-  setStatus('Needs Verification');
- }catch(e){
-  $('ocrMessage').textContent='Photo reading failed: '+e.message;
- }finally{
-  ocrBusy=false;
-  $('check').disabled=false;
- }
-};
-
 function drawCrop(){
  if(!photoBitmap)return;
+ ctx.clearRect(0,0,cropCanvas.width,cropCanvas.height);
  ctx.drawImage(photoBitmap,0,0,cropCanvas.width,cropCanvas.height);
+
  if(cropRect){
+  ctx.fillStyle='rgba(0,0,0,.28)';
+  ctx.fillRect(0,0,cropCanvas.width,cropCanvas.height);
+  ctx.drawImage(
+   photoBitmap,
+   cropRect.x*photoBitmap.width/cropCanvas.width,
+   cropRect.y*photoBitmap.height/cropCanvas.height,
+   cropRect.w*photoBitmap.width/cropCanvas.width,
+   cropRect.h*photoBitmap.height/cropCanvas.height,
+   cropRect.x,cropRect.y,cropRect.w,cropRect.h
+  );
   ctx.strokeStyle='#00e676';
-  ctx.lineWidth=5;
+  ctx.lineWidth=Math.max(3,cropCanvas.width/180);
   ctx.strokeRect(cropRect.x,cropRect.y,cropRect.w,cropRect.h);
  }
 }
 
-$('manualCropButton').onclick=()=>{
- $('cropPanel').style.display='block';
- drawCrop();
- $('cropPanel').scrollIntoView({behavior:'smooth'});
-};
-
 function cropPoint(e){
  const r=cropCanvas.getBoundingClientRect();
  return {
-  x:(e.clientX-r.left)*cropCanvas.width/r.width,
-  y:(e.clientY-r.top)*cropCanvas.height/r.height
+  x:Math.max(0,Math.min(cropCanvas.width,
+   (e.clientX-r.left)*cropCanvas.width/r.width)),
+  y:Math.max(0,Math.min(cropCanvas.height,
+   (e.clientY-r.top)*cropCanvas.height/r.height))
  };
 }
 
 cropCanvas.onpointerdown=e=>{
+ if(!photoBitmap)return;
  dragStart=cropPoint(e);
- cropCanvas.setPointerCapture(e.pointerId);
+ cropRect=null;
+ try{cropCanvas.setPointerCapture(e.pointerId);}catch{}
 };
 
 cropCanvas.onpointermove=e=>{
@@ -1791,38 +1839,138 @@ cropCanvas.onpointermove=e=>{
   h:Math.abs(p.y-dragStart.y)
  };
  drawCrop();
+ $('cropSelectionStatus').textContent=
+  'Selection ready. Make sure the entire ingredient list is inside the green box.';
 };
 
-cropCanvas.onpointerup=cropCanvas.onpointercancel=()=>dragStart=null;
+function endCrop(){
+ dragStart=null;
+}
+cropCanvas.onpointerup=endCrop;
+cropCanvas.onpointercancel=endCrop;
+
 $('resetCrop').onclick=()=>{
  cropRect=null;
  drawCrop();
+ $('cropSelectionStatus').textContent=
+  'Selection cleared. Drag around the complete ingredient list.';
+};
+
+$('selectFull').onclick=()=>{
+ if(!photoBitmap)return;
+ cropRect={
+  x:0,y:0,
+  w:cropCanvas.width,
+  h:cropCanvas.height
+ };
+ drawCrop();
+ $('cropSelectionStatus').textContent=
+  'Entire photograph selected.';
+};
+
+$('manualCropButton').onclick=()=>{
+ if(!photoBitmap)return;
+ $('cropPanel').style.display='block';
+ drawCrop();
+ $('cropPanel').scrollIntoView({behavior:'smooth',block:'start'});
+};
+
+photoInput.onchange=async()=>{
+ const file=photoInput.files?.[0];
+ if(!file||ocrBusy)return;
+
+ const session=++photoSession;
+ ocrBusy=true;
+ $('check').disabled=true;
+ $('ocrMessage').textContent='Preparing ingredient photograph…';
+
+ try{
+  if(photoBitmap)photoBitmap.close();
+  photoBitmap=await createImageBitmap(file);
+  if(session!==photoSession)return;
+
+  const canvas=makeCanvas(photoBitmap,1600);
+  cropCanvas.width=canvas.width;
+  cropCanvas.height=canvas.height;
+  cropRect=null;
+  drawCrop();
+
+  const preview=$('ingredientPreview');
+  if(preview.src.startsWith('blob:'))URL.revokeObjectURL(preview.src);
+  preview.src=URL.createObjectURL(file);
+  preview.style.display='block';
+
+  $('cropPanel').style.display='block';
+  $('manualCropButton').style.display='block';
+  $('cropSelectionStatus').textContent=
+   'Drag around the complete ingredient list, or use the full picture.';
+  $('ocrMessage').textContent=
+   'Select the ingredient area in the smaller picture below.';
+  $('ingredientWarning').style.display='none';
+  ocrRejected=true;
+  verifiedByPackage=false;
+  $('confirmed').checked=false;
+  clearResult();
+  setStatus('Needs Verification');
+ }catch(e){
+  $('ocrMessage').textContent='Photo preparation failed: '+e.message;
+ }finally{
+  ocrBusy=false;
+  $('check').disabled=false;
+ }
 };
 
 $('readCrop').onclick=async()=>{
  if(!photoBitmap||ocrBusy)return;
+
+ const session=photoSession;
  ocrBusy=true;
  $('readCrop').disabled=true;
+ $('check').disabled=true;
+
  try{
   if(!cropRect||cropRect.w<20||cropRect.h<20){
-   throw Error('Draw a larger rectangle around ONLY the ingredient list first.');
+   throw Error(
+    'Draw a rectangle around the complete ingredient list, or tap Use Full Picture.'
+   );
   }
+
   const r=cropRect;
   const sx=photoBitmap.width/cropCanvas.width;
   const sy=photoBitmap.height/cropCanvas.height;
+
+  const sourceX=Math.max(0,Math.floor(r.x*sx));
+  const sourceY=Math.max(0,Math.floor(r.y*sy));
+  const sourceW=Math.min(
+   photoBitmap.width-sourceX,
+   Math.ceil(r.w*sx)
+  );
+  const sourceH=Math.min(
+   photoBitmap.height-sourceY,
+   Math.ceil(r.h*sy)
+  );
+
+  if(sourceW<20||sourceH<20){
+   throw Error('The selected area is too small.');
+  }
+
+  const scale=Math.min(1,2600/Math.max(sourceW,sourceH));
   const c=document.createElement('canvas');
-  c.width=Math.max(1,Math.round(r.w*sx));
-  c.height=Math.max(1,Math.round(r.h*sy));
+  c.width=Math.max(1,Math.round(sourceW*scale));
+  c.height=Math.max(1,Math.round(sourceH*scale));
   c.getContext('2d').drawImage(
-   photoBitmap,r.x*sx,r.y*sy,r.w*sx,r.h*sy,
+   photoBitmap,
+   sourceX,sourceY,sourceW,sourceH,
    0,0,c.width,c.height
   );
-  await readIngredientsCanvas(c);
+
+  await readIngredientsCanvas(c,session);
  }catch(e){
   $('ocrMessage').textContent=e.message;
  }finally{
   ocrBusy=false;
   $('readCrop').disabled=false;
+  $('check').disabled=false;
  }
 };
 
@@ -1835,7 +1983,7 @@ $('ingredients').oninput=()=>{
  setStatus('Needs Verification');
 };
 
-/* VERIFIED PACKAGE INGREDIENTS OVERRIDE BAD IMPORTS */
+/* PACKAGE VERIFICATION */
 
 async function verifyIngredients(){
  if(ocrBusy)return;
