@@ -47,7 +47,23 @@ function removePlantIngredientNames(t){return String(t).replace(/\b(?:almond|oat
 const RECIPE_SIGNALS=[/\b(?:recipe|recipes|serving suggestion|suggested recipe)\b/i,/\b(?:chicken marsala|chicken cutlets?|preheat oven|cook until|simmer for)\b/i,/\b(?:in a skillet|in a saucepan|heat a skillet)\b/i,/\b(?:tablespoons?|teaspoons?|tbsp|tsp)\b/i,/\b(?:directions|preparation instructions|cooking instructions)\b/i,/\b(?:add the chicken|stir in|bring to a boil|serve with)\b/i];
 function looksLikeRecipe(t){return RECIPE_SIGNALS.filter(r=>r.test(t)).length>=2;}
 function looksLikeNutrition(t){return ['nutrition facts','serving size','calories','total fat','saturated fat','cholesterol','total carbohydrate','dietary fiber','daily value','added sugars','vitamin d'].filter(s=>clean(t).toLowerCase().includes(s)).length>=3;}
-function splitPackageText(raw){const source=String(raw||'').replace(/\r/g,'\n').replace(/[ \t]+/g,' ');const heading=/\bingredients?\s*[:\-]\s*/i.exec(source);let text=heading?source.slice(heading.index+heading[0].length):source;let end=text.length;for(const re of [/\bmay\s+(?:also\s+)?contain\s*:?\s+/i,/\bcontains\s*:?\s+(?=[a-z])/i,/\bmade\s+in\s+a\s+facility\b/i,/\b(?:nutrition facts|nutrition information|distributed by|manufactured by|packed for|visit us at|www\.)\b/i,/\b(?:recipe|directions|preparation instructions|serving suggestion)\b/i,/\b(?:total fat|saturated fat|cholesterol|total carbohydrate|dietary fiber|total sugars|added sugars|daily value)\s*[:\d]/i]){const m=re.exec(text);if(m)end=Math.min(end,m.index);}return {ingredients:clean(text.slice(0,end)).replace(/^[\s:;.,\-]+|[\s:;.,\-]+$/g,'').slice(0,3500),contains:clean(source.match(/\bcontains\s*:?\s+([^\n.]{2,120})/i)?.[1]||''),mayContain:clean(source.match(/\bmay\s+(?:also\s+)?contain\s*:?\s+([^\n.]{2,120})/i)?.[1]||''),hadHeading:!!heading};}
+function splitPackageText(raw){
+ const source=String(raw||'').replace(/\r/g,'\n').replace(/[ \t]+/g,' ').replace(/\u00ad/g,'');
+ const heading=/\bingredients?\s*[:\-]\s*/i.exec(source);
+ let text=heading?source.slice(heading.index+heading[0].length):source;
+ // "CONTAINS LESS THAN 2% OF" belongs to the ingredient list, NOT the allergen statement.
+ const stopPatterns=[/\bmay\s+(?:also\s+)?contain\s*:/i,/\bcontains\s*:\s*(?!less\s+than\b)/i,/\bmade\s+in\s+a\s+facility\b/i,/\b(?:nutrition facts|nutrition information|distributed by|manufactured by|packed for|visit us at|www\.)\b/i,/\b(?:recipe|directions|preparation instructions|serving suggestion)\b/i,/\b(?:total fat|saturated fat|cholesterol|total carbohydrate|dietary fiber|total sugars|added sugars|daily value)\s*[:\d]/i];
+ let end=text.length;
+ for(const re of stopPatterns){const m=re.exec(text);if(m)end=Math.min(end,m.index);}
+ // A stand-alone allergen heading without a colon is also a terminator, but NOT "contains less than 2%".
+ const lines=text.split('\n');let offset=0;
+ for(const line of lines){if(/^\s*contains\s+(?!less\s+than\b)(?:milk|egg|wheat|soy|peanuts|tree nuts|fish|shellfish|sesame)\b/i.test(line)){end=Math.min(end,offset);break;}offset+=line.length+1;}
+ const ingredients=clean(text.slice(0,end)).replace(/^[\s:;.,\-]+|[\s:;.,\-]+$/g,'').slice(0,3500);
+ const tail=text.slice(end);
+ const containsMatch=/(?:^|\n)\s*contains\s*:?\s*(?!less\s+than\b)([^\n.]{2,120})/i.exec(tail);
+ const mayMatch=/(?:^|\n)\s*may\s+(?:also\s+)?contain\s*:?\s*([^\n.]{2,120})/i.exec(source);
+ return {ingredients,contains:clean(containsMatch?.[1]||''),mayContain:clean(mayMatch?.[1]||''),hadHeading:!!heading};
+}
 function ingredientTextQuality(raw){const t=clean(raw);if(!t||t.length>3500||looksLikeRecipe(t)||looksLikeNutrition(t)||/\b(?:distributed by|wholesale|customer service|manufactured by|www\.)\b/i.test(t))return false;const lower=t.toLowerCase().replace(/^ingredients?\s*:\s*/,'').replace(/[.!]+$/,'').trim();if(SINGLE_INGREDIENTS.has(lower))return true;const words=t.match(/[A-Za-z]{2,}/g)||[];if(!words.length)return false;const symbols=(t.match(/[^A-Za-z0-9\s,().:%\-']/g)||[]).length;if(symbols>t.length*.2)return false;return t.length<18?/^[a-z][a-z\s-]*$/i.test(t):words.length>=2;}
 function classify(raw){const t=splitPackageText(raw).ingredients;if(!ingredientTextQuality(t))return {status:'Needs Verification',reasons:[],explanation:'No reliable ingredient list is available.',caution:'Photograph or enter the complete package ingredients.'};const screened=removePlantIngredientNames(t);const reasons=[...new Set(ANIMAL_RULES.filter(x=>x[1].test(screened)).map(x=>x[0]))];if(reasons.length)return {status:'Not Vegan',reasons,explanation:'Animal-derived ingredients detected in the ingredient list.',caution:'Confirm the list belongs to this exact product.'};return {status:'Vegan',reasons:['No explicitly animal-derived ingredients detected.'],explanation:'Vegan by ingredient-text screening.',caution:'Ingredient screening is not manufacturer certification. Some ingredient origins may require additional verification.'};}
 function updateAllergens(){$('containsText').textContent=allergens.contains?'Contains: '+allergens.contains:'';$('mayContainText').textContent=allergens.mayContain?'May contain: '+allergens.mayContain:'';$('allergenPanel').style.display=allergens.contains||allergens.mayContain?'block':'none';}
@@ -92,7 +108,37 @@ const photoInput=$('photoInput'),cropCanvas=$('cropCanvas'),ctx=cropCanvas.getCo
 async function getWorker(){if(ocrWorker)return ocrWorker;if(!ocrPromise)ocrPromise=(async()=>{if(!window.Tesseract)await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=resolve;s.onerror=()=>reject(Error('Text reader failed to load.'));document.head.append(s);});return Tesseract.createWorker('eng');})();ocrWorker=await ocrPromise;return ocrWorker;}
 function makeCanvas(bitmap,max=2400){const scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(bitmap.width*scale));c.height=Math.max(1,Math.round(bitmap.height*scale));c.getContext('2d').drawImage(bitmap,0,0,c.width,c.height);return c;}
 function enhanceCanvas(canvas){const c=document.createElement('canvas');c.width=canvas.width;c.height=canvas.height;const context=c.getContext('2d',{willReadFrequently:true});context.drawImage(canvas,0,0);const image=context.getImageData(0,0,c.width,c.height);for(let i=0;i<image.data.length;i+=4){const g=Math.round(.299*image.data[i]+.587*image.data[i+1]+.114*image.data[i+2]),v=Math.max(0,Math.min(255,(g-128)*1.5+128));image.data[i]=image.data[i+1]=image.data[i+2]=v;}context.putImageData(image,0,0);return c;}
-async function readIngredientsCanvas(canvas){const worker=await getWorker(),variants=[canvas,enhanceCanvas(canvas)];let best=null;$('ocrProgress').style.display='block';for(let i=0;i<variants.length;i++){$('ocrMessage').textContent='Reading ingredients ('+(i+1)+' of '+variants.length+')…';$('ocrProgressBar').style.width=(15+i*40)+'%';const result=await worker.recognize(variants[i]),text=result.data?.text||'',confidence=Number(result.data?.confidence)||0,parsed=splitPackageText(text),words=(parsed.ingredients.match(/[A-Za-z]{3,}/g)||[]).length,score=words*2+confidence*.25+(parsed.hadHeading?30:0)-(looksLikeRecipe(text)?80:0)-(looksLikeNutrition(parsed.ingredients)?40:0)-(ingredientTextQuality(parsed.ingredients)?0:45);if(!best||score>best.score)best={text,confidence,score};}$('ocrProgressBar').style.width='100%';const parsed=splitPackageText(best?.text||'');if(!best||best.score<30||best.confidence<30||!ingredientTextQuality(parsed.ingredients)||looksLikeRecipe(best.text)){ocrRejected=true;ingredientSource='ocr';$('ocrMessage').textContent='Text was unclear. Select only the ingredient list or enter it manually.';$('ingredientWarning').style.display='block';$('ingredientWarning').textContent='⚠️ Unreliable text. No vegan result assigned.';$('cropPanel').style.display='block';clearResult();setStatus('Needs Verification');return;}loadIngredients(best.text);ingredientSource='ocr';ocrRejected=false;verifiedByPackage=false;$('confirmed').checked=false;clearResult();setStatus('Needs Verification');$('ingredientWarning').style.display='none';$('ocrMessage').textContent='Ingredients detected. Check every word against the package, correct mistakes, then confirm.';$('ingredients').scrollIntoView({behavior:'smooth',block:'center'});}
+async function readIngredientsCanvas(canvas){
+ const worker=await getWorker();
+ const enhanced=enhanceCanvas(canvas);
+ const variants=[{canvas,label:'Original photograph',psm:'3'},{canvas:enhanced,label:'Enhanced contrast',psm:'6'},{canvas:enhanced,label:'Full ingredient block',psm:'3'}];
+ let best=null;
+ $('ocrProgress').style.display='block';$('ocrProgressBar').style.width='0%';
+ for(let i=0;i<variants.length;i++){
+  const v=variants[i];$('ocrMessage').textContent='Reading entire ingredient list: '+v.label+' ('+(i+1)+'/'+variants.length+')…';
+  $('ocrProgressBar').style.width=Math.round(i/variants.length*90)+'%';
+  try{
+   await worker.setParameters({tessedit_pageseg_mode:v.psm,preserve_interword_spaces:'1'});
+   const result=await worker.recognize(v.canvas),raw=result.data?.text||'',confidence=Number(result.data?.confidence)||0,parsed=splitPackageText(raw);
+   const words=(parsed.ingredients.match(/[A-Za-z]{3,}/g)||[]).length;
+   const broken=(parsed.ingredients.match(/(?:\d\s*["'<>]|[|~{}_^]|\b\d{2,}\b)/g)||[]).length;
+   const score=words*3+confidence*.35+(parsed.hadHeading?65:0)+(parsed.ingredients.match(/,/g)||[]).length*2-Math.min(100,broken*12)-(looksLikeRecipe(raw)?100:0)-(looksLikeNutrition(parsed.ingredients)?80:0)-(ingredientTextQuality(parsed.ingredients)?0:90);
+   if(!best||score>best.score)best={raw,parsed,confidence,score,words,broken};
+  }catch(e){if(!best&&i===variants.length-1)throw e;}
+ }
+ $('ocrProgressBar').style.width='100%';
+ if(!best||!best.parsed.hadHeading||best.confidence<30||best.words<4||!ingredientTextQuality(best.parsed.ingredients)||looksLikeRecipe(best.raw)){
+  ocrRejected=true;ingredientSource='ocr';verifiedByPackage=false;$('confirmed').checked=false;
+  if(best?.parsed.ingredients)loadIngredients(best.raw);
+  $('ocrMessage').textContent='The complete ingredient list could not be read reliably. Select the entire ingredients block, or type the missing words.';
+  $('ingredientWarning').style.display='block';$('ingredientWarning').textContent='⚠️ Incomplete or unreliable reading. No Vegan result will be assigned until you correct the full list.';
+  $('cropPanel').style.display='block';clearResult();setStatus('Needs Verification');return;
+ }
+ loadIngredients(best.raw);ingredientSource='ocr';ocrRejected=false;verifiedByPackage=false;$('confirmed').checked=false;clearResult();setStatus('Needs Verification');
+ $('ingredientWarning').style.display='block';$('ingredientWarning').textContent='⚠️ Automatic reading can omit entire lines. Compare the FIRST and LAST ingredients and every line in between with the package. Add missing ingredients before confirming.';
+ $('ocrMessage').textContent='Ingredient text extracted. Check that EVERY ingredient and the entire "contains less than 2%" section are present. Correct missing or wrong words before confirming.';
+ $('ingredients').scrollIntoView({behavior:'smooth',block:'center'});
+}
 photoInput.onchange=async()=>{const file=photoInput.files?.[0];if(!file||ocrBusy)return;ocrBusy=true;$('check').disabled=true;try{if(photoBitmap)photoBitmap.close();photoBitmap=await createImageBitmap(file);const canvas=makeCanvas(photoBitmap);cropCanvas.width=canvas.width;cropCanvas.height=canvas.height;ctx.drawImage(canvas,0,0);const preview=$('ingredientPreview');if(preview.src.startsWith('blob:'))URL.revokeObjectURL(preview.src);preview.src=URL.createObjectURL(file);preview.style.display='block';cropRect=null;$('manualCropButton').style.display='block';$('cropPanel').style.display='none';$('ocrMessage').textContent='Reading ingredient picture automatically…';ocrRejected=true;clearResult();setStatus('Needs Verification');await readIngredientsCanvas(canvas);}catch(e){$('ocrMessage').textContent='Photo reading failed: '+e.message;}finally{ocrBusy=false;$('check').disabled=false;}};
 function drawCrop(){if(!photoBitmap)return;ctx.drawImage(photoBitmap,0,0,cropCanvas.width,cropCanvas.height);if(cropRect){ctx.strokeStyle='#00e676';ctx.lineWidth=5;ctx.strokeRect(cropRect.x,cropRect.y,cropRect.w,cropRect.h);}}
 $('manualCropButton').onclick=()=>{$('cropPanel').style.display='block';drawCrop();$('cropPanel').scrollIntoView({behavior:'smooth'});};
