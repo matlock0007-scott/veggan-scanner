@@ -44,13 +44,28 @@ $('savePassword').onclick=async()=>{try{if($('newPassword').value.length<8)throw
 $('logout').onclick=()=>{isAdmin=false;setSession(null);$('authMessage').textContent='Logged out.';};
 async function restore(){try{const h=new URLSearchParams(location.hash.slice(1));if(h.has('access_token')&&h.has('refresh_token')){const access=h.get('access_token'),refresh=h.get('refresh_token');history.replaceState(null,'',location.pathname+location.search);const r=await fetch(BASE+'/auth/v1/user',{headers:headers(access)});if(!r.ok)throw Error(await errorResponse(r));setSession({access_token:access,refresh_token:refresh,expires_at:Math.floor(Date.now()/1000)+Number(h.get('expires_in')||3600),user:await r.json()});if(h.get('type')==='recovery'){$('recoveryBox').style.display='block';return;}}else{const s=JSON.parse(localStorage.getItem(AUTHKEY)||'null');if(!s?.access_token)return;setSession(s);const r=await fetch(BASE+'/auth/v1/user',{headers:headers(await token())});if(!r.ok)throw Error('Session expired.');session.user=await r.json();setSession(session);}await afterLogin();}catch(e){setSession(null);$('authMessage').textContent='Authentication: '+e.message;}}
 function variants(b){const x=digits(b),v=new Set([x]);if(x.length===12)v.add('0'+x);if(x.length===13&&x[0]==='0')v.add(x.slice(1));return [...v].filter(valid);}
-async function cloudLookup(b){const all=[];for(const code of variants(b)){const rows=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(code)+'&select=*&limit=50');if(Array.isArray(rows))all.push(...rows);}return all.find(x=>digits(x.barcode).replace(/^0+/,'')===digits(b).replace(/^0+/,''))||null;}
+async function cloudLookup(b){
+  const all=[],seen=new Set();
+  for(const code of variants(b)){
+    const rows=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(code)+'&select=*&limit=100',{extra:{'Cache-Control':'no-cache'}});
+    for(const row of Array.isArray(rows)?rows:[]){
+      if(!seen.has(String(row.id))){seen.add(String(row.id));all.push(row);}
+    }
+  }
+  const matching=all.filter(x=>digits(x.barcode).replace(/^0+/,'')===digits(b).replace(/^0+/,''));
+  // Prefer the most recently changed matching product, especially one with an approved photo.
+  matching.sort((a,b)=>{
+    const date=x=>Date.parse(x.updated_at||x.modified_at||x.created_at||'')||0;
+    return date(b)-date(a);
+  });
+  return matching.find(x=>x.image_url)||matching[0]||null;
+}
 async function externalLookup(b){const matches=await Promise.all(variants(b).map(async code=>{try{const r=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json');const j=await r.json();return j.status!==0&&j.product?j.product:null;}catch{return null;}}));return matches.filter(Boolean).sort((a,b)=>(b.ingredients_text?.length||0)-(a.ingredients_text?.length||0))[0]||null;}
 function nutritionShow(n){nutrition=n||{};const keys=[['Protein','proteins_100g'],['Carbohydrates','carbohydrates_100g'],['Sugar','sugars_100g'],['Fat','fat_100g'],['Fiber','fiber_100g'],['Salt','salt_100g']];const vals=keys.filter(([_,k])=>nutrition[k]!=null&&Number.isFinite(Number(nutrition[k])));$('nutrition').textContent=vals.length?'Per 100 g: '+vals.map(([name,k])=>name+': '+Number(nutrition[k]).toFixed(1)+' g').join(' • '):'Nutrition information not available.';}
 function setPicture(url){photoUrl=url||'';const img=$('productPhoto');img.hidden=true;img.removeAttribute('src');$('photoPlaceholder').style.display='block';if(url){img.onload=()=>{img.hidden=false;$('photoPlaceholder').style.display='none';};img.onerror=()=>{$('photoPlaceholder').textContent='Product image unavailable';};img.src=url;}else $('photoPlaceholder').textContent='No product picture available';}
 function refreshedImage(url){if(!url)return '';if(url.startsWith('blob:'))return url;return url+(url.includes('?')?'&':'?')+'vv_refresh='+Date.now();}
 function reset(){barcode='';cloud=null;selectedPhoto=null;if(selectedPhotoUrl)URL.revokeObjectURL(selectedPhotoUrl);selectedPhotoUrl='';$('photoInput').value='';$('submitPhoto').style.display='none';$('photoMessage').textContent='Choose a picture to replace an outdated product image or add a missing one.';$('productName').value='';$('brand').value='';$('ingredients').value='';$('confirmed').checked=false;verified=false;clearResult();setPicture('');nutritionShow({});status('Needs Verification');$('message').textContent='';$('wrongMessage').textContent='';$('saveMessage').textContent='';}
-async function lookup(b){if(!valid(b))return alert('Enter a valid 8–14 digit barcode.');const serial=++lookupSerial;await stopCamera();reset();barcode=digits(b);$('productBarcode').textContent='Barcode: '+barcode;$('scannerView').style.display='none';$('productView').style.display='block';$('message').textContent='Checking Supabase and product sources…';try{let cloudError='';try{cloud=await cloudLookup(barcode);}catch(e){cloudError=e.message;}let ext=null;try{ext=await externalLookup(barcode);}catch{}if(serial!==lookupSerial)return;const name=cloud?.product_name||ext?.product_name||ext?.product_name_en||'',brand=cloud?.brand||ext?.brands||'',ingredients=cloud?.ingredients||ext?.ingredients_text_en||ext?.ingredients_text||'';$('productName').value=name;$('brand').value=brand;$('ingredients').value=parseIngredients(ingredients);const url=cloud?.image_url||ext?.image_front_url||ext?.image_url||'';setPicture(refreshedImage(url));$('source').textContent=cloud?'Source: Supabase cloud':ext?'Source: Open Food Facts':'';nutritionShow(cloud?{proteins_100g:cloud.protein_100g,carbohydrates_100g:cloud.carb_100g,sugars_100g:cloud.sugar_100g,fat_100g:cloud.fat_100g,fiber_100g:cloud.fiber_100g,salt_100g:cloud.salt_100g}:ext?.nutriments||{});if(quality($('ingredients').value))showResult(classify($('ingredients').value));else status('Needs Verification');$('message').textContent=cloud?'Product loaded from Supabase. Check the package.':ext?'Product found in outside sources. Check the package.':'No product found. Add the product name and ingredients.';if(cloudError)$('message').textContent+=' Cloud lookup error: '+cloudError;}catch(e){$('message').textContent='Lookup failed: '+e.message;status('Needs Verification');}}
+async function lookup(b){if(!valid(b))return alert('Enter a valid 8–14 digit barcode.');const serial=++lookupSerial;await stopCamera();reset();barcode=digits(b);$('productBarcode').textContent='Barcode: '+barcode;$('scannerView').style.display='none';$('productView').style.display='block';$('message').textContent='Checking Supabase and product sources…';try{let cloudError='';try{cloud=await cloudLookup(barcode);}catch(e){cloudError=e.message;}let ext=null;try{ext=await externalLookup(barcode);}catch{}if(serial!==lookupSerial)return;const name=cloud?.product_name||ext?.product_name||ext?.product_name_en||'',brand=cloud?.brand||ext?.brands||'',ingredients=cloud?.ingredients||ext?.ingredients_text_en||ext?.ingredients_text||'';$('productName').value=name;$('brand').value=brand;$('ingredients').value=parseIngredients(ingredients);const url=cloud?.image_url||ext?.image_front_url||ext?.image_url||'';setPicture(refreshedImage(url));$('source').textContent=cloud?(cloud.image_url?'Photo: Supabase approved product record':'Product: Supabase • Photo: Open Food Facts'):ext?'Source: Open Food Facts':'';nutritionShow(cloud?{proteins_100g:cloud.protein_100g,carbohydrates_100g:cloud.carb_100g,sugars_100g:cloud.sugar_100g,fat_100g:cloud.fat_100g,fiber_100g:cloud.fiber_100g,salt_100g:cloud.salt_100g}:ext?.nutriments||{});if(quality($('ingredients').value))showResult(classify($('ingredients').value));else status('Needs Verification');$('message').textContent=cloud?'Product loaded from Supabase. Check the package.':ext?'Product found in outside sources. Check the package.':'No product found. Add the product name and ingredients.';if(cloudError)$('message').textContent+=' Cloud lookup error: '+cloudError;}catch(e){$('message').textContent='Lookup failed: '+e.message;status('Needs Verification');}}
 $('manualToggle').onclick=()=>{$('manualEntry').style.display=$('manualEntry').style.display==='none'?'block':'none';};$('lookup').onclick=()=>lookup($('barcode').value);$('barcode').onkeydown=e=>{if(e.key==='Enter')lookup($('barcode').value);};$('retry').onclick=()=>lookup(barcode);$('wrongProduct').onclick=()=>{$('wrongMessage').textContent='Product identity disputed on this screen. To submit a correction, sign in and verify the correct ingredients. This flag alone has not been sent to the cloud.';status('Needs Verification');};
 async function stopCamera(){if(scanner){const s=scanner;scanner=null;try{await s.stop();}catch{}try{await s.clear();}catch{}}$('cameraBox').style.display='none';}
 async function loadScript(url,check){if(check())return;await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=url;s.onload=resolve;s.onerror=()=>reject(Error('Unable to load '+url));document.head.append(s);});}
@@ -76,23 +91,41 @@ async function loadRewards(){if(!user||isAdmin)return;try{const id=encodeURIComp
 // Never report a successful picture replacement unless the database actually returns the submitted URL.
 async function applyApprovedPhoto(contribution){
   const url=contribution.image_url,code=digits(contribution.barcode);
-  if(!/^https:\/\//i.test(url||''))throw Error('Approved contribution has no valid HTTPS photo URL.');
+  if(!String(url||'').startsWith('https://'))throw Error('Approved contribution has no valid HTTPS photo URL.');
   if(!valid(code))throw Error('Approved contribution has no valid barcode.');
-  const rows=[];
+  const rows=[],seen=new Set();
   for(const variant of variants(code)){
-    const found=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(variant)+'&select=id,barcode,image_url,product_name,brand&limit=10',{authenticated:true});
-    if(Array.isArray(found))rows.push(...found);
+    const found=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(variant)+'&select=id,barcode,image_url&limit=100',{authenticated:true,extra:{'Cache-Control':'no-cache'}});
+    for(const item of Array.isArray(found)?found:[]){
+      if(!seen.has(String(item.id))){seen.add(String(item.id));rows.push(item);}
+    }
   }
-  const product=rows.find(p=>digits(p.barcode).replace(/^0+/,'')===code.replace(/^0+/,''));
-  if(!product)throw Error('Photo approved, but no matching product exists in Supabase for barcode '+code+'. Create its product record before the picture can be displayed.');
-  if(product.image_url!==url){
-    const updated=await request('/rest/v1/products?id=eq.'+encodeURIComponent(product.id),{method:'PATCH',body:{image_url:url},authenticated:true,extra:{Prefer:'return=representation'}});
-    if(!Array.isArray(updated)||updated.length!==1||updated[0].image_url!==url)throw Error('Photo approved, but Supabase did not confirm the image update. Check products UPDATE permissions or the vv_review_contribution database function.');
+  const matches=rows.filter(p=>digits(p.barcode).replace(/^0+/,'')===code.replace(/^0+/,''));
+  if(!matches.length)throw Error('Contribution approved, but no matching product exists in Supabase for barcode '+code+'.');
+  // Update EVERY matching record. An old duplicate must not win the next barcode lookup.
+  for(const product of matches){
+    if(product.image_url!==url){
+      const updated=await request('/rest/v1/products?id=eq.'+encodeURIComponent(product.id),{
+        method:'PATCH',body:{image_url:url},authenticated:true,extra:{Prefer:'return=representation'}
+      });
+      if(!Array.isArray(updated)||updated.length!==1||updated[0].image_url!==url)
+        throw Error('Supabase did not confirm the photo update for product '+product.id+'. Check products UPDATE permissions.');
+    }
   }
-  const verifiedRows=await request('/rest/v1/products?id=eq.'+encodeURIComponent(product.id)+'&select=id,image_url&limit=1',{authenticated:true,extra:{'Cache-Control':'no-cache'}});
-  if(!Array.isArray(verifiedRows)||verifiedRows[0]?.image_url!==url)throw Error('Photo approved, but the saved product image could not be verified.');
-  if(barcode&&variants(barcode).some(v=>variants(code).includes(v))){cloud={...(cloud||{}),image_url:url};setPicture(refreshedImage(url));$('photoMessage').textContent='✅ Approved replacement photo is now displayed.';}
-  return product;
+  // Verify with a new read, not just the response to the write.
+  for(const product of matches){
+    const verified=await request('/rest/v1/products?id=eq.'+encodeURIComponent(product.id)+'&select=id,image_url&limit=1',{
+      authenticated:true,extra:{'Cache-Control':'no-cache'}
+    });
+    if(!Array.isArray(verified)||verified[0]?.image_url!==url)
+      throw Error('Photo was approved but product '+product.id+' still has an old image in Supabase.');
+  }
+  if(barcode&&variants(barcode).some(v=>variants(code).includes(v))){
+    cloud={...(cloud||{}),image_url:url};
+    setPicture(refreshedImage(url));
+    $('photoMessage').textContent='✅ Approved replacement photo is now displayed.';
+  }
+  return matches;
 }
 async function loadAdmin(){
   if(!user||!isAdmin)return;
