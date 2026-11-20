@@ -71,7 +71,59 @@ $('ingredients').oninput=()=>{verified=false;$('confirmed').checked=false;clearR
 $('check').onclick=async()=>{if(!valid(barcode))return alert('Scan a barcode first.');const t=parseIngredients($('ingredients').value);if(!quality(t))return alert('Enter the complete ingredient list from the package.');if(!$('confirmed').checked)return alert('Check the ingredient list and tick the confirmation box.');$('ingredients').value=t;verified=true;showResult(classify(t));$('result').scrollIntoView({behavior:'smooth'});await persist();};
 async function persist(){if(saveBusy||!verified||!lastResult||lastResult.status==='Needs Verification'||!valid(barcode))return;saveBusy=true;$('save').disabled=true;$('saveMessage').textContent='Saving verified scan…';try{if(user)await checkAdmin();const existing=await cloudLookup(barcode),name=clean($('productName').value),brand=clean($('brand').value),ingredients=clean($('ingredients').value);if(!name||!brand)throw Error('Enter product name and brand first.');if(existing&&!isAdmin){if(!user)throw Error('This product already exists. Sign in to submit corrections for review.');if(ingredients===clean(existing.ingredients)&&name===clean(existing.product_name)&&brand===clean(existing.brand)&&!selectedPhoto){$('saveMessage').textContent='✅ Verified product already in the database.';return;}let url=null;if(selectedPhoto)url=await uploadPhoto(selectedPhoto);await submit(url?'product_photo':'correction',url,ingredients);$('saveMessage').textContent='✅ Correction submitted for administrator approval. Points pending.';await loadRewards();return;}const payload={barcode,product_name:name,brand,ingredients,vegan_status:lastResult.status,vegan_reason:lastResult.reasons.join('; ')};if(selectedPhoto)payload.image_url=await uploadPhoto(selectedPhoto);if(existing){const patch={...payload};delete patch.barcode;await request('/rest/v1/products?id=eq.'+encodeURIComponent(existing.id),{method:'PATCH',body:patch,authenticated:true,extra:{Prefer:'return=representation'}});}else{await request('/rest/v1/products',{method:'POST',body:payload,authenticated:!!user,extra:{Prefer:'return=representation'}});if(user&&!isAdmin){try{await submit(selectedPhoto?'product_photo':'ingredients',payload.image_url||null,ingredients);await loadRewards();}catch(e){$('saveMessage').textContent='Product saved, but rewards submission failed: '+e.message;return;}}}$('saveMessage').textContent='✅ Verified scan saved to Supabase.';}catch(e){$('saveMessage').textContent='❌ Save failed: '+e.message;}finally{saveBusy=false;$('save').disabled=false;}}$('save').onclick=persist;
 async function loadRewards(){if(!user||isAdmin)return;try{const id=encodeURIComponent(user.id),totals=await request('/rest/v1/vv_my_rewards?user_id=eq.'+id+'&select=*',{authenticated:true});$('earned').textContent=totals[0]?.earned_points??0;$('pending').textContent=totals[0]?.pending_points??0;const rows=await request('/rest/v1/vv_contributions?user_id=eq.'+id+'&select=barcode,contribution_type,points,status,created_at&order=created_at.desc&limit=30',{authenticated:true});$('history').replaceChildren();if(!rows.length)$('history').textContent='No contributions yet.';rows.forEach(c=>{const d=document.createElement('div');d.className='card';d.textContent=(c.contribution_type||'Contribution').replace(/_/g,' ')+' • '+c.barcode+' • '+c.points+' points • '+c.status;$('history').append(d);});$('rewardMessage').textContent='Points are awarded after administrator approval.';}catch(e){$('rewardMessage').textContent='Rewards unavailable: '+e.message;}}$('refreshRewards').onclick=loadRewards;
-async function loadAdmin(){if(!user||!isAdmin)return;const box=$('adminPending');box.replaceChildren();$('adminMessage').textContent='Loading pending contributions…';try{const rows=await request('/rest/v1/vv_contributions?status=eq.pending&select=*&order=created_at.asc&limit=100',{authenticated:true});const pending=rows.filter(c=>c.user_id!==user.id);$('adminMessage').textContent=pending.length?pending.length+' pending contribution(s).':'✅ No contributions awaiting review.';for(const c of pending){const d=document.createElement('div');d.className='card',h=document.createElement('h3'),info=document.createElement('p');h.textContent=(c.contribution_type||'Contribution').replace(/_/g,' ');info.textContent='Barcode: '+c.barcode+' • Points: '+c.points;d.append(h,info);if(c.description){const p=document.createElement('p');p.textContent=c.description;d.append(p);}if(c.ingredients){const p=document.createElement('p');p.textContent='Ingredients: '+c.ingredients;d.append(p);}if(c.image_url&&/^https:\/\//.test(c.image_url)){const img=document.createElement('img');img.src=c.image_url;img.alt='Submitted replacement product photo';d.append(img);}const actions=document.createElement('div');actions.className='actions';for(const approve of [true,false]){const b=document.createElement('button');b.textContent=approve?'✅ Approve':'❌ Reject';if(!approve)b.className='danger';b.onclick=async()=>{if(!confirm((approve?'Approve':'Reject')+' this contribution?'))return;b.disabled=true;try{await request('/rest/v1/rpc/vv_review_contribution',{method:'POST',authenticated:true,body:{p_id:c.id,p_approve:approve}});await loadAdmin();await loadLeaderboard();}catch(e){$('adminMessage').textContent='Review failed: '+e.message;}finally{b.disabled=false;}};actions.append(b);}d.append(actions);box.append(d);}}catch(e){$('adminMessage').textContent='Unable to load reviews: '+e.message;}}$('refreshAdmin').onclick=loadAdmin;
+async function loadAdmin(){
+  if(!user||!isAdmin)return;
+  const panel=$('adminPending');
+  panel.replaceChildren();
+  $('adminMessage').textContent='Loading pending contributions…';
+  try{
+    const rows=await request('/rest/v1/vv_contributions?status=eq.pending&select=*&order=created_at.asc&limit=100',{authenticated:true});
+    if(!Array.isArray(rows))throw Error('Unexpected review response.');
+    const pending=rows.filter(item=>item.user_id!==user.id);
+    $('adminMessage').textContent=pending.length?pending.length+' pending contribution(s).':'✅ No contributions awaiting review.';
+    for(const contribution of pending){
+      const card=document.createElement('div');
+      card.className='card';
+      const heading=document.createElement('h3');
+      heading.textContent=(contribution.contribution_type||'Contribution').replace(/_/g,' ');
+      const details=document.createElement('p');
+      details.textContent='Barcode: '+(contribution.barcode||'Unknown')+' • Points: '+(contribution.points??0);
+      card.append(heading,details);
+      if(contribution.description){const description=document.createElement('p');description.textContent=contribution.description;card.append(description);}
+      if(contribution.ingredients){const ingredients=document.createElement('p');ingredients.textContent='Ingredients: '+contribution.ingredients;card.append(ingredients);}
+      if(contribution.image_url&&/^https:\/\//.test(contribution.image_url)){
+        const picture=document.createElement('img');
+        picture.src=contribution.image_url;
+        picture.alt='Submitted replacement product photo';
+        picture.loading='lazy';
+        card.append(picture);
+      }
+      const actions=document.createElement('div');
+      actions.className='actions';
+      for(const approve of [true,false]){
+        const button=document.createElement('button');
+        button.textContent=approve?'✅ Approve':'❌ Reject';
+        if(!approve)button.className='danger';
+        button.onclick=async()=>{
+          if(!confirm((approve?'Approve':'Reject')+' this contribution?'))return;
+          for(const sibling of actions.querySelectorAll('button'))sibling.disabled=true;
+          try{
+            await request('/rest/v1/rpc/vv_review_contribution',{method:'POST',authenticated:true,body:{p_id:contribution.id,p_approve:approve}});
+            await loadAdmin();
+            await loadLeaderboard();
+          }catch(error){
+            $('adminMessage').textContent='Review failed: '+error.message;
+            for(const sibling of actions.querySelectorAll('button'))sibling.disabled=false;
+          }
+        };
+        actions.append(button);
+      }
+      card.append(actions);
+      panel.append(card);
+    }
+  }catch(error){$('adminMessage').textContent='Unable to load reviews: '+error.message;}
+}
+$('refreshAdmin').onclick=loadAdmin;
 async function loadLeaderboard(){const now=new Date(),month=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';$('month').textContent=now.toLocaleDateString('en-US',{month:'long',year:'numeric'});try{const rows=await request('/rest/v1/rpc/vv_monthly_leaderboard',{method:'POST',body:{p_month:month}});$('leaderboard').replaceChildren();const top=(Array.isArray(rows)?rows:[]).sort((a,b)=>Number(b.approved_points)-Number(a.approved_points)).slice(0,3);if(!top.length){$('leaderboardMessage').textContent='No approved contributions yet this month.';return;}top.forEach((r,i)=>{const d=document.createElement('div');d.className='card';d.textContent=['🥇','🥈','🥉'][i]+' '+(r.contributor_name||'Vegan Contributor')+' — '+(r.approved_points||0)+' points • '+(r.approved_contributions||0)+' approved contributions';$('leaderboard').append(d);});$('leaderboardMessage').textContent='Current approved rankings.';}catch(e){$('leaderboardMessage').textContent='Leaderboard unavailable: '+e.message;}}$('refreshLeaderboard').onclick=loadLeaderboard;
 window.addEventListener('pagehide',()=>{stopCamera();if(ocrBitmap)ocrBitmap.close();if(ocrWorker)ocrWorker.terminate().catch(()=>{});});accountUI();restore();loadLeaderboard();
 </script></body></html>
