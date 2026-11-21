@@ -1,39 +1,35 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#126c42"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon-192.png"><link rel="apple-touch-icon" href="./icon-192.png"><title>Verified Vegan</title><style>
-*{box-sizing:border-box}body{margin:0;background:#f4faf5;color:#173b2a;font:16px system-ui,Arial}header{background:#126c42;color:white;text-align:center;padding:19px}h1{margin:0}header p{margin:5px}main{max-width:720px;margin:auto;padding:14px}section,.banner{background:white;border-radius:16px;padding:17px;margin-bottom:15px;box-shadow:0 2px 12px #1232}.banner{text-align:center;color:#126c42;font-weight:900;font-size:21px}h2{font-size:20px;margin:0 0 12px}input,textarea,button{font:inherit;width:100%;padding:12px;border-radius:10px;margin:5px 0}input,textarea{border:1px solid #a9c2b2}textarea{min-height:110px}button{border:0;background:#126c42;color:white;font-weight:700;cursor:pointer}button.secondary{background:#426755}button.danger{background:#8a3d36}button:disabled{opacity:.5}label{display:block;margin-top:10px}.muted{color:#617469}.small{font-size:13px}.status{padding:16px;border-radius:12px;font-size:24px;font-weight:900;text-align:center}.vegan{background:#d5f4dc;color:#11612c}.notvegan{background:#ffe0dd;color:#9c2219}.unknown{background:#fff0c5;color:#795000}.photo{display:flex;gap:12px;align-items:center;margin:12px 0}.photo>div{width:50%}.photo img{width:100%;max-height:240px;object-fit:contain}.photo .status{width:50%}.steps{background:#f1f7f2;padding:12px;border-radius:12px}.steps li{margin:7px 0}.card{border:1px solid #d7e8dc;border-radius:12px;padding:12px;margin:10px 0}.card img{max-width:180px;max-height:180px;object-fit:contain}.actions{display:flex;gap:8px}.actions button{width:50%}#cameraBox,#productView,#result,#signedIn,#rewards,#admin,#cropBox,#ingredientPreview,#recoveryBox{display:none}#reader{width:100%;overflow:hidden}#cropCanvas{max-width:100%;touch-action:none;border:1px solid #a9c2b2}#ingredientPreview{max-width:100%;max-height:250px;object-fit:contain}#photoInput,#ingredientInput{display:none}.rewardGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.rewardGrid>div{background:#f1f7f2;padding:15px;text-align:center;border-radius:10px}.rewardGrid strong{font-size:28px;display:block}.password-wrap{display:flex;gap:5px}.password-wrap input{flex:1;min-width:0}.password-wrap button{width:90px}#message,#saveMessage,#photoMessage,#authMessage,#adminMessage{overflow-wrap:anywhere}
-</style></head><body><header><h1>🌱 Verified Vegan</h1><p>Vegans, Know What's in Your Products!</p><p>Free scanning • Independent results • For the animals</p></header><main><div class="banner">🐾 EVERY SCAN COUNTS. EVERY ANIMAL MATTERS. 💚<p class="small">Together, we're building a kinder world for animals.</p></div>
-<section><div id="scannerView"><h2>📷 Scan Any Product Barcode</h2><button id="startCamera">📷 Scan Barcode</button><div id="cameraBox"><div id="reader"></div><button id="stopCamera" class="secondary">Stop Camera</button></div><button id="manualToggle" class="secondary">Can't Scan? Enter Barcode</button><div id="manualEntry" style="display:none"><label for="barcode">UPC / EAN barcode</label><input id="barcode" inputmode="numeric" placeholder="Enter barcode number"><button id="lookup">Look Up Product</button></div></div><div id="productView"><h2>Product Details</h2><button id="scanAnother" class="secondary">📷 Scan Another Product</button><p id="productBarcode"></p><p id="source" class="small muted"></p><div class="photo"><div><img id="productPhoto" alt="Product packaging" hidden><p id="photoPlaceholder" class="muted">Product picture appears here</p></div><div id="productStatus" class="status unknown">Needs Verification</div></div><p id="message" class="muted"></p><button id="wrongProduct" class="secondary">⚠️ Wrong Product? Report It</button><p id="wrongMessage" class="small muted"></p><button id="retry" class="secondary">🔎 Search Additional Sources Again</button><div class="steps"><strong>🏆 Community Contributions</strong><ol><li>Scan the barcode.</li><li>For an outdated or missing picture, choose a new product picture.</li><li>Tap <strong>Submit Replacement Photo for Approval</strong>. No ingredient verification needed for photo-only corrections.</li><li>Earn points after administrator approval.</li></ol><p class="small">Scanning is free without signing in. Sign in to contribute photos or earn rewards. Administrators can approve their own photos directly.</p></div><h2>Product Picture</h2><input id="photoInput" type="file" accept="image/*"><button id="takePhoto">📸 Take Product Picture</button><button id="choosePhoto" class="secondary">Choose Product Picture From Gallery</button><button id="submitPhoto" style="display:none">📤 Submit Replacement Photo for Approval</button><p id="photoMessage" class="muted" aria-live="polite">Choose a picture to replace an outdated product image or add a missing one.</p><label for="productName">Product name</label><input id="productName" placeholder="Product name"><label for="brand">Brand</label><input id="brand" placeholder="Brand"><h2>Nutrition Facts</h2><div id="nutrition" class="muted">Nutrition information appears here when available.</div></div></section>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#126c42"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon-192.png"><link rel="apple-touch-icon" href="./icon-192.png"><title>Verified Vegan</title>
+<style>*{box-sizing:border-box}body{margin:0;background:#f4faf5;color:#173b2a;font:16px system-ui,Arial}header{background:#126c42;color:white;text-align:center;padding:19px}h1{margin:0}header p{margin:5px}main{max-width:720px;margin:auto;padding:14px}section,.banner{background:white;border-radius:16px;padding:17px;margin-bottom:15px;box-shadow:0 2px 12px #1232}.banner{text-align:center;color:#126c42;font-weight:900;font-size:21px}h2{font-size:20px;margin:0 0 12px}input,textarea,button{font:inherit;width:100%;padding:12px;border-radius:10px;margin:5px 0}input,textarea{border:1px solid #a9c2b2}textarea{min-height:110px}button{border:0;background:#126c42;color:white;font-weight:700;cursor:pointer}button.secondary{background:#426755}button.danger{background:#8a3d36}button:disabled{opacity:.5}label{display:block;margin-top:10px}.muted{color:#617469}.small{font-size:13px}.status{padding:16px;border-radius:12px;font-size:24px;font-weight:900;text-align:center}.vegan{background:#d5f4dc;color:#11612c}.notvegan{background:#ffe0dd;color:#9c2219}.unknown{background:#fff0c5;color:#795000}.photo{display:flex;gap:12px;align-items:center;margin:12px 0}.photo>div{width:50%}.photo img{width:100%;max-height:240px;object-fit:contain}.photo .status{width:50%}.steps{background:#f1f7f2;padding:12px;border-radius:12px}.steps li{margin:7px 0}.card{border:1px solid #d7e8dc;border-radius:12px;padding:12px;margin:10px 0}.card img{max-width:180px;max-height:180px;object-fit:contain}.actions{display:flex;gap:8px}.actions button{width:50%}#cameraBox,#productView,#result,#signedIn,#rewards,#admin,#cropBox,#ingredientPreview,#recoveryBox{display:none}#reader{width:100%;overflow:hidden}#cropCanvas{max-width:100%;touch-action:none;border:1px solid #a9c2b2}#ingredientPreview{max-width:100%;max-height:250px;object-fit:contain}#photoInput,#ingredientInput{display:none}.notice{padding:12px;background:#fff0c5;border-radius:10px}.rewardGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.rewardGrid>div{background:#f1f7f2;padding:15px;text-align:center;border-radius:10px}.rewardGrid strong{font-size:28px;display:block}.password-wrap{display:flex;gap:5px}.password-wrap input{flex:1;min-width:0}.password-wrap button{width:90px}#message,#saveMessage,#photoMessage,#authMessage,#adminMessage{overflow-wrap:anywhere}</style></head><body>
+<header><h1>🌱 Verified Vegan</h1><p>Vegans, Know What's in Your Products!</p><p>Free scanning • Independent results • For the animals</p></header><main><div class="banner">🐾 EVERY SCAN COUNTS. EVERY ANIMAL MATTERS. 💚<p class="small">Together, we're building a kinder world for animals.</p></div>
+<section><div id="scannerView"><h2>📷 Scan Any Product Barcode</h2><button id="startCamera">📷 Scan Barcode</button><div id="cameraBox"><div id="reader"></div><button id="stopCamera" class="secondary">Stop Camera</button></div><button id="manualToggle" class="secondary">Can't Scan? Enter Barcode</button><div id="manualEntry" style="display:none"><label for="barcode">UPC / EAN barcode</label><input id="barcode" inputmode="numeric" placeholder="Enter barcode number"><button id="lookup">Look Up Product</button></div></div>
+<div id="productView"><h2>Product Details</h2><button id="scanAnother" class="secondary">📷 Scan Another Product</button><p id="productBarcode"></p><p id="source" class="small muted"></p><div class="photo"><div><img id="productPhoto" alt="Product packaging" hidden><p id="photoPlaceholder" class="muted">Product picture appears here</p></div><div id="productStatus" class="status unknown">Needs Verification</div></div><p id="message" class="muted"></p><button id="wrongProduct" class="secondary">⚠️ Wrong Product? Report It</button><p id="wrongMessage" class="small muted"></p><button id="retry" class="secondary">🔎 Search Additional Sources Again</button>
+<div class="steps"><strong>🏆 Community Contributions</strong><ol><li>Scan the barcode.</li><li>For an outdated or missing picture, choose a new product picture.</li><li>Tap <strong>Submit Replacement Photo for Approval</strong>. No ingredient verification needed for photo-only corrections.</li><li>Earn points after administrator approval.</li></ol><p class="small">Scanning is free without signing in. Sign in to contribute photos or earn rewards. Administrators can approve their own photos directly.</p></div>
+<h2>Product Picture</h2><input id="photoInput" type="file" accept="image/*"><button id="takePhoto">📸 Take Product Picture</button><button id="choosePhoto" class="secondary">Choose Product Picture From Gallery</button><button id="submitPhoto" style="display:none">📤 Submit Replacement Photo for Approval</button><p id="photoMessage" class="muted" aria-live="polite">Choose a picture to replace an outdated product image or add a missing one.</p>
+<label for="productName">Product name</label><input id="productName" placeholder="Product name"><label for="brand">Brand</label><input id="brand" placeholder="Brand"><h2>Nutrition Facts</h2><div id="nutrition" class="muted">Nutrition information appears here when available.</div></div></section>
 <section id="ingredientSection"><h2>Ingredients</h2><p>Photograph the ingredients or enter them manually.</p><p class="small muted">Fill the picture with the ingredient list, keep the camera straight, and avoid glare.</p><input id="ingredientInput" type="file" accept="image/*"><button id="takeIngredient">📸 Take Ingredient Picture</button><button id="chooseIngredient" class="secondary">Choose Existing Ingredient Photo</button><img id="ingredientPreview" alt="Ingredient photograph"><p id="ocrMessage" class="muted">No ingredient picture selected yet.</p><div id="cropBox"><h2>Select Ingredient Area</h2><p>Drag a rectangle around the complete ingredient list.</p><canvas id="cropCanvas"></canvas><button id="readCrop">🔎 Read Selected Ingredients</button><button id="resetCrop" class="secondary">Reset Selection</button></div><button id="showCrop" class="secondary" style="display:none">✂️ Select Ingredient Area Manually</button><label for="ingredients">Ingredient list</label><textarea id="ingredients" placeholder="Ingredients appear here. Correct or type them."></textarea><p id="allergens" class="muted small"></p><label><input type="checkbox" id="confirmed" style="width:auto"> I checked the complete ingredient list against the package and corrected mistakes.</label><button id="check">🌱 Verify Ingredients</button></section>
 <section id="result"><h2>Verification Details</h2><p id="explanation"></p><h3>Reasons</h3><ul id="reasons"></ul><p id="caution" class="muted"></p><button id="save">💾 Save Scan / Submit Contribution</button><p id="saveMessage" aria-live="polite"></p></section>
 <section id="authSection"><h2>🏆 Community Rewards</h2><p>Help improve Verified Vegan and earn points for approved contributions.</p><p class="muted">Scanning is free without signing in. Accounts are only for rewards.</p><div id="signedOut"><label>Email address</label><input id="email" type="email" autocomplete="email"><label>Password</label><div class="password-wrap"><input id="password" type="password" autocomplete="current-password"><button id="togglePassword" class="secondary">Show</button></div><button id="signUp">🌱 Create Free Account</button><button id="signIn" class="secondary">Log In</button><button id="forgot" class="secondary">Forgot Password?</button></div><div id="recoveryBox"><label>New password</label><input id="newPassword" type="password"><button id="savePassword">Save New Password</button></div><div id="signedIn"><p id="welcome"></p><button id="refreshRewards">🏆 My Rewards</button><button id="logout" class="danger">Log Out</button></div><p id="authMessage" class="muted"></p></section>
-<section id="admin"><h2>🛡️ Administrator Dashboard</h2><p>Review submitted corrections and replacement photos.</p><button id="refreshAdmin">🔄 Refresh Pending Reviews</button><p id="adminMessage"></p><div id="adminPending"></div></section><section id="rewards"><h2>🏆 My Rewards</h2><div class="rewardGrid"><div><strong id="earned">0</strong>Approved Points</div><div><strong id="pending">0</strong>Pending Points</div></div><p id="rewardMessage"></p><h3>Your Contributions</h3><div id="history"></div></section><section><h2>🏆 Monthly Leaderboard</h2><p id="month"></p><div id="leaderboard"></div><p id="leaderboardMessage" class="muted"></p><button id="refreshLeaderboard" class="secondary">🔄 Refresh Monthly Leaderboard</button><div class="steps"><strong>🎁 Prizes Coming Soon!</strong><p>Monthly prizes await sponsors. Only approved contributions count toward rankings.</p></div></section><section style="text-align:center"><h2>✉️ Contact & Support</h2><p>Have a question, suggestion, or product correction?</p><a href="mailto:verifiedveganhelp@gmail.com">verifiedveganhelp@gmail.com</a><p class="small muted">© 2026 Verified Vegan. Helping animals, one product at a time. 🌱</p></section></main>
+<section id="admin"><h2>🛡️ Administrator Dashboard</h2><p>Review submitted corrections and replacement photos.</p><button id="refreshAdmin">🔄 Refresh Pending Reviews</button><p id="adminMessage"></p><div id="adminPending"></div></section>
+<section id="rewards"><h2>🏆 My Rewards</h2><div class="rewardGrid"><div><strong id="earned">0</strong>Approved Points</div><div><strong id="pending">0</strong>Pending Points</div></div><p id="rewardMessage"></p><h3>Your Contributions</h3><div id="history"></div></section>
+<section><h2>🏆 Monthly Leaderboard</h2><p id="month"></p><div id="leaderboard"></div><p id="leaderboardMessage" class="muted"></p><button id="refreshLeaderboard" class="secondary">🔄 Refresh Monthly Leaderboard</button><div class="steps"><strong>🎁 Prizes Coming Soon!</strong><p>Monthly prizes await sponsors. Only approved contributions count toward rankings.</p></div></section>
+<section style="text-align:center"><h2>✉️ Contact & Support</h2><p>Have a question, suggestion, or product correction?</p><a href="mailto:verifiedveganhelp@gmail.com">verifiedveganhelp@gmail.com</a><p class="small muted">© 2026 Verified Vegan. Helping animals, one product at a time. 🌱</p></section></main>
 <script>
 'use strict';
 const BASE='https://bluaqqfcsjudoiaxkbjn.supabase.co',KEY='sb_publishable_ed4oFchBc40deLLF5Ws9CQ_MVz_sxog',AUTHKEY='verified-vegan-auth-v1';
 const $=id=>document.getElementById(id),clean=s=>String(s??'').replace(/\s+/g,' ').trim(),digits=s=>String(s??'').replace(/\D/g,''),valid=s=>/^\d{8,14}$/.test(digits(s));
-const knownProducts={'810126660404':{product_name:'L-Theanine 200 mg, 60 Vegetable Capsules',brand:'Force Factor',packageVeganClaim:true,legacyPhotoBarcode:'321003360404'}};
+const knownProducts={'810126660404':{product_name:'L-Theanine 200 mg, 60 Vegetable Capsules',brand:'Force Factor'}};
 let barcode='',session=null,user=null,isAdmin=false,scanner=null,selectedPhoto=null,selectedPhotoUrl='',cloud=null,photoUrl='',nutrition={},lastResult=null,verified=false,scanBusy=false,saveBusy=false,ocrWorker=null,ocrBitmap=null,crop=null,drag=null,lookupSerial=0,ocrBusy=false;
 const animalRules=[['Milk or dairy',/\b(?:milk|whey|casein|caseinate|lactose|buttermilk|cheese|yogurt|yoghurt|ghee|milkfat|milk fat|milk solids|cream|butter|dairy|custard)\b/i],['Egg',/\b(?:egg|eggs|albumen|ovalbumin|egg whites?|egg yolks?)\b/i],['Honey or bee products',/\b(?:honey|royal jelly|propolis|beeswax|cera alba|e901)\b/i],['Gelatin',/\b(?:gelatin|gelatine|isinglass)\b/i],['Carmine or cochineal',/\b(?:carmine|cochineal|carminic acid|e120)\b/i],['Shellac',/\b(?:shellac|confectioner'?s glaze|e904)\b/i],['Animal fat',/\b(?:lard|tallow|suet|duck fat|goose fat|bacon fat)\b/i],['Meat',/\b(?:beef|pork|chicken|turkey|meat broth|bone broth|veal|lamb|bacon|ham)\b/i],['Fish or seafood',/\b(?:fish oil|fish sauce|anchov(?:y|ies)|oyster|shrimp|prawn|crab|lobster|bonito|salmon|tuna|sardines?|clam|mussel)\b/i],['Animal proteins',/\b(?:collagen|keratin|elastin)\b/i]];
 function stripPlant(s){return s.replace(/\b(?:almond|oat|soy|soya|coconut|rice|cashew|pea|hemp|flax|hazelnut|macadamia)\s+milk\b/gi,'plant beverage').replace(/\b(?:almond|oat|soy|soya|coconut|cashew)\s+(?:cream|creamer|butter|yogurt|cheese)\b/gi,'plant alternative').replace(/\b(?:cocoa|shea|peanut|almond|cashew|apple)\s+butter\b/gi,'plant fat').replace(/\bcream of tartar\b/gi,'tartar');}
 function parseIngredients(raw){let t=String(raw||'').replace(/\r/g,'\n');const h=/\bingredients?\s*[:\-]\s*/i.exec(t);if(h)t=t.slice(h.index+h[0].length);const stop=/\b(?:may\s+(?:also\s+)?contain\s*:|contains\s*:\s*(?!less\s+than)|nutrition facts|distributed by|manufactured by|total fat\s*\d|serving size|directions\s*:|recipe\s*:)\b/i.exec(t);return clean((stop?t.slice(0,stop.index):t)).slice(0,3500);}
 function quality(t){return !!t&&t.length<=3500&&!/\b(?:nutrition facts|serving size|daily value|distributed by|www\.)\b/i.test(t)&&/[a-z]{3}/i.test(t)&&!(/\b(?:preheat oven|cook until|in a skillet)\b/i.test(t));}
 function classify(raw){const t=parseIngredients(raw);if(!quality(t))return {status:'Needs Verification',reasons:[],explanation:'No reliable ingredient list available.',caution:'Check the full package ingredients.'};const screened=stripPlant(t);const reasons=animalRules.filter(([_,re])=>re.test(screened)).map(x=>x[0]);return reasons.length?{status:'Not Vegan',reasons,explanation:'Animal-derived ingredients detected.',caution:'Confirm ingredients belong to this exact product.'}:{status:'Vegan',reasons:['No explicitly animal-derived ingredients detected.'],explanation:'Vegan by ingredient-text screening.',caution:'This screening is not manufacturer certification. Some ingredient origins require further verification.'};}
-const PACKAGE_REFERENCES={
- '850008751530':{
-  brand:'ChocZero',
-  ingredients:'Dark chocolate (unsweetened chocolate, cocoa butter), soluble corn fiber (resistant dextrin), peanuts, palm fruit oil, sea salt, sunflower lecithin, monk fruit extract.',
-  nutrition:{proteins_100g:2/28*100,carbohydrates_100g:15/28*100,sugars_100g:0,fat_100g:10/28*100,fiber_100g:13/28*100,salt_100g:0.065*100/28},
-  serving:'28 g (2 cups)',
-  labelSource:'Package photo supplied for this barcode; confirm against your package before saving'
- }
-};
-function comparableIngredients(s){return parseIngredients(s).toLowerCase().replace(/[^a-z0-9]/g,'');}
-function ingredientConflict(a,b){return quality(a)&&quality(b)&&comparableIngredients(a)!==comparableIngredients(b);}
 const VERIFIED_CACHE='vv-verified-products-v2';
-function readVerified(code){try{const x=JSON.parse(localStorage.getItem(VERIFIED_CACHE)||'{}');return variants(code).map(v=>x[v]).find(v=>v&&['Vegan','Not Vegan'].includes(v.status))||null;}catch{return null;}}
-// FIX: save an already verified status even when the photo-only record has no ingredient text.
-function rememberVerified(code,ingredients,result){if(!valid(code)||!['Vegan','Not Vegan'].includes(result?.status))return;try{const all=JSON.parse(localStorage.getItem(VERIFIED_CACHE)||'{}');const old=readVerified(code);all[digits(code)]={ingredients:quality(ingredients)?parseIngredients(ingredients):old?.ingredients||'',status:result.status,updated_at:new Date().toISOString()};const keys=Object.keys(all);if(keys.length>500)keys.sort((a,b)=>String(all[a].updated_at).localeCompare(String(all[b].updated_at))).slice(0,keys.length-500).forEach(k=>delete all[k]);localStorage.setItem(VERIFIED_CACHE,JSON.stringify(all));}catch{}}
+function readVerified(code){try{const x=JSON.parse(localStorage.getItem(VERIFIED_CACHE)||'{}');return x[digits(code)]||null;}catch{return null;}}
+function rememberVerified(code,ingredients,result){if(!valid(code)||!quality(ingredients)||!['Vegan','Not Vegan'].includes(result?.status))return;try{const all=JSON.parse(localStorage.getItem(VERIFIED_CACHE)||'{}');all[digits(code)]={ingredients:parseIngredients(ingredients),status:result.status,updated_at:new Date().toISOString()};const keys=Object.keys(all);if(keys.length>500)keys.sort((a,b)=>String(all[a].updated_at).localeCompare(String(all[b].updated_at))).slice(0,keys.length-500).forEach(k=>delete all[k]);localStorage.setItem(VERIFIED_CACHE,JSON.stringify(all));}catch{}}
 function status(s){$('productStatus').textContent=s;$('productStatus').className='status '+(s==='Vegan'?'vegan':s==='Not Vegan'?'notvegan':'unknown');}
-function showResult(r){lastResult=r;status(r.status);$('result').style.display='block';$('explanation').textContent=r.explanation;$('caution').textContent=r.caution;$('reasons').replaceChildren();(r.reasons||[]).forEach(v=>{const li=document.createElement('li');li.textContent=v;$('reasons').append(li);});}
+function showResult(r){lastResult=r;status(r.status);$('result').style.display='block';$('explanation').textContent=r.explanation;$('caution').textContent=r.caution;$('reasons').replaceChildren();r.reasons.forEach(v=>{const li=document.createElement('li');li.textContent=v;$('reasons').append(li);});}
 function clearResult(){lastResult=null;$('result').style.display='none';}
 function headers(token){return {apikey:KEY,...(token?{Authorization:'Bearer '+token}:{})};}
 async function errorResponse(r){const t=await r.text();try{const j=JSON.parse(t);return 'HTTP '+r.status+': '+(j.message||j.msg||j.error_description||t);}catch{return 'HTTP '+r.status+': '+t.slice(0,250);}}
@@ -52,131 +48,57 @@ $('savePassword').onclick=async()=>{try{if($('newPassword').value.length<8)throw
 $('logout').onclick=()=>{isAdmin=false;setSession(null);$('authMessage').textContent='Logged out.';};
 async function restore(){try{const h=new URLSearchParams(location.hash.slice(1));if(h.has('access_token')&&h.has('refresh_token')){const access=h.get('access_token'),refresh=h.get('refresh_token');history.replaceState(null,'',location.pathname+location.search);const r=await fetch(BASE+'/auth/v1/user',{headers:headers(access)});if(!r.ok)throw Error(await errorResponse(r));setSession({access_token:access,refresh_token:refresh,expires_at:Math.floor(Date.now()/1000)+Number(h.get('expires_in')||3600),user:await r.json()});if(h.get('type')==='recovery'){$('recoveryBox').style.display='block';return;}}else{const s=JSON.parse(localStorage.getItem(AUTHKEY)||'null');if(!s?.access_token)return;setSession(s);const r=await fetch(BASE+'/auth/v1/user',{headers:headers(await token())});if(!r.ok)throw Error('Session expired.');session.user=await r.json();setSession(session);}await afterLogin();}catch(e){setSession(null);$('authMessage').textContent='Authentication: '+e.message;}}
 function variants(b){const x=digits(b),v=new Set([x]);if(x.length===12)v.add('0'+x);if(x.length===13&&x[0]==='0')v.add(x.slice(1));return [...v].filter(valid);}
-function sameBarcode(a,b){return variants(a).some(v=>variants(b).includes(v));}
-function normalizedStatus(v){const s=clean(v).toLowerCase().replace(/[_-]+/g,' ');if(['vegan','verified vegan','is vegan','yes'].includes(s))return 'Vegan';if(['not vegan','non vegan','nonvegan','notvegan','contains animal ingredients'].includes(s))return 'Not Vegan';return '';}
-// FIX: photo-only duplicate rows must not mask the original verified status.
-async function cloudLookup(b){const all=[],seen=new Set();for(const code of variants(b)){const rows=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(code)+'&select=*&limit=100',{extra:{'Cache-Control':'no-cache'}});for(const row of Array.isArray(rows)?rows:[]){if(!seen.has(String(row.id))){seen.add(String(row.id));all.push(row);}}}
-const matching=all.filter(x=>sameBarcode(x.barcode,b));matching.sort((a,b)=>(Date.parse(b.updated_at||b.modified_at||b.created_at||'')||0)-(Date.parse(a.updated_at||a.modified_at||a.created_at||'')||0));
-if(digits(b)==='810126660404'){try{const legacy=await request('/rest/v1/products?barcode=eq.321003360404&select=*&limit=100',{extra:{'Cache-Control':'no-cache'}});const same=(Array.isArray(legacy)?legacy:[]).find(x=>x.image_url&&/force\s*factor/i.test(String(x.brand||'')+' '+String(x.product_name||''))&&/theanine/i.test(String(x.product_name||'')));if(same){if(!matching.length)return {barcode:digits(b),product_name:knownProducts[digits(b)].product_name,brand:'Force Factor',image_url:same.image_url};if(!matching.some(x=>x.image_url))matching[0]={...matching[0],image_url:same.image_url};}}catch(e){console.warn('Legacy photo recovery unavailable',e);}}
-if(!matching.length)return null;
-const verifiedRows=matching.filter(x=>normalizedStatus(x.vegan_status)&&quality(x.ingredients));
-const base=verifiedRows[0]||matching.find(x=>quality(x.ingredients)&&x.product_name)||matching.find(x=>x.product_name&&x.brand)||matching[0];
-const merged={...base};
-// A photo-only record may supply a missing image, but not ingredients or nutrition.
-// Only accept its image if the product name and brand agree with the selected record.
-const identity=x=>clean(x.brand).toLowerCase()+'|'+clean(x.product_name).toLowerCase();
-const photo=matching.find(x=>x.image_url&&identity(x)===identity(base));
-if(!merged.image_url&&photo)merged.image_url=photo.image_url;
-const contradictory=matching.filter(x=>quality(x.ingredients)&&ingredientConflict(x.ingredients,base.ingredients));
-if(contradictory.length)merged._conflictingRecords=true;
-
-return merged;}
-// Food-first: exact barcode only. Non-food sources remain available for later expansion.
-// Open Food Facts is community-sourced; never replace an approved Supabase record with it.
-async function externalLookup(b){
- const codes=variants(b), found=[];
- const endpoints=['https://world.openfoodfacts.org'];
- async function getProduct(host,code,version){
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),7000);
-  try{
-   const response=await fetch(host+'/api/'+version+'/product/'+encodeURIComponent(code)+'.json',{signal:controller.signal,headers:{Accept:'application/json'}});
-   if(!response.ok)return null;
-   const data=await response.json(),p=data.product;
-   if(!p||data.status===0||data.result?.id==='product_not_found')return null;
-   if(p.code&&!sameBarcode(p.code,b))return null;
-   return {...p,_source:'Open Food Facts'};
-  }catch{return null;}finally{clearTimeout(timer);}
- }
- // Rate-limit friendly: stop after a complete match; do not issue redundant queries.
- for(const host of endpoints){
-  for(const code of codes){
-   const p=await getProduct(host,code,'v2');
-   if(p){found.push(p);if(quality(p.ingredients_text_en||p.ingredients_text)&&p.image_front_url&&p.nutriments)break;}
+async function cloudLookup(b){
+  const all=[],seen=new Set();
+  for(const code of variants(b)){
+    const rows=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(code)+'&select=*&limit=100',{extra:{'Cache-Control':'no-cache'}});
+    for(const row of Array.isArray(rows)?rows:[]){
+      if(!seen.has(String(row.id))){seen.add(String(row.id));all.push(row);}
+    }
   }
-  if(found.length)break;
- }
- // The food database is authoritative for food lookup. Do not mix cosmetics or cleaners into food.
- if(!found.length)return null;
- const score=p=>(quality(p.ingredients_text_en||p.ingredients_text)?100:0)+(p.image_front_url?30:0)+(p.product_name?15:0)+(p.brands?10:0)+(Object.keys(p.nutriments||{}).length?15:0);
- found.sort((a,b)=>score(b)-score(a));
- const best={...found[0],nutriments:{...(found[0].nutriments||{})}};
- for(const other of found.slice(1)){
-  // Fill missing fields only from records of the same exact barcode.
-  for(const key of ['product_name','product_name_en','brands','ingredients_text_en','ingredients_text','image_front_url','image_url','serving_size','quantity','allergens','traces','allergens_from_ingredients','traces_from_ingredients','ingredients_analysis_tags','categories','countries'])if(!best[key]&&other[key])best[key]=other[key];
-  for(const [key,value] of Object.entries(other.nutriments||{}))if(best.nutriments[key]==null&&value!=null)best.nutriments[key]=value;
- }
- return best;
+  const matching=all.filter(x=>digits(x.barcode).replace(/^0+/,'')===digits(b).replace(/^0+/,''));
+  // Prefer the most recently changed matching product, especially one with an approved photo.
+  matching.sort((a,b)=>{
+    const date=x=>Date.parse(x.updated_at||x.modified_at||x.created_at||'')||0;
+    return date(b)-date(a);
+  });
+  return matching.find(x=>x.image_url)||matching[0]||null;
+}
+async function externalLookup(b){const endpoints=['https://world.openfoodfacts.org','https://world.openbeautyfacts.org','https://world.openproductsfacts.org'];
+const matches=await Promise.all(endpoints.flatMap(host=>variants(b).map(async code=>{try{
+const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6500);
+try{const r=await fetch(host+'/api/v2/product/'+encodeURIComponent(code)+'.json',{signal:controller.signal});if(!r.ok)return null;const j=await r.json();return j.status!==0&&j.product?j.product:null;}finally{clearTimeout(timer);}
+}catch{return null;}})));
+return matches.filter(Boolean).sort((a,b)=>((b.image_front_url||b.image_url)?10000:0)+(b.ingredients_text?.length||0)-(((a.image_front_url||a.image_url)?10000:0)+(a.ingredients_text?.length||0)))[0]||null;}
+// Ingredient-source integrity: never silently merge ingredient lists.
+function ingredientTokens(raw){
+  return new Set(parseIngredients(raw).toLowerCase().replace(/\\borganic\\s+/g,'').split(/[,;()]+/).map(x=>x.trim().replace(/\\s+/g,' ')).filter(x=>x.length>2));
+}
+function ingredientDiscrepancy(a,b){
+  const x=ingredientTokens(a),y=ingredientTokens(b);
+  if(!x.size||!y.size)return null;
+  const onlyA=[...x].filter(v=>!y.has(v)),onlyB=[...y].filter(v=>!x.has(v));
+  return onlyA.length||onlyB.length?{onlyA,onlyB}:null;
+}
+function sameProductIdentity(cloud,ext){
+  if(!cloud||!ext)return true;
+  const norm=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  const a=norm(cloud.product_name),b=norm(ext.product_name||ext.product_name_en);
+  const brandA=norm(cloud.brand),brandB=norm(ext.brands).split(',')[0];
+  if(brandA&&brandB&&brandA!==brandB)return false;
+  if(a&&b&&a!==b&&!a.includes(b)&&!b.includes(a))return false;
+  return true;
 }
 function nutritionShow(n){nutrition=n||{};const keys=[['Protein','proteins_100g'],['Carbohydrates','carbohydrates_100g'],['Sugar','sugars_100g'],['Fat','fat_100g'],['Fiber','fiber_100g'],['Salt','salt_100g']];const vals=keys.filter(([_,k])=>nutrition[k]!=null&&Number.isFinite(Number(nutrition[k])));$('nutrition').textContent=vals.length?'Per 100 g: '+vals.map(([name,k])=>name+': '+Number(nutrition[k]).toFixed(1)+' g').join(' • '):'Nutrition information not available.';}
 function setPicture(url){photoUrl=url||'';const img=$('productPhoto');img.hidden=true;img.removeAttribute('src');$('photoPlaceholder').style.display='block';if(url){img.onload=()=>{img.hidden=false;$('photoPlaceholder').style.display='none';};img.onerror=()=>{$('photoPlaceholder').textContent='Product image unavailable';};img.src=url;}else $('photoPlaceholder').textContent='No product picture available';}
 function refreshedImage(url){if(!url)return '';if(url.startsWith('blob:'))return url;return url+(url.includes('?')?'&':'?')+'vv_refresh='+Date.now();}
-function reset(){barcode='';cloud=null;selectedPhoto=null;if(selectedPhotoUrl)URL.revokeObjectURL(selectedPhotoUrl);selectedPhotoUrl='';$('photoInput').value='';$('submitPhoto').style.display='none';$('photoMessage').textContent='Choose a picture to replace an outdated product image or add a missing one.';$('productName').value='';$('brand').value='';$('ingredients').value='';$('confirmed').checked=false;verified=false;clearResult();setPicture('');nutritionShow({});status('Needs Verification');$('message').textContent='';$('allergens').textContent='';$('source').textContent='';$('wrongMessage').textContent='';$('saveMessage').textContent='';}
-async function lookup(b){
- if(!valid(b))return alert('Enter a valid 8–14 digit barcode.');
- const serial=++lookupSerial;
- await stopCamera();if(serial!==lookupSerial)return;
- reset();barcode=digits(b);
- $('productBarcode').textContent='Barcode: '+barcode;
- $('scannerView').style.display='none';$('productView').style.display='block';
- $('message').textContent='Checking saved food records and exact barcode…';
- let cloudError='';
- try{cloud=await cloudLookup(barcode);}catch(e){cloudError=e.message;}
- if(serial!==lookupSerial)return;
- const saved=readVerified(barcode),known=knownProducts[barcode]||{},reference=PACKAGE_REFERENCES[barcode]||null;
- let ext=null;
- // External records may fill empty fields only. Never combine external ingredients
- // with saved nutrition, or infer that two formulations are identical from UPC alone.
- try{ext=await externalLookup(barcode);}catch(e){console.warn('External lookup unavailable',e);}
- if(serial!==lookupSerial)return;
- const name=cloud?.product_name||known.product_name||ext?.product_name||ext?.product_name_en||'';
- const brand=reference?.brand||cloud?.brand||known.brand||ext?.brands||'';
- const cloudIngredients=quality(cloud?.ingredients)?parseIngredients(cloud.ingredients):'';
- const savedIngredients=quality(saved?.ingredients)?parseIngredients(saved.ingredients):'';
- const externalIngredients=quality(ext?.ingredients_text_en||ext?.ingredients_text)?parseIngredients(ext.ingredients_text_en||ext.ingredients_text):'';
- const ingredients=reference?.ingredients||cloudIngredients||savedIngredients||externalIngredients;
- const conflict=!!(cloud?._conflictingRecords||
-   (reference&&(ingredientConflict(reference.ingredients,cloudIngredients)||ingredientConflict(reference.ingredients,externalIngredients)))||
-   (!reference&&ingredientConflict(cloudIngredients,externalIngredients)));
- $('productName').value=name;
- $('brand').value=brand;
- $('ingredients').value=ingredients;
- const url=cloud?.image_url||ext?.image_front_url||ext?.image_url||'';
- setPicture(refreshedImage(url));
- $('source').textContent=reference?'Ingredients and nutrition: photographed package reference (not yet saved to Supabase)':cloudIngredients?'Ingredients: saved Supabase record':externalIngredients?'Ingredients: Open Food Facts':'No verified ingredient source';
- const allergens=reference?'Contains: peanuts | Made in a facility processing milk and tree nuts':
- ext?'Contains: '+(clean(ext.allergens_from_ingredients||ext.allergens)||'Not listed')+' | May contain: '+(clean(ext.traces_from_ingredients||ext.traces)||'Not listed'):'';
- $('allergens').textContent=allergens;
- const cloudNutrition=Object.fromEntries([['proteins_100g','protein_100g'],['carbohydrates_100g','carb_100g'],['sugars_100g','sugar_100g'],['fat_100g','fat_100g'],['fiber_100g','fiber_100g'],['salt_100g','salt_100g']].filter(([k,v])=>cloud?.[v]!=null).map(([k,v])=>[k,cloud[v]]));
- // All six nutrition fields must originate from one record, never mixed.
- const chosenNutrition=reference?.nutrition||(Object.keys(cloudNutrition).length?cloudNutrition:ext?.nutriments||{});
- nutritionShow(chosenNutrition);
- if(reference)$('nutrition').textContent+=' | Label serving: '+reference.serving;
- clearResult();status('Needs Verification');
- const cloudStatus=normalizedStatus(cloud?.vegan_status);
- if(reference){
-  // The photographed package supersedes mismatched imported text on this device,
-  // but the administrator must confirm before replacing the cloud record.
-  const r=classify(reference.ingredients);
-  showResult({...r,explanation:'Ingredient screening based on the supplied package photo; cloud correction awaits your confirmation.',caution:'Check the package and use Verify Ingredients to confirm and save the corrected record.'});
- }else if(conflict){
-  $('message').textContent='⚠️ CONFLICT: different ingredient lists found for this barcode. Verify against the actual package before saving.';
- }else if(cloudStatus&&cloudIngredients){
-  const result=classify(cloudIngredients);
-  if(result.status===cloudStatus)showResult({status:cloudStatus,reasons:result.reasons,explanation:'Saved Supabase verification with matching ingredients.',caution:'Check current package if formulation has changed.'});
-  else $('message').textContent='⚠️ Saved vegan status disagrees with saved ingredients. Verify package before saving.';
- }else if(saved&&savedIngredients&&normalizedStatus(saved.status)===classify(savedIngredients).status){
-  showResult({...classify(savedIngredients),explanation:'Previously checked ingredients saved on this device.',caution:'Confirm the package is still the same formulation.'});
- }else if(externalIngredients){
-  showResult({...classify(externalIngredients),explanation:'Preliminary screening of public food-database ingredients, not package-confirmed.',caution:'Compare with package before relying on or saving this result.'});
- }else if(known.packageVeganClaim){
-  $('message').textContent='Manufacturer vegan claim is noted, but full ingredient verification is still needed.';
- }
- if(!conflict&&!$('message').textContent.includes('⚠️'))$('message').textContent=reference?'Photographed package reference loaded. Confirm the ingredients and save the correction.':cloud?'Saved product loaded; incomplete data is not blended with conflicting sources.':ext?'Exact-barcode food record found. Check against package.':'No matching food record found. Add product details and ingredients.';
- if(conflict&&reference)$('message').textContent='⚠️ Imported ingredient list conflicts with your photographed package. Showing package reference; confirm and save to correct Supabase.';
- if(cloudError)$('message').textContent+=' Supabase error: '+cloudError;
-}
-
-$('manualToggle').onclick=()=>{$('manualEntry').style.display=$('manualEntry').style.display==='none'?'block':'none';};$('lookup').onclick=()=>lookup($('barcode').value);$('barcode').onkeydown=e=>{if(e.key==='Enter')lookup($('barcode').value);};$('retry').onclick=()=>lookup(barcode);$('wrongProduct').onclick=()=>{$('wrongMessage').textContent='Product identity disputed on this screen. To submit a correction, sign in and verify the correct ingredients. This flag alone has not been sent to the cloud.';/* Do not erase previously saved verification just by reporting a picture. */};
+function reset(){barcode='';cloud=null;selectedPhoto=null;if(selectedPhotoUrl)URL.revokeObjectURL(selectedPhotoUrl);selectedPhotoUrl='';$('photoInput').value='';$('submitPhoto').style.display='none';$('photoMessage').textContent='Choose a picture to replace an outdated product image or add a missing one.';$('productName').value='';$('brand').value='';$('ingredients').value='';$('confirmed').checked=false;verified=false;clearResult();setPicture('');nutritionShow({});status('Needs Verification');$('message').textContent='';$('wrongMessage').textContent='';$('saveMessage').textContent='';}
+async function lookup(b){if(!valid(b))return alert('Enter a valid 8–14 digit barcode.');const serial=++lookupSerial;await stopCamera();reset();barcode=digits(b);$('productBarcode').textContent='Barcode: '+barcode;$('scannerView').style.display='none';$('productView').style.display='block';$('message').textContent='Checking Supabase and product sources…';try{let cloudError='';try{cloud=await cloudLookup(barcode);}catch(e){cloudError=e.message;}let ext=null;try{ext=await externalLookup(barcode);}catch{}if(serial!==lookupSerial)return;const known=knownProducts[barcode]||{};
+const identityMatches=sameProductIdentity(cloud,ext);
+const discrepancy=identityMatches?ingredientDiscrepancy(cloud?.ingredients,ext?.ingredients_text_en||ext?.ingredients_text):null;
+const sourceWarning=!identityMatches?'⚠️ Product sources disagree on identity. Do not use outside ingredients until the package is checked.':discrepancy?'⚠️ Ingredient sources disagree. A saved list may be incomplete. Compare the entire package ingredient label and confirm corrections before saving.':'';
+const name=cloud?.product_name||ext?.product_name||ext?.product_name_en||known.product_name||'',brand=cloud?.brand||ext?.brands||known.brand||'',ingredients=cloud?.ingredients||(identityMatches?(ext?.ingredients_text_en||ext?.ingredients_text):'')||readVerified(barcode)?.ingredients||'';$('productName').value=name;$('brand').value=brand;$('ingredients').value=parseIngredients(ingredients);const url=cloud?.image_url||ext?.image_front_url||ext?.image_url||'';setPicture(refreshedImage(url));$('source').textContent=cloud?(cloud.image_url?'Photo: Supabase approved product record':'Product: Supabase • Photo: Open Food Facts'):ext?'Source: Open Food Facts':'';nutritionShow(cloud?{proteins_100g:cloud.protein_100g,carbohydrates_100g:cloud.carb_100g,sugars_100g:cloud.sugar_100g,fat_100g:cloud.fat_100g,fiber_100g:cloud.fiber_100g,salt_100g:cloud.salt_100g}:ext?.nutriments||{});if(quality($('ingredients').value)){const evaluated=classify($('ingredients').value);showResult(evaluated);rememberVerified(barcode,$('ingredients').value,evaluated);}else if(cloud&&['Vegan','Not Vegan'].includes(cloud.vegan_status)){showResult({status:cloud.vegan_status,reasons:cloud.vegan_reason?[cloud.vegan_reason]:['Previously saved verification in Supabase.'],explanation:'Previously verified product result retrieved from Supabase.',caution:'Ingredient list unavailable here. Confirm the current package before relying on this result.'});}else status('Needs Verification');$('message').textContent=cloud?'Product loaded from Supabase. Check the package.':ext?'Product found in outside sources. Check the package.':(knownProducts[barcode]?'Product identity restored from previously confirmed details. Ingredients still need verification.':'No product found. Add the product name and ingredients.');if(sourceWarning)$('message').textContent+=' '+sourceWarning+' The app cannot guarantee completeness from databases alone.';if(cloudError)$('message').textContent+=' Cloud lookup error: '+cloudError;}catch(e){$('message').textContent='Lookup failed: '+e.message;status('Needs Verification');}}
+$('manualToggle').onclick=()=>{$('manualEntry').style.display=$('manualEntry').style.display==='none'?'block':'none';};$('lookup').onclick=()=>lookup($('barcode').value);$('barcode').onkeydown=e=>{if(e.key==='Enter')lookup($('barcode').value);};$('retry').onclick=()=>lookup(barcode);$('wrongProduct').onclick=()=>{$('wrongMessage').textContent='Product identity disputed on this screen. To submit a correction, sign in and verify the correct ingredients. This flag alone has not been sent to the cloud.';status('Needs Verification');};
 async function stopCamera(){if(scanner){const s=scanner;scanner=null;try{await s.stop();}catch{}try{await s.clear();}catch{}}$('cameraBox').style.display='none';}
 async function loadScript(url,check){if(check())return;await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=url;s.onload=resolve;s.onerror=()=>reject(Error('Unable to load '+url));document.head.append(s);});}
 $('startCamera').onclick=async()=>{if(scanBusy)return;scanBusy=true;try{await loadScript('https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js',()=>!!window.Html5Qrcode);$('cameraBox').style.display='block';scanner=new Html5Qrcode('reader',{verbose:false});await scanner.start({facingMode:'environment'},{fps:12,qrbox:{width:250,height:140}},async code=>{if(!valid(code)||!scanner)return;await lookup(code);},()=>{});}catch(e){await stopCamera();alert('Camera unavailable: '+e.message+'. Use manual barcode entry.');$('manualEntry').style.display='block';}finally{scanBusy=false;}};$('stopCamera').onclick=stopCamera;$('scanAnother').onclick=async()=>{++lookupSerial;await stopCamera();reset();$('productView').style.display='none';$('scannerView').style.display='block';$('startCamera').click();};
@@ -185,33 +107,121 @@ async function compressed(file){const bitmap=await createImageBitmap(file);try{c
 $('photoInput').onchange=async()=>{const f=$('photoInput').files?.[0];if(!f)return;try{selectedPhoto=await compressed(f);if(selectedPhotoUrl)URL.revokeObjectURL(selectedPhotoUrl);selectedPhotoUrl=URL.createObjectURL(selectedPhoto);setPicture(selectedPhotoUrl);$('submitPhoto').style.display='block';$('photoMessage').textContent='Picture ready. Tap Submit Replacement Photo for Approval. No ingredient verification is required.';}catch(e){$('photoMessage').textContent='Photo error: '+e.message;}};
 async function uploadPhoto(file){const filename=barcode+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,7)+'.jpg';const r=await fetch(BASE+'/storage/v1/object/product-images/'+encodeURIComponent(filename),{method:'POST',headers:{...headers(await token()),'Content-Type':'image/jpeg','x-upsert':'false'},body:file});if(!r.ok)throw Error(await errorResponse(r));return BASE+'/storage/v1/object/public/product-images/'+encodeURIComponent(filename);}
 async function submit(type,url,ingredients){return request('/rest/v1/rpc/vv_submit_contribution',{method:'POST',authenticated:true,body:{p_barcode:barcode,p_type:type,p_description:type==='product_photo'?'Replacement or missing product packaging photo':type==='ingredients'?'Contributed ingredients':'Corrected product information',p_image_url:url||null,p_ingredients:ingredients||null}});}
-$('submitPhoto').onclick=async()=>{const button=$('submitPhoto'),message=$('photoMessage');if(!selectedPhoto||!valid(barcode))return message.textContent='Scan a barcode and select a picture first.';if(!user){message.textContent='Log in to submit a replacement photo for approval.';$('authSection').scrollIntoView({behavior:'smooth'});return;}button.disabled=true;message.textContent='Uploading replacement photo and submitting for approval…';try{await checkAdmin();const url=await uploadPhoto(selectedPhoto);if(isAdmin){const existing=await cloudLookup(barcode);if(!existing){const name=clean($('productName').value),brand=clean($('brand').value);if(!name||!brand)throw Error('Enter the product name and brand before adding its first picture.');const created=await request('/rest/v1/products',{method:'POST',authenticated:true,body:{barcode,product_name:name,brand,image_url:url,ingredients:clean($('ingredients').value),vegan_status:'Needs Verification',vegan_reason:'Ingredients not yet verified'},extra:{Prefer:'return=representation'}});if(!Array.isArray(created)||!created.length||created[0].image_url!==url)throw Error('Supabase did not confirm the new product and picture. Check INSERT permissions.');}const rows=existing?await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(existing.barcode)+'&select=id,image_url',{authenticated:true}):[];for(const item of rows){const updated=await request('/rest/v1/products?id=eq.'+encodeURIComponent(item.id),{method:'PATCH',authenticated:true,body:{image_url:url},extra:{Prefer:'return=representation'}});if(updated?.[0]?.image_url!==url)throw Error('Photo upload succeeded but product update was not permitted.');}const checked=await cloudLookup(barcode);if(checked?.image_url!==url)throw Error('Photo was uploaded but the database did not confirm the replacement.');cloud=checked;setPicture(refreshedImage(url));message.textContent='✅ Administrator photo and product saved and verified. Future scans will use this photo.';}else{await submit('product_photo',url,null);message.textContent='✅ Photo submitted for administrator approval. The existing picture remains until approval.';}button.style.display='none';selectedPhoto=null;await loadRewards();}catch(e){message.textContent='❌ Photo submission failed: '+e.message+' — The photo has not been confirmed as submitted.';}finally{button.disabled=false;}};
+$('submitPhoto').onclick=async()=>{const button=$('submitPhoto'),message=$('photoMessage');if(!selectedPhoto||!valid(barcode))return message.textContent='Scan a barcode and select a picture first.';if(!user){message.textContent='Log in to submit a replacement photo for approval.';$('authSection').scrollIntoView({behavior:'smooth'});return;}button.disabled=true;message.textContent='Uploading replacement photo and submitting for approval…';try{await checkAdmin();const url=await uploadPhoto(selectedPhoto);
+if(isAdmin){
+  const existing=await cloudLookup(barcode);
+  if(!existing){
+    const name=clean($('productName').value),brand=clean($('brand').value);
+    if(!name||!brand)throw Error('Enter the product name and brand before adding its first picture.');
+    const created=await request('/rest/v1/products',{method:'POST',authenticated:true,body:{barcode,product_name:name,brand,image_url:url,ingredients:clean($('ingredients').value),vegan_status:'Needs Verification',vegan_reason:'Ingredients not yet verified'},extra:{Prefer:'return=representation'}});
+    if(!Array.isArray(created)||!created.length||created[0].image_url!==url)throw Error('Supabase did not confirm the new product and picture. Check INSERT permissions.');
+  }
+  const rows=existing?await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(existing.barcode)+'&select=id,image_url',{authenticated:true}):[];
+  for(const item of rows){
+    const updated=await request('/rest/v1/products?id=eq.'+encodeURIComponent(item.id),{method:'PATCH',authenticated:true,body:{image_url:url},extra:{Prefer:'return=representation'}});
+    if(updated?.[0]?.image_url!==url)throw Error('Photo upload succeeded but product update was not permitted.');
+  }
+  const checked=await cloudLookup(barcode);
+  if(checked?.image_url!==url)throw Error('Photo was uploaded but the database did not confirm the replacement.');
+  cloud=checked;setPicture(refreshedImage(url));
+  message.textContent='✅ Administrator photo and product saved and verified. Future scans will use this photo.';
+}else{
+  await submit('product_photo',url,null);
+  message.textContent='✅ Photo submitted for administrator approval. The existing picture remains until approval.';
+}button.style.display='none';selectedPhoto=null;await loadRewards();}catch(e){message.textContent='❌ Photo submission failed: '+e.message+' — The photo has not been confirmed as submitted.';}finally{button.disabled=false;}};
 $('takeIngredient').onclick=()=>{if(!barcode)return alert('Scan a barcode first.');$('ingredientInput').setAttribute('capture','environment');$('ingredientInput').click();};$('chooseIngredient').onclick=()=>{if(!barcode)return alert('Scan a barcode first.');$('ingredientInput').removeAttribute('capture');$('ingredientInput').click();};
 const canvas=$('cropCanvas'),ctx=canvas.getContext('2d');function drawCrop(){if(!ocrBitmap)return;ctx.drawImage(ocrBitmap,0,0,canvas.width,canvas.height);if(crop){ctx.strokeStyle='#00e676';ctx.lineWidth=4;ctx.strokeRect(crop.x,crop.y,crop.w,crop.h);}}
 function point(e){const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height};}
 canvas.onpointerdown=e=>{drag=point(e);canvas.setPointerCapture(e.pointerId);};canvas.onpointermove=e=>{if(!drag)return;const p=point(e);crop={x:Math.min(p.x,drag.x),y:Math.min(p.y,drag.y),w:Math.abs(p.x-drag.x),h:Math.abs(p.y-drag.y)};drawCrop();};canvas.onpointerup=canvas.onpointercancel=()=>drag=null;$('resetCrop').onclick=()=>{crop=null;drawCrop();};$('showCrop').onclick=()=>{$('cropBox').style.display='block';drawCrop();};
-// FIX: OCR editing never deletes the persisted product's verification.
-async function readOCR(c){if(ocrBusy)return;ocrBusy=true;$('ocrMessage').textContent='Reading ingredient picture…';try{await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',()=>!!window.Tesseract);if(!ocrWorker)ocrWorker=await Tesseract.createWorker('eng');const result=await ocrWorker.recognize(c);const raw=result.data?.text||'',parsed=parseIngredients(raw);$('ingredients').value=parsed;verified=false;$('confirmed').checked=false;if(!normalizedStatus(cloud?.vegan_status)&&!readVerified(barcode)){clearResult();status('Needs Verification');}$('ocrMessage').textContent=quality(parsed)?'Text extracted. Check EVERY ingredient against the package, correct errors, then verify.':'Could not reliably read the full list. Select the ingredient area or type the complete list.';if(!quality(parsed))$('cropBox').style.display='block';}catch(e){$('ocrMessage').textContent='OCR failed: '+e.message+'. Enter ingredients manually.';}finally{ocrBusy=false;}}
+async function readOCR(c){if(ocrBusy)return;ocrBusy=true;$('ocrMessage').textContent='Reading ingredient picture…';try{await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',()=>!!window.Tesseract);if(!ocrWorker)ocrWorker=await Tesseract.createWorker('eng');const result=await ocrWorker.recognize(c);const raw=result.data?.text||'',parsed=parseIngredients(raw);$('ingredients').value=parsed;verified=false;$('confirmed').checked=false;clearResult();status('Needs Verification');$('ocrMessage').textContent=quality(parsed)?'Text extracted. Check EVERY ingredient against the package, correct errors, then verify.':'Could not reliably read the full list. Select the ingredient area or type the complete list.';if(!quality(parsed))$('cropBox').style.display='block';}catch(e){$('ocrMessage').textContent='OCR failed: '+e.message+'. Enter ingredients manually.';}finally{ocrBusy=false;}}
 $('ingredientInput').onchange=async()=>{const f=$('ingredientInput').files?.[0];if(!f)return;try{if(ocrBitmap)ocrBitmap.close();ocrBitmap=await createImageBitmap(f);const scale=Math.min(1,1800/Math.max(ocrBitmap.width,ocrBitmap.height));canvas.width=Math.round(ocrBitmap.width*scale);canvas.height=Math.round(ocrBitmap.height*scale);drawCrop();const img=$('ingredientPreview');img.src=URL.createObjectURL(f);img.style.display='block';$('showCrop').style.display='block';await readOCR(canvas);}catch(e){$('ocrMessage').textContent='Could not open photo: '+e.message;}};
 $('readCrop').onclick=async()=>{if(!ocrBitmap||!crop||crop.w<20||crop.h<20)return alert('Select the complete ingredient area first.');const c=document.createElement('canvas');c.width=Math.round(crop.w);c.height=Math.round(crop.h);c.getContext('2d').drawImage(canvas,crop.x,crop.y,crop.w,crop.h,0,0,c.width,c.height);await readOCR(c);};
-$('ingredients').oninput=()=>{verified=false;$('confirmed').checked=false;if(!normalizedStatus(cloud?.vegan_status)&&!readVerified(barcode)){clearResult();status('Needs Verification');}};
+$('ingredients').oninput=()=>{verified=false;$('confirmed').checked=false;clearResult();status('Needs Verification');};
 $('check').onclick=async()=>{if(!valid(barcode))return alert('Scan a barcode first.');const t=parseIngredients($('ingredients').value);if(!quality(t))return alert('Enter the complete ingredient list from the package.');if(!$('confirmed').checked)return alert('Check the ingredient list and tick the confirmation box.');$('ingredients').value=t;verified=true;showResult(classify(t));rememberVerified(barcode,t,lastResult);$('result').scrollIntoView({behavior:'smooth'});await persist();};
-async function persist(){if(saveBusy||!verified||!lastResult||lastResult.status==='Needs Verification'||!valid(barcode))return;saveBusy=true;$('save').disabled=true;$('saveMessage').textContent='Saving verified scan…';try{if(user)await checkAdmin();const existing=await cloudLookup(barcode),name=clean($('productName').value),brand=clean($('brand').value),ingredients=clean($('ingredients').value);if(!name||!brand)throw Error('Enter product name and brand first.');if(existing&&!isAdmin){if(!user)throw Error('This product already exists. Sign in to submit corrections for review.');if(ingredients===clean(existing.ingredients)&&name===clean(existing.product_name)&&brand===clean(existing.brand)&&!selectedPhoto){$('saveMessage').textContent='✅ Verified product already in the database.';return;}let url=null;if(selectedPhoto)url=await uploadPhoto(selectedPhoto);await submit(url?'product_photo':'correction',url,ingredients);$('saveMessage').textContent='✅ Correction submitted for administrator approval. Points pending.';await loadRewards();return;}const payload={barcode,product_name:name,brand,ingredients,vegan_status:lastResult.status,vegan_reason:lastResult.reasons.join('; ')};if(selectedPhoto)payload.image_url=await uploadPhoto(selectedPhoto);if(existing){
- const patch={...payload};delete patch.barcode;
- const candidates=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(existing.barcode)+'&select=id,barcode',{authenticated:!!user});
- if(!isAdmin&&user)throw Error('Corrections to existing products require administrator approval.');
- if(!user)throw Error('Sign in as administrator to correct existing records.');
- for(const row of candidates.filter(x=>sameBarcode(x.barcode,barcode))){
-  const changed=await request('/rest/v1/products?id=eq.'+encodeURIComponent(row.id),{method:'PATCH',body:patch,authenticated:true,extra:{Prefer:'return=representation'}});
-  if(!Array.isArray(changed)||changed.length!==1)throw Error('Supabase did not confirm the corrected record.');
- }
- const checked=await cloudLookup(barcode);
- if(!checked||ingredientConflict(checked.ingredients,ingredients))throw Error('Correction was not confirmed on readback.');
- cloud=checked;
-}else{await request('/rest/v1/products',{method:'POST',body:payload,authenticated:!!user,extra:{Prefer:'return=representation'}});if(user&&!isAdmin){try{await submit(selectedPhoto?'product_photo':'ingredients',payload.image_url||null,ingredients);await loadRewards();}catch(e){$('saveMessage').textContent='Product saved, but rewards submission failed: '+e.message;return;}}}$('saveMessage').textContent='✅ Verified scan saved to Supabase.';}catch(e){$('saveMessage').textContent='❌ Save failed: '+e.message;}finally{saveBusy=false;$('save').disabled=false;}}$('save').onclick=persist;
+async function persist(){if(saveBusy||!verified||!lastResult||lastResult.status==='Needs Verification'||!valid(barcode))return;saveBusy=true;$('save').disabled=true;$('saveMessage').textContent='Saving verified scan…';try{if(user)await checkAdmin();const existing=await cloudLookup(barcode),name=clean($('productName').value),brand=clean($('brand').value),ingredients=clean($('ingredients').value);if(!name||!brand)throw Error('Enter product name and brand first.');if(existing&&!isAdmin){if(!user)throw Error('This product already exists. Sign in to submit corrections for review.');if(ingredients===clean(existing.ingredients)&&name===clean(existing.product_name)&&brand===clean(existing.brand)&&!selectedPhoto){$('saveMessage').textContent='✅ Verified product already in the database.';return;}let url=null;if(selectedPhoto)url=await uploadPhoto(selectedPhoto);await submit(url?'product_photo':'correction',url,ingredients);$('saveMessage').textContent='✅ Correction submitted for administrator approval. Points pending.';await loadRewards();return;}const payload={barcode,product_name:name,brand,ingredients,vegan_status:lastResult.status,vegan_reason:lastResult.reasons.join('; ')};if(selectedPhoto)payload.image_url=await uploadPhoto(selectedPhoto);if(existing){const patch={...payload};delete patch.barcode;await request('/rest/v1/products?id=eq.'+encodeURIComponent(existing.id),{method:'PATCH',body:patch,authenticated:true,extra:{Prefer:'return=representation'}});}else{await request('/rest/v1/products',{method:'POST',body:payload,authenticated:!!user,extra:{Prefer:'return=representation'}});if(user&&!isAdmin){try{await submit(selectedPhoto?'product_photo':'ingredients',payload.image_url||null,ingredients);await loadRewards();}catch(e){$('saveMessage').textContent='Product saved, but rewards submission failed: '+e.message;return;}}}$('saveMessage').textContent='✅ Verified scan saved to Supabase.';}catch(e){$('saveMessage').textContent='❌ Save failed: '+e.message;}finally{saveBusy=false;$('save').disabled=false;}}$('save').onclick=persist;
 async function loadRewards(){if(!user||isAdmin)return;try{const id=encodeURIComponent(user.id),totals=await request('/rest/v1/vv_my_rewards?user_id=eq.'+id+'&select=*',{authenticated:true});$('earned').textContent=totals[0]?.earned_points??0;$('pending').textContent=totals[0]?.pending_points??0;const rows=await request('/rest/v1/vv_contributions?user_id=eq.'+id+'&select=barcode,contribution_type,points,status,created_at&order=created_at.desc&limit=30',{authenticated:true});$('history').replaceChildren();if(!rows.length)$('history').textContent='No contributions yet.';rows.forEach(c=>{const d=document.createElement('div');d.className='card';d.textContent=(c.contribution_type||'Contribution').replace(/_/g,' ')+' • '+c.barcode+' • '+c.points+' points • '+c.status;$('history').append(d);});$('rewardMessage').textContent='Points are awarded after administrator approval.';}catch(e){$('rewardMessage').textContent='Rewards unavailable: '+e.message;}}$('refreshRewards').onclick=loadRewards;
-async function applyApprovedPhoto(contribution){const url=contribution.image_url,code=digits(contribution.barcode);if(!String(url||'').startsWith('https://'))throw Error('Approved contribution has no valid HTTPS photo URL.');if(!valid(code))throw Error('Approved contribution has no valid barcode.');const rows=[],seen=new Set();for(const variant of variants(code)){const found=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(variant)+'&select=id,barcode,image_url&limit=100',{authenticated:true,extra:{'Cache-Control':'no-cache'}});for(const item of Array.isArray(found)?found:[]){if(!seen.has(String(item.id))){seen.add(String(item.id));rows.push(item);}}}const matches=rows.filter(p=>sameBarcode(p.barcode,code));if(!matches.length)throw Error('Contribution approved, but no matching product exists in Supabase for barcode '+code+'.');for(const product of matches){if(product.image_url!==url){const updated=await request('/rest/v1/products?id=eq.'+encodeURIComponent(product.id),{method:'PATCH',body:{image_url:url},authenticated:true,extra:{Prefer:'return=representation'}});if(!Array.isArray(updated)||updated.length!==1||updated[0].image_url!==url)throw Error('Supabase did not confirm the photo update for product '+product.id+'. Check products UPDATE permissions.');}}for(const product of matches){const verified=await request('/rest/v1/products?id=eq.'+encodeURIComponent(product.id)+'&select=id,image_url&limit=1',{authenticated:true,extra:{'Cache-Control':'no-cache'}});if(!Array.isArray(verified)||verified[0]?.image_url!==url)throw Error('Photo was approved but product '+product.id+' still has an old image in Supabase.');}if(barcode&&sameBarcode(barcode,code)){cloud={...(cloud||{}),image_url:url};setPicture(refreshedImage(url));$('photoMessage').textContent='✅ Approved replacement photo is now displayed.';}return matches;}
-async function loadAdmin(){if(!user||!isAdmin)return;const panel=$('adminPending');panel.replaceChildren();$('adminMessage').textContent='Loading pending contributions…';try{const rows=await request('/rest/v1/vv_contributions?status=eq.pending&select=*&order=created_at.asc&limit=100',{authenticated:true});if(!Array.isArray(rows))throw Error('Unexpected review response.');const pending=rows.filter(item=>item.user_id!==user.id);$('adminMessage').textContent=pending.length?pending.length+' pending contribution(s).':'✅ No contributions awaiting review.';for(const contribution of pending){const card=document.createElement('div');card.className='card';const heading=document.createElement('h3');heading.textContent=(contribution.contribution_type||'Contribution').replace(/_/g,' ');const details=document.createElement('p');details.textContent='Barcode: '+(contribution.barcode||'Unknown')+' • Points: '+(contribution.points??0);card.append(heading,details);if(contribution.description){const description=document.createElement('p');description.textContent=contribution.description;card.append(description);}if(contribution.ingredients){const ingredients=document.createElement('p');ingredients.textContent='Ingredients: '+contribution.ingredients;card.append(ingredients);}if(contribution.image_url&&/^https:\/\//.test(contribution.image_url)){const picture=document.createElement('img');picture.src=refreshedImage(contribution.image_url);picture.alt='Submitted replacement product photo';picture.loading='lazy';card.append(picture);}const actions=document.createElement('div');actions.className='actions';for(const approve of [true,false]){const button=document.createElement('button');button.textContent=approve?'✅ Approve':'❌ Reject';if(!approve)button.className='danger';button.onclick=async()=>{if(!confirm((approve?'Approve':'Reject')+' this contribution?'))return;for(const sibling of actions.querySelectorAll('button'))sibling.disabled=true;let approved=false;try{await request('/rest/v1/rpc/vv_review_contribution',{method:'POST',authenticated:true,body:{p_id:contribution.id,p_approve:approve}});approved=approve;if(approve&&contribution.contribution_type==='product_photo'){await applyApprovedPhoto(contribution);$('adminMessage').textContent='✅ Photo approved, saved to the product, and verified.';}else $('adminMessage').textContent=approve?'✅ Contribution approved.':'Contribution rejected.';card.remove();await loadLeaderboard();}catch(error){$('adminMessage').textContent=(approved?'⚠️ Contribution approved, but the product picture was NOT updated: ':'Review failed: ')+error.message;if(approved){card.remove();}else for(const sibling of actions.querySelectorAll('button'))sibling.disabled=false;}};actions.append(button);}card.append(actions);panel.append(card);}}catch(error){$('adminMessage').textContent='Unable to load reviews: '+error.message;}}
+// Photo approval repair: approve through the existing secure RPC, then write and verify the new product image URL.
+// Never report a successful picture replacement unless the database actually returns the submitted URL.
+async function applyApprovedPhoto(contribution){
+  const url=contribution.image_url,code=digits(contribution.barcode);
+  if(!String(url||'').startsWith('https://'))throw Error('Approved contribution has no valid HTTPS photo URL.');
+  if(!valid(code))throw Error('Approved contribution has no valid barcode.');
+  const rows=[],seen=new Set();
+  for(const variant of variants(code)){
+    const found=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(variant)+'&select=id,barcode,image_url&limit=100',{authenticated:true,extra:{'Cache-Control':'no-cache'}});
+    for(const item of Array.isArray(found)?found:[]){
+      if(!seen.has(String(item.id))){seen.add(String(item.id));rows.push(item);}
+    }
+  }
+  const matches=rows.filter(p=>digits(p.barcode).replace(/^0+/,'')===code.replace(/^0+/,''));
+  if(!matches.length)throw Error('Contribution approved, but no matching product exists in Supabase for barcode '+code+'.');
+  // Update EVERY matching record. An old duplicate must not win the next barcode lookup.
+  for(const product of matches){
+    if(product.image_url!==url){
+      const updated=await request('/rest/v1/products?id=eq.'+encodeURIComponent(product.id),{
+        method:'PATCH',body:{image_url:url},authenticated:true,extra:{Prefer:'return=representation'}
+      });
+      if(!Array.isArray(updated)||updated.length!==1||updated[0].image_url!==url)
+        throw Error('Supabase did not confirm the photo update for product '+product.id+'. Check products UPDATE permissions.');
+    }
+  }
+  // Verify with a new read, not just the response to the write.
+  for(const product of matches){
+    const verified=await request('/rest/v1/products?id=eq.'+encodeURIComponent(product.id)+'&select=id,image_url&limit=1',{
+      authenticated:true,extra:{'Cache-Control':'no-cache'}
+    });
+    if(!Array.isArray(verified)||verified[0]?.image_url!==url)
+      throw Error('Photo was approved but product '+product.id+' still has an old image in Supabase.');
+  }
+  if(barcode&&variants(barcode).some(v=>variants(code).includes(v))){
+    cloud={...(cloud||{}),image_url:url};
+    setPicture(refreshedImage(url));
+    $('photoMessage').textContent='✅ Approved replacement photo is now displayed.';
+  }
+  return matches;
+}
+async function loadAdmin(){
+  if(!user||!isAdmin)return;
+  const panel=$('adminPending');panel.replaceChildren();$('adminMessage').textContent='Loading pending contributions…';
+  try{
+    const rows=await request('/rest/v1/vv_contributions?status=eq.pending&select=*&order=created_at.asc&limit=100',{authenticated:true});
+    if(!Array.isArray(rows))throw Error('Unexpected review response.');
+    const pending=rows.filter(item=>item.user_id!==user.id);
+    $('adminMessage').textContent=pending.length?pending.length+' pending contribution(s).':'✅ No contributions awaiting review.';
+    for(const contribution of pending){
+      const card=document.createElement('div');card.className='card';
+      const heading=document.createElement('h3');heading.textContent=(contribution.contribution_type||'Contribution').replace(/_/g,' ');
+      const details=document.createElement('p');details.textContent='Barcode: '+(contribution.barcode||'Unknown')+' • Points: '+(contribution.points??0);
+      card.append(heading,details);
+      if(contribution.description){const description=document.createElement('p');description.textContent=contribution.description;card.append(description);}
+      if(contribution.ingredients){const ingredients=document.createElement('p');ingredients.textContent='Ingredients: '+contribution.ingredients;card.append(ingredients);}
+      if(contribution.image_url&&/^https:\/\//.test(contribution.image_url)){const picture=document.createElement('img');picture.src=refreshedImage(contribution.image_url);picture.alt='Submitted replacement product photo';picture.loading='lazy';card.append(picture);}
+      const actions=document.createElement('div');actions.className='actions';
+      for(const approve of [true,false]){
+        const button=document.createElement('button');button.textContent=approve?'✅ Approve':'❌ Reject';if(!approve)button.className='danger';
+        button.onclick=async()=>{
+          if(!confirm((approve?'Approve':'Reject')+' this contribution?'))return;
+          for(const sibling of actions.querySelectorAll('button'))sibling.disabled=true;
+          let approved=false;
+          try{
+            await request('/rest/v1/rpc/vv_review_contribution',{method:'POST',authenticated:true,body:{p_id:contribution.id,p_approve:approve}});
+            approved=approve;
+            if(approve&&contribution.contribution_type==='product_photo'){
+              await applyApprovedPhoto(contribution);
+              $('adminMessage').textContent='✅ Photo approved, saved to the product, and verified.';
+            }else $('adminMessage').textContent=approve?'✅ Contribution approved.':'Contribution rejected.';
+            card.remove();await loadLeaderboard();
+          }catch(error){
+            $('adminMessage').textContent=(approved?'⚠️ Contribution approved, but the product picture was NOT updated: ':'Review failed: ')+error.message;
+            if(approved){card.remove();}else for(const sibling of actions.querySelectorAll('button'))sibling.disabled=false;
+          }
+        };
+        actions.append(button);
+      }
+      card.append(actions);panel.append(card);
+    }
+  }catch(error){$('adminMessage').textContent='Unable to load reviews: '+error.message;}
+}
 $('refreshAdmin').onclick=loadAdmin;
 async function loadLeaderboard(){const now=new Date(),month=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';$('month').textContent=now.toLocaleDateString('en-US',{month:'long',year:'numeric'});try{const rows=await request('/rest/v1/rpc/vv_monthly_leaderboard',{method:'POST',body:{p_month:month}});$('leaderboard').replaceChildren();const top=(Array.isArray(rows)?rows:[]).sort((a,b)=>Number(b.approved_points)-Number(a.approved_points)).slice(0,3);if(!top.length){$('leaderboardMessage').textContent='No approved contributions yet this month.';return;}top.forEach((r,i)=>{const d=document.createElement('div');d.className='card';d.textContent=['🥇','🥈','🥉'][i]+' '+(r.contributor_name||'Vegan Contributor')+' — '+(r.approved_points||0)+' points • '+(r.approved_contributions||0)+' approved contributions';$('leaderboard').append(d);});$('leaderboardMessage').textContent='Current approved rankings.';}catch(e){$('leaderboardMessage').textContent='Leaderboard unavailable: '+e.message;}}$('refreshLeaderboard').onclick=loadLeaderboard;
 window.addEventListener('pagehide',()=>{stopCamera();if(ocrBitmap)ocrBitmap.close();if(ocrWorker)ocrWorker.terminate().catch(()=>{});});accountUI();restore();loadLeaderboard();
