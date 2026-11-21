@@ -32,7 +32,7 @@ async function errorResponse(r){const t=await r.text();try{const j=JSON.parse(t)
 async function authCall(path,body){const r=await fetch(BASE+'/auth/v1/'+path,{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw Error(await errorResponse(r));return r.json();}
 function setSession(s){session=s;user=s?.user||null;try{if(s)localStorage.setItem(AUTHKEY,JSON.stringify(s));else localStorage.removeItem(AUTHKEY);}catch{}accountUI();}
 async function token(){if(!session?.access_token)throw Error('Please log in first.');if(session.expires_at&&Date.now()/1000>session.expires_at-60){setSession(await authCall('token?grant_type=refresh_token',{refresh_token:session.refresh_token}));}return session.access_token;}
-async function request(path,{method='GET',body,authenticated=false,extra={}}={}){const t=authenticated?await token():null;const r=await fetch(BASE+path,{method,headers:{...headers(t),...(body!==undefined?{'Content-Type':'application/json'}:{}),...extra},...(body!==undefined?{body:JSON.stringify(body)}:{})});if(!r.ok)throw Error(await errorResponse(r));if(r.status===204)return null;const text=await r.text();return text?JSON.parse(text):null;}
+async function request(path,{method='GET',body,authenticated=false,extra={}}={}){const t=authenticated?await token():null;const r=await fetch(BASE+path,{method,cache:'no-store',headers:{...headers(t),...(body!==undefined?{'Content-Type':'application/json'}:{}),...extra},...(body!==undefined?{body:JSON.stringify(body)}:{})});if(!r.ok)throw Error(await errorResponse(r));if(r.status===204)return null;const text=await r.text();return text?JSON.parse(text):null;}
 function accountUI(){const signed=!!user;$('signedOut').style.display=signed?'none':'block';$('signedIn').style.display=signed?'block':'none';$('admin').style.display=signed&&isAdmin?'block':'none';$('rewards').style.display=signed&&!isAdmin?'block':'none';$('welcome').textContent=signed?'Signed in: '+(user.email||'Contributor')+(isAdmin?' — Administrator':''):'';$('save').textContent=isAdmin?'💾 Save Scan — Administrator':'💾 Save Scan / Submit Contribution';}
 async function checkAdmin(){isAdmin=false;if(!user)return false;try{const rows=await request('/rest/v1/vv_admins?user_id=eq.'+encodeURIComponent(user.id)+'&select=user_id&limit=1',{authenticated:true});isAdmin=Array.isArray(rows)&&rows.some(x=>x.user_id===user.id);}catch(e){$('authMessage').textContent='Administrator access check: '+e.message;}accountUI();return isAdmin;}
 async function afterLogin(){await checkAdmin();if(isAdmin)await loadAdmin();else{try{const rows=await request('/rest/v1/vv_profiles?user_id=eq.'+encodeURIComponent(user.id)+'&select=user_id',{authenticated:true});if(!rows.length)await request('/rest/v1/vv_profiles',{method:'POST',body:{user_id:user.id,show_on_leaderboard:false},authenticated:true});}catch{}await loadRewards();}}
@@ -47,13 +47,11 @@ function variants(b){const x=digits(b),v=new Set([x]);if(x.length===12)v.add('0'
 async function cloudLookup(b){
   const all=[],seen=new Set();
   for(const code of variants(b)){
-    const rows=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(code)+'&select=*&limit=100',{extra:{'Cache-Control':'no-cache'}});
-    for(const row of Array.isArray(rows)?rows:[]){
-      if(!seen.has(String(row.id))){seen.add(String(row.id));all.push(row);}
-    }
+    const rows=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(code)+'&select=*&limit=100',{extra:{'Cache-Control':'no-cache','Pragma':'no-cache'}});
+    for(const row of Array.isArray(rows)?rows:[]){if(!seen.has(String(row.id))){seen.add(String(row.id));all.push(row);}}
   }
-  const matching=all.filter(x=>digits(x.barcode).replace(/^0+/,'')===digits(b).replace(/^0+/,''));
-  // Prefer the most recently changed matching product, especially one with an approved photo.
+  const normalized=x=>digits(x).replace(/^0+/,'');
+  const matching=all.filter(x=>normalized(x.barcode)===normalized(b));
   matching.sort((a,b)=>{
     const date=x=>Date.parse(x.updated_at||x.modified_at||x.created_at||'')||0;
     return date(b)-date(a);
@@ -70,7 +68,7 @@ $('manualToggle').onclick=()=>{$('manualEntry').style.display=$('manualEntry').s
 async function stopCamera(){if(scanner){const s=scanner;scanner=null;try{await s.stop();}catch{}try{await s.clear();}catch{}}$('cameraBox').style.display='none';}
 async function loadScript(url,check){if(check())return;await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=url;s.onload=resolve;s.onerror=()=>reject(Error('Unable to load '+url));document.head.append(s);});}
 $('startCamera').onclick=async()=>{if(scanBusy)return;scanBusy=true;try{await loadScript('https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js',()=>!!window.Html5Qrcode);$('cameraBox').style.display='block';scanner=new Html5Qrcode('reader',{verbose:false});await scanner.start({facingMode:'environment'},{fps:12,qrbox:{width:250,height:140}},async code=>{if(!valid(code)||!scanner)return;await lookup(code);},()=>{});}catch(e){await stopCamera();alert('Camera unavailable: '+e.message+'. Use manual barcode entry.');$('manualEntry').style.display='block';}finally{scanBusy=false;}};$('stopCamera').onclick=stopCamera;$('scanAnother').onclick=async()=>{++lookupSerial;await stopCamera();reset();$('productView').style.display='none';$('scannerView').style.display='block';$('startCamera').click();};
-$('takePhoto').onclick=()=>{if(!barcode)return alert('Scan a barcode first.');$('photoInput').setAttribute('capture','environment');$('photoInput').click();};$('choosePhoto').onclick=()=>{if(!barcode)return alert('Scan a barcode first.');$('photoInput').removeAttribute('capture');$('photoInput').click();};
+$('takePhoto').onclick=()=>{if(!barcode)return alert('Scan a barcode first.');$('photoInput').setAttribute('capture','environment');$('photoInput').value='';$('photoInput').click();};$('choosePhoto').onclick=()=>{if(!barcode)return alert('Scan a barcode first.');$('photoInput').removeAttribute('capture');$('photoInput').value='';$('photoInput').click();};
 async function compressed(file){const bitmap=await createImageBitmap(file);try{const scale=Math.min(1,1200/Math.max(bitmap.width,bitmap.height)),c=document.createElement('canvas');c.width=Math.round(bitmap.width*scale);c.height=Math.round(bitmap.height*scale);c.getContext('2d').drawImage(bitmap,0,0,c.width,c.height);const blob=await new Promise(resolve=>c.toBlob(resolve,'image/jpeg',.8));if(!blob)throw Error('Could not convert picture.');return new File([blob],'product.jpg',{type:'image/jpeg'});}finally{bitmap.close();}}
 $('photoInput').onchange=async()=>{const f=$('photoInput').files?.[0];if(!f)return;try{selectedPhoto=await compressed(f);if(selectedPhotoUrl)URL.revokeObjectURL(selectedPhotoUrl);selectedPhotoUrl=URL.createObjectURL(selectedPhoto);setPicture(selectedPhotoUrl);$('submitPhoto').style.display='block';$('photoMessage').textContent='Picture ready. Tap Submit Replacement Photo for Approval. No ingredient verification is required.';}catch(e){$('photoMessage').textContent='Photo error: '+e.message;}};
 async function uploadPhoto(file){const filename=barcode+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,7)+'.jpg';const r=await fetch(BASE+'/storage/v1/object/product-images/'+encodeURIComponent(filename),{method:'POST',headers:{...headers(await token()),'Content-Type':'image/jpeg','x-upsert':'false'},body:file});if(!r.ok)throw Error(await errorResponse(r));return BASE+'/storage/v1/object/public/product-images/'+encodeURIComponent(filename);}
@@ -87,40 +85,22 @@ $('ingredients').oninput=()=>{verified=false;$('confirmed').checked=false;clearR
 $('check').onclick=async()=>{if(!valid(barcode))return alert('Scan a barcode first.');const t=parseIngredients($('ingredients').value);if(!quality(t))return alert('Enter the complete ingredient list from the package.');if(!$('confirmed').checked)return alert('Check the ingredient list and tick the confirmation box.');$('ingredients').value=t;verified=true;showResult(classify(t));$('result').scrollIntoView({behavior:'smooth'});await persist();};
 async function persist(){if(saveBusy||!verified||!lastResult||lastResult.status==='Needs Verification'||!valid(barcode))return;saveBusy=true;$('save').disabled=true;$('saveMessage').textContent='Saving verified scan…';try{if(user)await checkAdmin();const existing=await cloudLookup(barcode),name=clean($('productName').value),brand=clean($('brand').value),ingredients=clean($('ingredients').value);if(!name||!brand)throw Error('Enter product name and brand first.');if(existing&&!isAdmin){if(!user)throw Error('This product already exists. Sign in to submit corrections for review.');if(ingredients===clean(existing.ingredients)&&name===clean(existing.product_name)&&brand===clean(existing.brand)&&!selectedPhoto){$('saveMessage').textContent='✅ Verified product already in the database.';return;}let url=null;if(selectedPhoto)url=await uploadPhoto(selectedPhoto);await submit(url?'product_photo':'correction',url,ingredients);$('saveMessage').textContent='✅ Correction submitted for administrator approval. Points pending.';await loadRewards();return;}const payload={barcode,product_name:name,brand,ingredients,vegan_status:lastResult.status,vegan_reason:lastResult.reasons.join('; ')};if(selectedPhoto)payload.image_url=await uploadPhoto(selectedPhoto);if(existing){const patch={...payload};delete patch.barcode;await request('/rest/v1/products?id=eq.'+encodeURIComponent(existing.id),{method:'PATCH',body:patch,authenticated:true,extra:{Prefer:'return=representation'}});}else{await request('/rest/v1/products',{method:'POST',body:payload,authenticated:!!user,extra:{Prefer:'return=representation'}});if(user&&!isAdmin){try{await submit(selectedPhoto?'product_photo':'ingredients',payload.image_url||null,ingredients);await loadRewards();}catch(e){$('saveMessage').textContent='Product saved, but rewards submission failed: '+e.message;return;}}}$('saveMessage').textContent='✅ Verified scan saved to Supabase.';}catch(e){$('saveMessage').textContent='❌ Save failed: '+e.message;}finally{saveBusy=false;$('save').disabled=false;}}$('save').onclick=persist;
 async function loadRewards(){if(!user||isAdmin)return;try{const id=encodeURIComponent(user.id),totals=await request('/rest/v1/vv_my_rewards?user_id=eq.'+id+'&select=*',{authenticated:true});$('earned').textContent=totals[0]?.earned_points??0;$('pending').textContent=totals[0]?.pending_points??0;const rows=await request('/rest/v1/vv_contributions?user_id=eq.'+id+'&select=barcode,contribution_type,points,status,created_at&order=created_at.desc&limit=30',{authenticated:true});$('history').replaceChildren();if(!rows.length)$('history').textContent='No contributions yet.';rows.forEach(c=>{const d=document.createElement('div');d.className='card';d.textContent=(c.contribution_type||'Contribution').replace(/_/g,' ')+' • '+c.barcode+' • '+c.points+' points • '+c.status;$('history').append(d);});$('rewardMessage').textContent='Points are awarded after administrator approval.';}catch(e){$('rewardMessage').textContent='Rewards unavailable: '+e.message;}}$('refreshRewards').onclick=loadRewards;
-// Photo approval repair: approve through the existing secure RPC, then write and verify the new product image URL.
-// Never report a successful picture replacement unless the database actually returns the submitted URL.
+// Supabase trigger updates the product image atomically with approval.
+// Browser performs read-only verification; never attempts a second photo PATCH.
 async function applyApprovedPhoto(contribution){
   const url=contribution.image_url,code=digits(contribution.barcode);
-  if(!String(url||'').startsWith('https://'))throw Error('Approved contribution has no valid HTTPS photo URL.');
-  if(!valid(code))throw Error('Approved contribution has no valid barcode.');
-  const rows=[],seen=new Set();
+  if(!/^https:\/\//i.test(url||''))throw Error('Approved contribution has no valid HTTPS photo URL.');
+  const normalized=x=>digits(x).replace(/^0+/,'');
+  const found=[];
   for(const variant of variants(code)){
-    const found=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(variant)+'&select=id,barcode,image_url&limit=100',{authenticated:true,extra:{'Cache-Control':'no-cache'}});
-    for(const item of Array.isArray(found)?found:[]){
-      if(!seen.has(String(item.id))){seen.add(String(item.id));rows.push(item);}
-    }
+    const rows=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(variant)+'&select=id,barcode,image_url&limit=100',{authenticated:true,extra:{'Cache-Control':'no-cache','Pragma':'no-cache'}});
+    if(Array.isArray(rows))found.push(...rows);
   }
-  const matches=rows.filter(p=>digits(p.barcode).replace(/^0+/,'')===code.replace(/^0+/,''));
-  if(!matches.length)throw Error('Contribution approved, but no matching product exists in Supabase for barcode '+code+'.');
-  // Update EVERY matching record. An old duplicate must not win the next barcode lookup.
-  for(const product of matches){
-    if(product.image_url!==url){
-      const updated=await request('/rest/v1/products?id=eq.'+encodeURIComponent(product.id),{
-        method:'PATCH',body:{image_url:url},authenticated:true,extra:{Prefer:'return=representation'}
-      });
-      if(!Array.isArray(updated)||updated.length!==1||updated[0].image_url!==url)
-        throw Error('Supabase did not confirm the photo update for product '+product.id+'. Check products UPDATE permissions.');
-    }
-  }
-  // Verify with a new read, not just the response to the write.
-  for(const product of matches){
-    const verified=await request('/rest/v1/products?id=eq.'+encodeURIComponent(product.id)+'&select=id,image_url&limit=1',{
-      authenticated:true,extra:{'Cache-Control':'no-cache'}
-    });
-    if(!Array.isArray(verified)||verified[0]?.image_url!==url)
-      throw Error('Photo was approved but product '+product.id+' still has an old image in Supabase.');
-  }
-  if(barcode&&variants(barcode).some(v=>variants(code).includes(v))){
+  const matches=found.filter(p=>normalized(p.barcode)===normalized(code));
+  if(!matches.length)throw Error('No matching product record exists for this barcode.');
+  const outdated=matches.filter(p=>p.image_url!==url);
+  if(outdated.length)throw Error('Approval completed but '+outdated.length+' product record(s) still have the old photo. Verify the Supabase trigger and product permissions.');
+  if(barcode&&normalized(barcode)===normalized(code)){
     cloud={...(cloud||{}),image_url:url};
     setPicture(refreshedImage(url));
     $('photoMessage').textContent='✅ Approved replacement photo is now displayed.';
@@ -155,11 +135,11 @@ async function loadAdmin(){
             approved=approve;
             if(approve&&contribution.contribution_type==='product_photo'){
               await applyApprovedPhoto(contribution);
-              $('adminMessage').textContent='✅ Photo approved, saved to the product, and verified.';
+              $('adminMessage').textContent='✅ Photo approved in Supabase and verified on all matching products.';
             }else $('adminMessage').textContent=approve?'✅ Contribution approved.':'Contribution rejected.';
             card.remove();await loadLeaderboard();
           }catch(error){
-            $('adminMessage').textContent=(approved?'⚠️ Contribution approved, but the product picture was NOT updated: ':'Review failed: ')+error.message;
+            $('adminMessage').textContent=(approved?'⚠️ Approval returned, but the saved product picture could not be verified: ':'Review failed: ')+error.message;
             if(approved){card.remove();}else for(const sibling of actions.querySelectorAll('button'))sibling.disabled=false;
           }
         };
