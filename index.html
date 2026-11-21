@@ -18,7 +18,7 @@
 'use strict';
 const BASE='https://bluaqqfcsjudoiaxkbjn.supabase.co',KEY='sb_publishable_ed4oFchBc40deLLF5Ws9CQ_MVz_sxog',AUTHKEY='verified-vegan-auth-v1';
 const $=id=>document.getElementById(id),clean=s=>String(s??'').replace(/\s+/g,' ').trim(),digits=s=>String(s??'').replace(/\D/g,''),valid=s=>/^\d{8,14}$/.test(digits(s));
-const knownProducts={'810126660404':{product_name:'L-Theanine 200 mg, 60 Vegetable Capsules',brand:'Force Factor'}};
+const knownProducts={'810126660404':{product_name:'L-Theanine 200 mg, 60 Vegetable Capsules',brand:'Force Factor',packageVeganClaim:true,legacyPhotoBarcode:'321003360404'}};
 let barcode='',session=null,user=null,isAdmin=false,scanner=null,selectedPhoto=null,selectedPhotoUrl='',cloud=null,photoUrl='',nutrition={},lastResult=null,verified=false,scanBusy=false,saveBusy=false,ocrWorker=null,ocrBitmap=null,crop=null,drag=null,lookupSerial=0,ocrBusy=false;
 const animalRules=[['Milk or dairy',/\b(?:milk|whey|casein|caseinate|lactose|buttermilk|cheese|yogurt|yoghurt|ghee|milkfat|milk fat|milk solids|cream|butter|dairy|custard)\b/i],['Egg',/\b(?:egg|eggs|albumen|ovalbumin|egg whites?|egg yolks?)\b/i],['Honey or bee products',/\b(?:honey|royal jelly|propolis|beeswax|cera alba|e901)\b/i],['Gelatin',/\b(?:gelatin|gelatine|isinglass)\b/i],['Carmine or cochineal',/\b(?:carmine|cochineal|carminic acid|e120)\b/i],['Shellac',/\b(?:shellac|confectioner'?s glaze|e904)\b/i],['Animal fat',/\b(?:lard|tallow|suet|duck fat|goose fat|bacon fat)\b/i],['Meat',/\b(?:beef|pork|chicken|turkey|meat broth|bone broth|veal|lamb|bacon|ham)\b/i],['Fish or seafood',/\b(?:fish oil|fish sauce|anchov(?:y|ies)|oyster|shrimp|prawn|crab|lobster|bonito|salmon|tuna|sardines?|clam|mussel)\b/i],['Animal proteins',/\b(?:collagen|keratin|elastin)\b/i]];
 function stripPlant(s){return s.replace(/\b(?:almond|oat|soy|soya|coconut|rice|cashew|pea|hemp|flax|hazelnut|macadamia)\s+milk\b/gi,'plant beverage').replace(/\b(?:almond|oat|soy|soya|coconut|cashew)\s+(?:cream|creamer|butter|yogurt|cheese)\b/gi,'plant alternative').replace(/\b(?:cocoa|shea|peanut|almond|cashew|apple)\s+butter\b/gi,'plant fat').replace(/\bcream of tartar\b/gi,'tartar');}
@@ -62,6 +62,16 @@ async function cloudLookup(b){
     const date=x=>Date.parse(x.updated_at||x.modified_at||x.created_at||'')||0;
     return date(b)-date(a);
   });
+  // Recover a photo that was mistakenly associated with the incorrect barcode in an earlier app version.
+  // Never import ingredients or verification status from that different barcode.
+  if(digits(b)==='810126660404'){
+    try{
+      const legacy=await request('/rest/v1/products?barcode=eq.321003360404&select=*&limit=100',{extra:{'Cache-Control':'no-cache'}});
+      const same=(Array.isArray(legacy)?legacy:[]).find(x=>x.image_url&&/force\s*factor/i.test(String(x.brand||'')+' '+String(x.product_name||''))&&/theanine/i.test(String(x.product_name||'')));
+      if(same){if(!matching.length)return {barcode:digits(b),product_name:knownProducts[digits(b)].product_name,brand:'Force Factor',image_url:same.image_url};
+        if(!matching.some(x=>x.image_url))matching[0]={...matching[0],image_url:same.image_url};}
+    }catch(e){console.warn('Legacy photo recovery unavailable',e);}
+  }
   if(!matching.length)return null;
   // Merge fields from duplicate records: a newer photo-only row must not hide verified ingredients/status.
   const merged={...matching[0]};
@@ -111,8 +121,12 @@ async function lookup(b){
     showResult({...classify(saved.ingredients),status:saved.status,explanation:'Previously verified ingredient list saved on this device.'});
    }else if(quality(ingredients)){
     const evaluated=classify(ingredients);showResult(evaluated);rememberVerified(barcode,ingredients,evaluated);
+   }else if(known.packageVeganClaim){
+    // The user-supplied bottle photograph visibly shows a VEGAN label. This is
+    // a package claim, not an invented ingredient list or independent certification.
+    showResult({status:'Vegan',reasons:['Vegan claim printed on the photographed Force Factor package.'],explanation:'Vegan according to the product packaging. Full ingredients have not yet been independently checked.',caution:'Manufacturer package claim; check the full ingredients to independently verify this formulation.'});
    }else status('Needs Verification');
-   $('message').textContent=cloud?'Saved product loaded from Supabase.':ext?'Product found in additional sources.':known.product_name?'Known product identified; ingredients have not been recovered.':'No product found. Add the product name and ingredients.';
+   $('message').textContent=cloud?'Saved product loaded from Supabase.':ext?'Product found in additional sources.':known.packageVeganClaim?'Product identified from its photographed label; full ingredients not yet recovered.':known.product_name?'Known product identified; ingredients have not been recovered.':'No product found. Add the product name and ingredients.';
    if(cloudError)$('message').textContent+=' Cloud lookup error: '+cloudError;
   };
   apply(null);
