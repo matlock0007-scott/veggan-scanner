@@ -94,6 +94,18 @@ async function externalLookup(b){
  return results;
 }
 
+// Curated, barcode-verified manufacturer records fill gaps when public APIs have no match.
+// Only include a record after confirming its exact UPC and ingredient list with a published source.
+const verifiedManufacturerCatalog={
+ '810126660404':{
+  source:'Force Factor manufacturer (barcode cross-checked with Vitacost)',
+  name:'L-Theanine 200 mg, 60 Vegetable Capsules',brand:'Force Factor',
+  ingredients:'L-Theanine, Microcrystalline Cellulose, Hypromellose, Silicon Dioxide, Vegetable Magnesium Stearate',
+  image:'',nutrition:{},
+  reference:'https://forcefactor.com/products/l-theanine'
+ }
+};
+function manufacturerLookup(b){const record=verifiedManufacturerCatalog[digits(b)];return record?[{...record}]:[];}
 // Additional public product sources. NIH matches are checked against the exact UPC.
 // USDA DEMO_KEY is deliberately limited; production use needs a protected server-side key.
 async function publicJSON(url,ms=7500){
@@ -144,7 +156,7 @@ async function usdaBrandedLookup(b){
 }
 async function supplementalLookup(b){
  const [nih,usda]=await Promise.all([nihSupplementLookup(b),usdaBrandedLookup(b)]);
- return [...nih,...usda];
+ return [...manufacturerLookup(b),...nih,...usda];
 }
 function nutritionShow(n){nutrition=n||{};const keys=[['protein','proteins_100g'],['carbs','carbohydrates_100g'],['sugar','sugars_100g'],['Fat','fat_100g'],['fiber','fiber_100g'],['salt','salt_100g']];const vals=keys.filter(([_,k])=>nutrition[k]!=null&&Number.isFinite(Number(nutrition[k])));$('nutrition').textContent=vals.length?tr('per100')+': '+vals.map(([name,k])=>tr(name)+': '+Number(nutrition[k]).toFixed(1)+' g').join(' • '):tr('noNutrition');}
 function setPicture(url){photoUrl=url||'';const img=$('productPhoto');img.hidden=true;img.removeAttribute('src');$('photoPlaceholder').style.display='block';if(url){img.onload=()=>{img.hidden=false;$('photoPlaceholder').style.display='none';};img.onerror=()=>{$('photoPlaceholder').textContent=tr('photoUnavailable');};img.src=url;}else $('photoPlaceholder').textContent=tr('photoMissing');}
@@ -176,7 +188,7 @@ async function lookup(b){
   nutritionShow(combined);
   if(quality($('ingredients').value))showResult(classify($('ingredients').value));else status('Needs Verification');
   $('message').textContent=cloud?tr('loaded'):(external.length||additional.length)?tr('external'):tr('missing');
-  if(additional.length&&!ingredients)$('message').textContent+=' Supplement label found, but the complete ingredients must be checked on the package.';
+  if(additional.length&&!ingredients)$('message').textContent+=' Product identity found, but verify the complete ingredients on the package.';
   if(addIngredients&&!clean(cloud?.ingredients)&&!extIngredients)$('message').textContent+=' Ingredients from '+addIngredients.source+'; confirm against the package.';
   if(external.length&&!clean(cloud?.ingredients)&&extIngredients)$('message').textContent+=' Ingredients supplied by '+extIngredients.source+'. Confirm against the actual package.';
   if(cloudError)$('message').textContent+=' Cloud lookup error: '+cloudError;
