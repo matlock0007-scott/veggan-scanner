@@ -124,7 +124,15 @@ if(evaluated && ['Vegan','Not Vegan'].includes(evaluated.status) &&
 }else{
   status('Needs Verification');verified=false;clearResult();
 }
-$('confirmed').checked=false;$('message').textContent=cloud?'Product loaded from Supabase. Check the package.':ext?'Product found in outside sources. Check the package.':(knownProducts[barcode]?'Product identity restored from previously confirmed details. Ingredients still need verification.':'No product found. Add the product name and ingredients.');if(packageCorrection)$('message').textContent+=' ⚠️ '+packageCorrection.note+' The saved Supabase list may still be shorter until you confirm and save.';if(sourceWarning)$('message').textContent+=' '+sourceWarning+' The app cannot guarantee completeness from databases alone.';if(cloudError)$('message').textContent+=' Cloud lookup error: '+cloudError;}catch(e){$('message').textContent='Lookup failed: '+e.message;status('Needs Verification');}}
+$('confirmed').checked=false;
+if(verified){
+  $('message').textContent='Previously verified ingredients loaded. No further confirmation needed unless the package has changed.';
+}else{
+  $('message').textContent=cloud?'Product loaded from Supabase. Check the package.':ext?'Product found in outside sources. Check the package.':(knownProducts[barcode]?'Product identity restored from previously confirmed details. Ingredients still need verification.':'No product found. Add the product name and ingredients.');
+  if(packageCorrection)$('message').textContent+=' ⚠️ '+packageCorrection.note+' The saved Supabase list may still be shorter until you confirm and save.';
+  if(sourceWarning)$('message').textContent+=' '+sourceWarning+' The app cannot guarantee completeness from databases alone.';
+}
+if(cloudError && !verified)$('message').textContent+=' Cloud lookup error: '+cloudError;}catch(e){$('message').textContent='Lookup failed: '+e.message;status('Needs Verification');}}
 $('manualToggle').onclick=()=>{$('manualEntry').style.display=$('manualEntry').style.display==='none'?'block':'none';};$('lookup').onclick=()=>lookup($('barcode').value);$('barcode').onkeydown=e=>{if(e.key==='Enter')lookup($('barcode').value);};$('retry').onclick=()=>lookup(barcode);$('wrongProduct').onclick=()=>{$('wrongMessage').textContent='Product identity disputed on this screen. To submit a correction, sign in and verify the correct ingredients. This flag alone has not been sent to the cloud.';status('Needs Verification');};
 async function stopCamera(){if(scanner){const s=scanner;scanner=null;try{await s.stop();}catch{}try{await s.clear();}catch{}}$('cameraBox').style.display='none';}
 async function loadScript(url,check){if(check())return;await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=url;s.onload=resolve;s.onerror=()=>reject(Error('Unable to load '+url));document.head.append(s);});}
