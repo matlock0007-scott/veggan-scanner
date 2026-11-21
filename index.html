@@ -106,7 +106,25 @@ const identityMatches=sameProductIdentity(cloud,ext);
 const discrepancy=identityMatches?ingredientDiscrepancy(cloud?.ingredients,ext?.ingredients_text_en||ext?.ingredients_text):null;
 const sourceWarning=!identityMatches?'⚠️ Product sources disagree on identity. Do not use outside ingredients until the package is checked.':discrepancy?'⚠️ Ingredient sources disagree. A saved list may be incomplete. Compare the entire package ingredient label and confirm corrections before saving.':'';
 const packageCorrection=PACKAGE_CORRECTIONS[barcode];const name=cloud?.product_name||ext?.product_name||ext?.product_name_en||known.product_name||'',brand=cloud?.brand||ext?.brands||known.brand||'',ingredients=cloud?.ingredients||(identityMatches?(ext?.ingredients_text_en||ext?.ingredients_text):'')||readVerified(barcode)?.ingredients||'';$('productName').value=name;$('brand').value=brand;$('ingredients').value=parseIngredients(packageCorrection?.ingredients||ingredients);const url=cloud?.image_url||ext?.image_front_url||ext?.image_url||'';setPicture(refreshedImage(url));$('source').textContent=cloud?(cloud.image_url?'Photo: Supabase approved product record':'Product: Supabase • Photo: Open Food Facts'):ext?'Source: Open Food Facts':'';nutritionShow(cloud?{proteins_100g:cloud.protein_100g,carbohydrates_100g:cloud.carb_100g,sugars_100g:cloud.sugar_100g,fat_100g:cloud.fat_100g,fiber_100g:cloud.fiber_100g,salt_100g:cloud.salt_100g}:ext?.nutriments||{});// Source data is provisional: do not label it verified until the full package list is confirmed.
-status('Needs Verification');verified=false;clearResult();$('confirmed').checked=false;$('message').textContent=cloud?'Product loaded from Supabase. Check the package.':ext?'Product found in outside sources. Check the package.':(knownProducts[barcode]?'Product identity restored from previously confirmed details. Ingredients still need verification.':'No product found. Add the product name and ingredients.');if(packageCorrection)$('message').textContent+=' ⚠️ '+packageCorrection.note+' The saved Supabase list may still be shorter until you confirm and save.';if(sourceWarning)$('message').textContent+=' '+sourceWarning+' The app cannot guarantee completeness from databases alone.';if(cloudError)$('message').textContent+=' Cloud lookup error: '+cloudError;}catch(e){$('message').textContent='Lookup failed: '+e.message;status('Needs Verification');}}
+const savedStatus=cloud?.vegan_status;
+const displayed=$('ingredients').value;
+const cloudText=parseIngredients(cloud?.ingredients||'');
+const packageDiffers=!!packageCorrection && cloudText.toLowerCase()!==displayed.toLowerCase();
+const locallyVerified=readVerified(barcode);
+const trustedLocal=locallyVerified && parseIngredients(locallyVerified.ingredients).toLowerCase()===displayed.toLowerCase();
+const trustedCloud=cloud && ['Vegan','Not Vegan'].includes(savedStatus) &&
+  quality(cloudText) && !packageDiffers && identityMatches && !discrepancy &&
+  cloudText.toLowerCase()===displayed.toLowerCase();
+const evaluated=quality(displayed)?classify(displayed):null;
+if(evaluated && ['Vegan','Not Vegan'].includes(evaluated.status) &&
+   ((trustedCloud && savedStatus===evaluated.status) ||
+    (trustedLocal && locallyVerified.status===evaluated.status))){
+  showResult(evaluated);
+  verified=true;
+}else{
+  status('Needs Verification');verified=false;clearResult();
+}
+$('confirmed').checked=false;$('message').textContent=cloud?'Product loaded from Supabase. Check the package.':ext?'Product found in outside sources. Check the package.':(knownProducts[barcode]?'Product identity restored from previously confirmed details. Ingredients still need verification.':'No product found. Add the product name and ingredients.');if(packageCorrection)$('message').textContent+=' ⚠️ '+packageCorrection.note+' The saved Supabase list may still be shorter until you confirm and save.';if(sourceWarning)$('message').textContent+=' '+sourceWarning+' The app cannot guarantee completeness from databases alone.';if(cloudError)$('message').textContent+=' Cloud lookup error: '+cloudError;}catch(e){$('message').textContent='Lookup failed: '+e.message;status('Needs Verification');}}
 $('manualToggle').onclick=()=>{$('manualEntry').style.display=$('manualEntry').style.display==='none'?'block':'none';};$('lookup').onclick=()=>lookup($('barcode').value);$('barcode').onkeydown=e=>{if(e.key==='Enter')lookup($('barcode').value);};$('retry').onclick=()=>lookup(barcode);$('wrongProduct').onclick=()=>{$('wrongMessage').textContent='Product identity disputed on this screen. To submit a correction, sign in and verify the correct ingredients. This flag alone has not been sent to the cloud.';status('Needs Verification');};
 async function stopCamera(){if(scanner){const s=scanner;scanner=null;try{await s.stop();}catch{}try{await s.clear();}catch{}}$('cameraBox').style.display='none';}
 async function loadScript(url,check){if(check())return;await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=url;s.onload=resolve;s.onerror=()=>reject(Error('Unable to load '+url));document.head.append(s);});}
