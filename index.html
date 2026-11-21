@@ -94,6 +94,58 @@ async function externalLookup(b){
  return results;
 }
 
+// Additional public product sources. NIH matches are checked against the exact UPC.
+// USDA DEMO_KEY is deliberately limited; production use needs a protected server-side key.
+async function publicJSON(url,ms=7500){
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),ms);
+ try{const r=await fetch(url,{signal:controller.signal,headers:{Accept:'application/json'}});if(!r.ok)throw Error('HTTP '+r.status);return await r.json();}
+ finally{clearTimeout(timer);}
+}
+function matchingUPC(a,b){return !!digits(a)&&!!digits(b)&&digits(a).replace(/^0+(?=\d)/,'')===digits(b).replace(/^0+(?=\d)/,'');}
+async function nihSupplementLookup(b){
+ const results=[];
+ for(const code of variants(b)){
+  try{
+   const j=await publicJSON('https://api.ods.od.nih.gov/dsld/v9/search-filter?q='+encodeURIComponent('"'+code+'"')+'&size=12');
+   for(const hit of j?.hits||[]){
+    const raw=hit._source||hit.source||hit;
+    if(!matchingUPC(raw.upcSku||raw.upc||raw.barcode,b))continue;
+    // Search records are summaries; fetch the complete label to confirm identity.
+    let label=raw;
+    const id=raw.id||hit._id;
+    if(id&&/^\d+$/.test(String(id))){try{label=await publicJSON('https://api.ods.od.nih.gov/dsld/v9/label/'+encodeURIComponent(id));}catch{}}
+    if(!matchingUPC(label.upcSku||raw.upcSku||raw.upc,b))continue;
+    // Supplement Facts alone does not establish a complete vegan ingredient list.
+    results.push({source:'NIH Dietary Supplement Label Database',name:clean(label.fullName||raw.fullName),brand:clean(label.brandName||raw.brandName),ingredients:'',image:'',nutrition:{},supplement:true});
+   }
+  }catch{} // Browser CORS and source outages must not break scanning.
+ }
+ return results;
+}
+function usdaNutrients(food){
+ const n={};for(const v of food.foodNutrients||[]){
+  const id=Number(v.nutrientId||v.nutrient?.id),name=String(v.nutrientName||v.nutrient?.name||'').toLowerCase(),amount=Number(v.value??v.amount);
+  if(!Number.isFinite(amount))continue;
+  if(id===1003||name==='protein')n.proteins_100g=amount;
+  if(id===1005||name==='carbohydrate, by difference')n.carbohydrates_100g=amount;
+  if(id===1008||name==='energy')continue;
+  if(id===1004||name==='total lipid (fat)')n.fat_100g=amount;
+  if(id===2000||name==='sugars, total including nlea')n.sugars_100g=amount;
+  if(id===1079||name==='fiber, total dietary')n.fiber_100g=amount;
+ }
+ return n;
+}
+async function usdaBrandedLookup(b){
+ // DEMO_KEY is public, very low-rate and unsuitable for a production rollout.
+ try{
+  const j=await publicJSON('https://api.nal.usda.gov/fdc/v1/foods/search?api_key=DEMO_KEY&query='+encodeURIComponent(b)+'&dataType=Branded&pageSize=15',7500);
+  return (j.foods||[]).filter(f=>matchingUPC(f.gtinUpc,b)).map(f=>({source:'USDA FoodData Central',name:clean(f.description),brand:clean(f.brandOwner||f.brandName),ingredients:clean(f.ingredients),image:'',nutrition:usdaNutrients(f)}));
+ }catch{return [];}
+}
+async function supplementalLookup(b){
+ const [nih,usda]=await Promise.all([nihSupplementLookup(b),usdaBrandedLookup(b)]);
+ return [...nih,...usda];
+}
 function nutritionShow(n){nutrition=n||{};const keys=[['protein','proteins_100g'],['carbs','carbohydrates_100g'],['sugar','sugars_100g'],['Fat','fat_100g'],['fiber','fiber_100g'],['salt','salt_100g']];const vals=keys.filter(([_,k])=>nutrition[k]!=null&&Number.isFinite(Number(nutrition[k])));$('nutrition').textContent=vals.length?tr('per100')+': '+vals.map(([name,k])=>tr(name)+': '+Number(nutrition[k]).toFixed(1)+' g').join(' • '):tr('noNutrition');}
 function setPicture(url){photoUrl=url||'';const img=$('productPhoto');img.hidden=true;img.removeAttribute('src');$('photoPlaceholder').style.display='block';if(url){img.onload=()=>{img.hidden=false;$('photoPlaceholder').style.display='none';};img.onerror=()=>{$('photoPlaceholder').textContent=tr('photoUnavailable');};img.src=url;}else $('photoPlaceholder').textContent=tr('photoMissing');}
 function refreshedImage(url){if(!url)return '';if(url.startsWith('blob:'))return url;return url+(url.includes('?')?'&':'?')+'vv_refresh='+Date.now();}
@@ -105,23 +157,27 @@ async function lookup(b){
  $('scannerView').style.display='none';$('productView').style.display='block';$('message').textContent=tr('loading');
  try{
   let cloudError='';try{cloud=await cloudLookup(barcode);}catch(e){cloudError=e.message;}
-  const external=await externalLookup(barcode);
+  const [external,additional]=await Promise.all([externalLookup(barcode),supplementalLookup(barcode)]);
   if(serial!==lookupSerial)return;
   const pick=(getter)=>external.map(x=>({value:getter(x.product),source:x.source})).find(x=>x.value);
   const extName=pick(catalogName),extBrand=pick(p=>clean(p.brands)),extIngredients=pick(catalogIngredients),extPhoto=pick(catalogImage);
-  const name=clean(cloud?.product_name)||extName?.value||'',brand=clean(cloud?.brand)||extBrand?.value||'';
-  const ingredients=clean(cloud?.ingredients)||extIngredients?.value||'';
+  const addName=additional.find(x=>x.name),addBrand=additional.find(x=>x.brand),addIngredients=additional.find(x=>x.ingredients);
+  const name=clean(cloud?.product_name)||extName?.value||addName?.name||'',brand=clean(cloud?.brand)||extBrand?.value||addBrand?.brand||'';
+  const ingredients=clean(cloud?.ingredients)||extIngredients?.value||addIngredients?.ingredients||'';
   $('productName').value=name;$('brand').value=brand;$('ingredients').value=parseIngredients(ingredients);
   // A previously approved Supabase image always wins over public-catalog pictures.
   const url=cloud?.image_url||extPhoto?.value||'';setPicture(refreshedImage(url));
-  const sources=[...(cloud?['Supabase']:[]),...new Set(external.map(x=>x.source))];
+  const sources=[...(cloud?['Supabase']:[]),...new Set([...external.map(x=>x.source),...additional.map(x=>x.source)])];
   $('source').textContent=sources.length?'Product sources checked: '+sources.join(' • ')+(cloud?.image_url?' | Photo: Supabase approved':extPhoto?' | Photo: '+extPhoto.source:'')+(extIngredients&&!clean(cloud?.ingredients)?' | Ingredients: '+extIngredients.source:''):'';
   const cloudNutrition={proteins_100g:cloud?.protein_100g,carbohydrates_100g:cloud?.carb_100g,sugars_100g:cloud?.sugar_100g,fat_100g:cloud?.fat_100g,fiber_100g:cloud?.fiber_100g,salt_100g:cloud?.salt_100g};
   const nutritionSource=external.find(x=>x.product.nutriments&&Object.keys(x.product.nutriments).length);
-  const combined={...nutritionSource?.product.nutriments};for(const [key,value] of Object.entries(cloudNutrition))if(value!==null&&value!==undefined)combined[key]=value;
+  const additionalNutrition=additional.find(x=>Object.keys(x.nutrition||{}).length);
+  const combined={...additionalNutrition?.nutrition,...nutritionSource?.product.nutriments};for(const [key,value] of Object.entries(cloudNutrition))if(value!==null&&value!==undefined)combined[key]=value;
   nutritionShow(combined);
   if(quality($('ingredients').value))showResult(classify($('ingredients').value));else status('Needs Verification');
-  $('message').textContent=cloud?tr('loaded'):external.length?tr('external'):tr('missing');
+  $('message').textContent=cloud?tr('loaded'):(external.length||additional.length)?tr('external'):tr('missing');
+  if(additional.length&&!ingredients)$('message').textContent+=' Supplement label found, but the complete ingredients must be checked on the package.';
+  if(addIngredients&&!clean(cloud?.ingredients)&&!extIngredients)$('message').textContent+=' Ingredients from '+addIngredients.source+'; confirm against the package.';
   if(external.length&&!clean(cloud?.ingredients)&&extIngredients)$('message').textContent+=' Ingredients supplied by '+extIngredients.source+'. Confirm against the actual package.';
   if(cloudError)$('message').textContent+=' Cloud lookup error: '+cloudError;
  }catch(e){if(serial!==lookupSerial)return;$('message').textContent='Lookup failed: '+e.message;status('Needs Verification');}
