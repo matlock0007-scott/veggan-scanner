@@ -16,6 +16,7 @@
 <section style="text-align:center"><h2>✉️ Contact & Support</h2><p>Have a question, suggestion, or product correction?</p><a href="mailto:verifiedveganhelp@gmail.com">verifiedveganhelp@gmail.com</a><p class="small muted">© 2026 Verified Vegan. Helping animals, one product at a time. 🌱</p></section></main>
 <script>
 'use strict';
+// Verified Vegan photo-approval prerequisite fix — 2026-11-20.
 const BASE='https://bluaqqfcsjudoiaxkbjn.supabase.co',KEY='sb_publishable_ed4oFchBc40deLLF5Ws9CQ_MVz_sxog',AUTHKEY='verified-vegan-auth-v1';
 const $=id=>document.getElementById(id),clean=s=>String(s??'').replace(/\s+/g,' ').trim(),digits=s=>String(s??'').replace(/\D/g,''),valid=s=>/^\d{8,14}$/.test(digits(s));
 let barcode='',session=null,user=null,isAdmin=false,scanner=null,selectedPhoto=null,selectedPhotoUrl='',cloud=null,photoUrl='',nutrition={},lastResult=null,verified=false,scanBusy=false,saveBusy=false,ocrWorker=null,ocrBitmap=null,crop=null,drag=null,lookupSerial=0,ocrBusy=false;
@@ -72,7 +73,7 @@ $('takePhoto').onclick=()=>{if(!barcode)return alert('Scan a barcode first.');$(
 async function compressed(file){const bitmap=await createImageBitmap(file);try{const scale=Math.min(1,1200/Math.max(bitmap.width,bitmap.height)),c=document.createElement('canvas');c.width=Math.round(bitmap.width*scale);c.height=Math.round(bitmap.height*scale);c.getContext('2d').drawImage(bitmap,0,0,c.width,c.height);const blob=await new Promise(resolve=>c.toBlob(resolve,'image/jpeg',.8));if(!blob)throw Error('Could not convert picture.');return new File([blob],'product.jpg',{type:'image/jpeg'});}finally{bitmap.close();}}
 $('photoInput').onchange=async()=>{const f=$('photoInput').files?.[0];if(!f)return;try{selectedPhoto=await compressed(f);if(selectedPhotoUrl)URL.revokeObjectURL(selectedPhotoUrl);selectedPhotoUrl=URL.createObjectURL(selectedPhoto);setPicture(selectedPhotoUrl);$('submitPhoto').style.display='block';$('photoMessage').textContent='Picture ready. Tap Submit Replacement Photo for Approval. No ingredient verification is required.';}catch(e){$('photoMessage').textContent='Photo error: '+e.message;}};
 async function uploadPhoto(file){const filename=barcode+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,7)+'.jpg';const r=await fetch(BASE+'/storage/v1/object/product-images/'+encodeURIComponent(filename),{method:'POST',headers:{...headers(await token()),'Content-Type':'image/jpeg','x-upsert':'false'},body:file});if(!r.ok)throw Error(await errorResponse(r));return BASE+'/storage/v1/object/public/product-images/'+encodeURIComponent(filename);}
-async function submit(type,url,ingredients){return request('/rest/v1/rpc/vv_submit_contribution',{method:'POST',authenticated:true,body:{p_barcode:barcode,p_type:type,p_description:type==='product_photo'?'Replacement or missing product packaging photo':type==='ingredients'?'Contributed ingredients':'Corrected product information',p_image_url:url||null,p_ingredients:ingredients||null}});}
+async function submit(type,url,ingredients){return request('/rest/v1/rpc/vv_submit_contribution',{method:'POST',authenticated:true,body:{p_barcode:barcode,p_type:type,p_description:type==='product_photo'?('Replacement or missing product packaging photo'+(clean($('productName').value)?' | Product: '+clean($('productName').value).slice(0,120):'')+(clean($('brand').value)?' | Brand: '+clean($('brand').value).slice(0,100):'')):type==='ingredients'?'Contributed ingredients':'Corrected product information',p_image_url:url||null,p_ingredients:ingredients||null}});}
 $('submitPhoto').onclick=async()=>{const button=$('submitPhoto'),message=$('photoMessage');if(!selectedPhoto||!valid(barcode))return message.textContent='Scan a barcode and select a picture first.';if(!user){message.textContent='Log in to submit a replacement photo for approval.';$('authSection').scrollIntoView({behavior:'smooth'});return;}button.disabled=true;message.textContent='Uploading replacement photo and submitting for approval…';try{await checkAdmin();if(isAdmin)throw Error('This approval workflow requires a contributor account. Administrators can review submissions from other accounts.');const url=await uploadPhoto(selectedPhoto);await submit('product_photo',url,null);message.textContent='✅ Photo submitted for administrator approval. The existing picture remains until approval.';button.style.display='none';selectedPhoto=null;await loadRewards();}catch(e){message.textContent='❌ Photo submission failed: '+e.message+' — The photo has not been confirmed as submitted.';}finally{button.disabled=false;}};
 $('takeIngredient').onclick=()=>{if(!barcode)return alert('Scan a barcode first.');$('ingredientInput').setAttribute('capture','environment');$('ingredientInput').click();};$('chooseIngredient').onclick=()=>{if(!barcode)return alert('Scan a barcode first.');$('ingredientInput').removeAttribute('capture');$('ingredientInput').click();};
 const canvas=$('cropCanvas'),ctx=canvas.getContext('2d');function drawCrop(){if(!ocrBitmap)return;ctx.drawImage(ocrBitmap,0,0,canvas.width,canvas.height);if(crop){ctx.strokeStyle='#00e676';ctx.lineWidth=4;ctx.strokeRect(crop.x,crop.y,crop.w,crop.h);}}
@@ -85,27 +86,106 @@ $('ingredients').oninput=()=>{verified=false;$('confirmed').checked=false;clearR
 $('check').onclick=async()=>{if(!valid(barcode))return alert('Scan a barcode first.');const t=parseIngredients($('ingredients').value);if(!quality(t))return alert('Enter the complete ingredient list from the package.');if(!$('confirmed').checked)return alert('Check the ingredient list and tick the confirmation box.');$('ingredients').value=t;verified=true;showResult(classify(t));$('result').scrollIntoView({behavior:'smooth'});await persist();};
 async function persist(){if(saveBusy||!verified||!lastResult||lastResult.status==='Needs Verification'||!valid(barcode))return;saveBusy=true;$('save').disabled=true;$('saveMessage').textContent='Saving verified scan…';try{if(user)await checkAdmin();const existing=await cloudLookup(barcode),name=clean($('productName').value),brand=clean($('brand').value),ingredients=clean($('ingredients').value);if(!name||!brand)throw Error('Enter product name and brand first.');if(existing&&!isAdmin){if(!user)throw Error('This product already exists. Sign in to submit corrections for review.');if(ingredients===clean(existing.ingredients)&&name===clean(existing.product_name)&&brand===clean(existing.brand)&&!selectedPhoto){$('saveMessage').textContent='✅ Verified product already in the database.';return;}let url=null;if(selectedPhoto)url=await uploadPhoto(selectedPhoto);await submit(url?'product_photo':'correction',url,ingredients);$('saveMessage').textContent='✅ Correction submitted for administrator approval. Points pending.';await loadRewards();return;}const payload={barcode,product_name:name,brand,ingredients,vegan_status:lastResult.status,vegan_reason:lastResult.reasons.join('; ')};if(selectedPhoto)payload.image_url=await uploadPhoto(selectedPhoto);if(existing){const patch={...payload};delete patch.barcode;await request('/rest/v1/products?id=eq.'+encodeURIComponent(existing.id),{method:'PATCH',body:patch,authenticated:true,extra:{Prefer:'return=representation'}});}else{await request('/rest/v1/products',{method:'POST',body:payload,authenticated:!!user,extra:{Prefer:'return=representation'}});if(user&&!isAdmin){try{await submit(selectedPhoto?'product_photo':'ingredients',payload.image_url||null,ingredients);await loadRewards();}catch(e){$('saveMessage').textContent='Product saved, but rewards submission failed: '+e.message;return;}}}$('saveMessage').textContent='✅ Verified scan saved to Supabase.';}catch(e){$('saveMessage').textContent='❌ Save failed: '+e.message;}finally{saveBusy=false;$('save').disabled=false;}}$('save').onclick=persist;
 async function loadRewards(){if(!user||isAdmin)return;try{const id=encodeURIComponent(user.id),totals=await request('/rest/v1/vv_my_rewards?user_id=eq.'+id+'&select=*',{authenticated:true});$('earned').textContent=totals[0]?.earned_points??0;$('pending').textContent=totals[0]?.pending_points??0;const rows=await request('/rest/v1/vv_contributions?user_id=eq.'+id+'&select=barcode,contribution_type,points,status,created_at&order=created_at.desc&limit=30',{authenticated:true});$('history').replaceChildren();if(!rows.length)$('history').textContent='No contributions yet.';rows.forEach(c=>{const d=document.createElement('div');d.className='card';d.textContent=(c.contribution_type||'Contribution').replace(/_/g,' ')+' • '+c.barcode+' • '+c.points+' points • '+c.status;$('history').append(d);});$('rewardMessage').textContent='Points are awarded after administrator approval.';}catch(e){$('rewardMessage').textContent='Rewards unavailable: '+e.message;}}$('refreshRewards').onclick=loadRewards;
-// Supabase trigger updates the product image atomically with approval.
-// Browser performs read-only verification; never attempts a second photo PATCH.
+// Photo approval must reference a real product row. A photo-only submission is allowed
+// before that row exists; the administrator creates its unverified shell first.
+// Never label the product Vegan/Not Vegan solely from its package photo.
+function sameProductBarcode(a,b){
+  const normalize=x=>digits(x).replace(/^0+(?=\d)/,'');
+  return !!digits(a)&&!!digits(b)&&normalize(a)===normalize(b);
+}
+async function productsForBarcode(code){
+  const found=[],seen=new Set();
+  for(const variant of variants(code)){
+    const rows=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(variant)+'&select=id,barcode,image_url,product_name,brand&limit=100',{
+      authenticated:!!user,extra:{'Cache-Control':'no-cache','Pragma':'no-cache'}
+    });
+    for(const p of Array.isArray(rows)?rows:[]){
+      if(sameProductBarcode(p.barcode,code)&&!seen.has(String(p.id))){seen.add(String(p.id));found.push(p);}
+    }
+  }
+  return found;
+}
+function contributionIdentity(contribution){
+  const description=String(contribution.description||'');
+  return {
+    name:clean(description.match(/(?:^|\|)\s*Product:\s*([^|]+)/i)?.[1]||''),
+    brand:clean(description.match(/(?:^|\|)\s*Brand:\s*([^|]+)/i)?.[1]||'')
+  };
+}
+async function ensurePhotoProduct(contribution){
+  const code=digits(contribution.barcode);
+  if(!isAdmin)throw Error('Administrator access is required to create a product record for approval.');
+  if(!valid(code))throw Error('This contribution has an invalid barcode.');
+  const existing=await productsForBarcode(code);
+  if(existing.length)return existing;
+
+  // Obtain product identity from the submission, the current product, or a public
+  // product-data source. Ask the reviewer if none of those identifies the package.
+  const identity=contributionIdentity(contribution);
+  let name=identity.name,brand=identity.brand;
+  if(sameProductBarcode(barcode,code)){
+    name=name||clean($('productName').value);
+    brand=brand||clean($('brand').value);
+  }
+  if(!name||!brand){
+    try{
+      const external=await externalLookup(code);
+      name=name||clean(external?.product_name||external?.product_name_en||'');
+      brand=brand||clean(external?.brands||'');
+    }catch{}
+  }
+  if(!name)name=clean(prompt('This barcode is missing from the product database. Enter the product name shown on the package before approving:', '')||'');
+  if(!brand)brand=clean(prompt('Enter the brand shown on the product package:', '')||'');
+  if(!name||!brand)throw Error('Approval was not attempted: a new product needs its name and brand. The photo is still pending.');
+
+  const base={barcode:code,product_name:name.slice(0,250),brand:brand.slice(0,250)};
+  const tries=[
+    {...base,ingredients:'',vegan_status:'Needs Verification',vegan_reason:'Ingredients not yet verified; photo-only product record.'},
+    {...base,ingredients:''},
+    {...base}
+  ];
+  let lastError=null;
+  for(const payload of tries){
+    try{
+      await request('/rest/v1/products',{method:'POST',body:payload,authenticated:true,extra:{Prefer:'return=representation'}});
+      const verified=await productsForBarcode(code);
+      if(verified.length)return verified;
+      throw Error('Supabase did not return the newly created product record.');
+    }catch(error){
+      const found=await productsForBarcode(code).catch(()=>[]);
+      if(found.length)return found; // A concurrent contributor may have created it.
+      lastError=error;
+      // Database permissions or server failures cannot be fixed by retrying a different payload.
+      if(!/^HTTP 400\b|^HTTP 422\b/.test(error.message))break;
+    }
+  }
+  throw Error('Supabase could not create an unverified product record for barcode '+code+'. Approval was not attempted, so the photo remains pending. Check the products INSERT policy and table constraints. '+(lastError?.message||''));
+}
 async function applyApprovedPhoto(contribution){
   const url=contribution.image_url,code=digits(contribution.barcode);
   if(!/^https:\/\//i.test(url||''))throw Error('Approved contribution has no valid HTTPS photo URL.');
-  const normalized=x=>digits(x).replace(/^0+/,'');
-  const found=[];
-  for(const variant of variants(code)){
-    const rows=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(variant)+'&select=id,barcode,image_url&limit=100',{authenticated:true,extra:{'Cache-Control':'no-cache','Pragma':'no-cache'}});
-    if(Array.isArray(rows))found.push(...rows);
+  const matches=await productsForBarcode(code);
+  if(!matches.length)throw Error('Approval returned but the product cannot be read from Supabase.');
+  // The server's secure review procedure should write the image. If duplicates
+  // remain with an older image, update those as an administrator and verify each.
+  for(const p of matches){
+    if(p.image_url===url)continue;
+    const updated=await request('/rest/v1/products?id=eq.'+encodeURIComponent(p.id),{
+      method:'PATCH',body:{image_url:url},authenticated:true,
+      extra:{Prefer:'return=representation'}
+    });
+    if(!Array.isArray(updated)||updated.length!==1||updated[0].image_url!==url)
+      throw Error('Photo review completed, but the new photo was not saved for product '+p.id+'. Check Supabase products UPDATE policy.');
   }
-  const matches=found.filter(p=>normalized(p.barcode)===normalized(code));
-  if(!matches.length)throw Error('No matching product record exists for this barcode.');
-  const outdated=matches.filter(p=>p.image_url!==url);
-  if(outdated.length)throw Error('Approval completed but '+outdated.length+' product record(s) still have the old photo. Verify the Supabase trigger and product permissions.');
-  if(barcode&&normalized(barcode)===normalized(code)){
+  const verified=await productsForBarcode(code);
+  if(!verified.length||verified.some(p=>p.image_url!==url))
+    throw Error('Approval returned, but Supabase still has an outdated or missing image for this barcode.');
+  if(sameProductBarcode(barcode,code)){
     cloud={...(cloud||{}),image_url:url};
     setPicture(refreshedImage(url));
     $('photoMessage').textContent='✅ Approved replacement photo is now displayed.';
   }
-  return matches;
+  return verified;
 }
 async function loadAdmin(){
   if(!user||!isAdmin)return;
@@ -131,6 +211,12 @@ async function loadAdmin(){
           for(const sibling of actions.querySelectorAll('button'))sibling.disabled=true;
           let approved=false;
           try{
+            // A missing product would make vv_review_contribution fail with HTTP 400.
+            // Create an unverified product shell first; do not approve if creation fails.
+            if(approve&&contribution.contribution_type==='product_photo'){
+              $('adminMessage').textContent='Checking the product record before photo approval…';
+              await ensurePhotoProduct(contribution);
+            }
             await request('/rest/v1/rpc/vv_review_contribution',{method:'POST',authenticated:true,body:{p_id:contribution.id,p_approve:approve}});
             approved=approve;
             if(approve&&contribution.contribution_type==='product_photo'){
