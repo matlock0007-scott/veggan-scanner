@@ -31,10 +31,10 @@ function setLanguage(code){
  document.querySelectorAll('[data-i]').forEach(el=>{el.textContent=tr(el.dataset.i);});
  document.querySelectorAll('[data-p]').forEach(el=>{el.placeholder=tr(el.dataset.p);});
 }
-$('language').onchange=e=>setLanguage(e.target.value);
 
 const BASE='https://bluaqqfcsjudoiaxkbjn.supabase.co',KEY='sb_publishable_ed4oFchBc40deLLF5Ws9CQ_MVz_sxog',AUTHKEY='verified-vegan-auth-v1';
 const $=id=>document.getElementById(id),clean=s=>String(s??'').replace(/\s+/g,' ').trim(),digits=s=>String(s??'').replace(/\D/g,''),valid=s=>/^\d{8,14}$/.test(digits(s));
+$('language').onchange=e=>setLanguage(e.target.value);
 const knownProducts={'810126660404':{product_name:'L-Theanine 200 mg, 60 Vegetable Capsules',brand:'Force Factor',packageVeganClaim:true,legacyPhotoBarcode:'321003360404'}};
 let barcode='',session=null,user=null,isAdmin=false,scanner=null,selectedPhoto=null,selectedPhotoUrl='',cloud=null,photoUrl='',nutrition={},lastResult=null,verified=false,scanBusy=false,saveBusy=false,ocrWorker=null,ocrBitmap=null,crop=null,drag=null,lookupSerial=0,ocrBusy=false;
 const animalRules=[['Milk or dairy',/\b(?:milk|whey|casein|caseinate|lactose|buttermilk|cheese|yogurt|yoghurt|ghee|milkfat|milk fat|milk solids|cream|butter|dairy|custard)\b/i],['Egg',/\b(?:egg|eggs|albumen|ovalbumin|egg whites?|egg yolks?)\b/i],['Honey or bee products',/\b(?:honey|royal jelly|propolis|beeswax|cera alba|e901)\b/i],['Gelatin',/\b(?:gelatin|gelatine|isinglass)\b/i],['Carmine or cochineal',/\b(?:carmine|cochineal|carminic acid|e120)\b/i],['Shellac',/\b(?:shellac|confectioner'?s glaze|e904)\b/i],['Animal fat',/\b(?:lard|tallow|suet|duck fat|goose fat|bacon fat)\b/i],['Meat',/\b(?:beef|pork|chicken|turkey|meat broth|bone broth|veal|lamb|bacon|ham)\b/i],['Fish or seafood',/\b(?:fish oil|fish sauce|anchov(?:y|ies)|oyster|shrimp|prawn|crab|lobster|bonito|salmon|tuna|sardines?|clam|mussel)\b/i],['Animal proteins',/\b(?:collagen|keratin|elastin)\b/i]];
