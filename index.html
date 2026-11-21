@@ -75,12 +75,14 @@ async function cloudLookup(b){
   if(!matching.length)return null;
   // Merge fields from duplicate records: a newer photo-only row must not hide verified ingredients/status.
   const merged={...matching[0]};
-  const photo=matching.find(x=>x.image_url);
   const verifiedRow=matching.find(x=>['Vegan','Not Vegan'].includes(x.vegan_status)&&quality(x.ingredients))||matching.find(x=>['Vegan','Not Vegan'].includes(x.vegan_status));
+  // A photo must belong to the same verified product identity; do not borrow from unrelated duplicate records.
+  const sameIdentity=x=>clean(x.product_name).toLowerCase()===clean(verifiedRow?.product_name||merged.product_name).toLowerCase() && clean(x.brand).toLowerCase()===clean(verifiedRow?.brand||merged.brand).toLowerCase();
+  const photo=(verifiedRow?.image_url?verifiedRow:null)||matching.find(x=>x.image_url&&sameIdentity(x));
   const ingredientsRow=matching.find(x=>quality(x.ingredients));
   const named=matching.find(x=>x.product_name&&x.brand);
   if(named){merged.product_name=named.product_name;merged.brand=named.brand;}
-  if(photo)merged.image_url=photo.image_url;
+  merged.image_url=photo?.image_url||null;
   if(ingredientsRow)merged.ingredients=ingredientsRow.ingredients;
   if(verifiedRow){merged.vegan_status=verifiedRow.vegan_status;merged.vegan_reason=verifiedRow.vegan_reason; if(quality(verifiedRow.ingredients))merged.ingredients=verifiedRow.ingredients;}
   return merged;
@@ -110,7 +112,8 @@ async function lookup(b){
    const brand=cloud?.brand||known.brand||ext?.brands||'';
    const ingredients=quality(cloud?.ingredients)?cloud.ingredients:quality(saved?.ingredients)?saved.ingredients:ext?.ingredients_text_en||ext?.ingredients_text||'';
    $('productName').value=name;$('brand').value=brand;$('ingredients').value=parseIngredients(ingredients);
-   const url=cloud?.image_url||ext?.image_front_url||ext?.image_url||'';
+   // Existing cloud products are authoritative: NEVER substitute an external image.
+   const url=cloud?cloud.image_url||'':ext?.image_front_url||ext?.image_url||'';
    setPicture(refreshedImage(url));
    $('source').textContent=cloud?.image_url?'Photo: Supabase approved product record':url?'Photo: public product database':cloud?'Product: Supabase':'';
    nutritionShow(cloud?{proteins_100g:cloud.protein_100g,carbohydrates_100g:cloud.carb_100g,sugars_100g:cloud.sugar_100g,fat_100g:cloud.fat_100g,fiber_100g:cloud.fiber_100g,salt_100g:cloud.salt_100g}:ext?.nutriments||{});
@@ -130,8 +133,9 @@ async function lookup(b){
    if(cloudError)$('message').textContent+=' Cloud lookup error: '+cloudError;
   };
   apply(null);
-  let ext=null;try{ext=await externalLookup(barcode);}catch{}
-  if(serial===lookupSerial)apply(ext);
+  // Saved records are complete authority; avoid asynchronous external overwrite.
+  if(!cloud){let ext=null;try{ext=await externalLookup(barcode);}catch{}
+  if(serial===lookupSerial)apply(ext);}
  }catch(e){$('message').textContent='Lookup failed: '+e.message;status('Needs Verification');}
 }
 $('manualToggle').onclick=()=>{$('manualEntry').style.display=$('manualEntry').style.display==='none'?'block':'none';};$('lookup').onclick=()=>lookup($('barcode').value);$('barcode').onkeydown=e=>{if(e.key==='Enter')lookup($('barcode').value);};$('retry').onclick=()=>lookup(barcode);$('wrongProduct').onclick=()=>{$('wrongMessage').textContent='Product identity disputed on this screen. To submit a correction, sign in and verify the correct ingredients. This flag alone has not been sent to the cloud.';status('Needs Verification');};
