@@ -232,7 +232,7 @@ $('panIngredient').onclick=()=>{panIngredientImage=!panIngredientImage;canvas.cl
 function enhancedImage(source,mode){
  const c=document.createElement('canvas'),w=source.width,h=source.height;
  // Give short, curved bottle text more pixels while limiting memory use on phones.
- const scale=Math.max(1,Math.min(3.6,2400/Math.max(w,h)));
+ const scale=Math.max(1,Math.min(2.4,1800/Math.max(w,h)));
  c.width=Math.max(1,Math.round(w*scale));c.height=Math.max(1,Math.round(h*scale));
  const g=c.getContext('2d',{willReadFrequently:true});g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';g.drawImage(source,0,0,c.width,c.height);
  if(mode==='original')return c;
@@ -277,7 +277,8 @@ async function readOCR(image,append=false,selected=true){
   // A single narrow ingredient panel is best treated as a block of text.
   try{await ocrWorker.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1'});}catch{}
   let best='',bestScore=-Infinity,bestConfidence=0;
-  for(const mode of ['original','contrast','gray','threshold']){
+  // Fast path: one OCR pass normally; retry only when the first reading is weak.
+  for(const mode of ['original','contrast','gray']){
    if(run!==ingredientOCRRequest||bar!==barcode)return;
    const prepared=enhancedImage(image,mode);
    const result=await ocrWorker.recognize(prepared);
@@ -286,7 +287,7 @@ async function readOCR(image,append=false,selected=true){
    const candidate=extractIngredientOCR(result.data?.text||'',selected);
    const score=ocrScore(candidate,confidence);
    if(candidate&&score>bestScore){best=candidate;bestScore=score;bestConfidence=confidence;}
-   if(candidate.length>=15&&confidence>=88&&((candidate.match(/\(/g)||[]).length===(candidate.match(/\)/g)||[]).length))break;
+   if(candidate.length>=20&&confidence>=70&&((candidate.match(/\(/g)||[]).length===(candidate.match(/\)/g)||[]).length))break;
   }
   if(run!==ingredientOCRRequest||bar!==barcode)return;
   const words=best.match(/[A-Za-z]{2,}/g)||[];
