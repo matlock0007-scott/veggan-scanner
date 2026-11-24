@@ -103,6 +103,13 @@ return merged;}
 // Open Food Facts is community-sourced; never replace an approved Supabase record with it.
 async function externalLookup(b){
  const codes=variants(b), found=[];
+ // Catalog is a fallback source, never a verified cloud record.
+ let catalog=null;
+ try {
+  const rows=await request('/rest/v1/rpc/vv_catalog_lookup',{method:'POST',body:{codes}});
+  catalog=(Array.isArray(rows)?rows:[]).find(p=>sameBarcode(p.code,b))||null;
+ } catch(e){console.warn('Catalog unavailable; using live lookup',e);}
+
  const endpoints=['https://world.openfoodfacts.org'];
  async function getProduct(host,code,version){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),7000);
@@ -124,7 +131,7 @@ async function externalLookup(b){
   if(found.length)break;
  }
  // The food database is authoritative for food lookup. Do not mix cosmetics or cleaners into food.
- if(!found.length)return null;
+ if(!found.length)return catalog;
  const score=p=>(quality(p.ingredients_text_en||p.ingredients_text)?100:0)+(p.image_front_url?30:0)+(p.product_name?15:0)+(p.brands?10:0)+(Object.keys(p.nutriments||{}).length?15:0);
  found.sort((a,b)=>score(b)-score(a));
  const best={...found[0],nutriments:{...(found[0].nutriments||{})}};
