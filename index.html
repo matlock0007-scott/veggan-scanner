@@ -328,16 +328,24 @@ $('fitIngredient').onclick=()=>setCropZoom(1);
 $('panIngredient').onclick=()=>{fixedCropMode=!fixedCropMode;panIngredientImage=false;crop=null;photoOffsetX=0;photoOffsetY=0;drawCrop();setCropZoom(cropZoom);$('panIngredient').textContent=fixedCropMode?'✂️ Draw Box Manually':'✋ Use Fixed Green Box';$('cropHelp').textContent=fixedCropMode?'Drag the four green corner circles to resize the box; drag the photo to position it.':'Drag a rectangle around the ingredient list.';};
 function enhancedImage(source,mode){
  const c=document.createElement('canvas'),w=source.width,h=source.height;
- // Give short, curved bottle text more pixels while limiting memory use on phones.
- const scale=Math.max(1,Math.min(3.6,2400/Math.max(w,h)));
+ // OCR works from ORIGINAL photo pixels, not the on-screen zoomed preview.
+ const scale=Math.max(1,Math.min(4,2600/Math.max(w,h)));
  c.width=Math.max(1,Math.round(w*scale));c.height=Math.max(1,Math.round(h*scale));
  const g=c.getContext('2d',{willReadFrequently:true});g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';g.drawImage(source,0,0,c.width,c.height);
  if(mode==='original')return c;
- const d=g.getImageData(0,0,c.width,c.height);
- for(let i=0;i<d.data.length;i+=4){const v=.299*d.data[i]+.587*d.data[i+1]+.114*d.data[i+2];
- const gray=mode==='contrast'?Math.max(0,Math.min(255,(v-125)*1.48+125)):mode==='threshold'?(v>155?255:0):v;
- d.data[i]=d.data[i+1]=d.data[i+2]=gray;
- }g.putImageData(d,0,0);return c;
+ const d=g.getImageData(0,0,c.width,c.height),pixels=d.data;
+ const hist=new Uint32Array(256);let sum=0;
+ for(let i=0;i<pixels.length;i+=4){const v=Math.round(.299*pixels[i]+.587*pixels[i+1]+.114*pixels[i+2]);hist[v]++;sum+=v;}
+ const n=c.width*c.height,mean=sum/n;let threshold=mean;
+ if(mode==='otsu'){
+  let total=0;for(let k=0;k<256;k++)total+=k*hist[k];let back=0,weight=0,best=-1;
+  for(let k=0;k<256;k++){weight+=hist[k];if(!weight||weight===n)continue;back+=k*hist[k];const v=weight*(n-weight)*Math.pow(back/weight-(total-back)/(n-weight),2);if(v>best){best=v;threshold=k;}}
+ }
+ for(let i=0;i<pixels.length;i+=4){const v=.299*pixels[i]+.587*pixels[i+1]+.114*pixels[i+2];
+  const adjusted=mode==='contrast'?Math.max(0,Math.min(255,(v-mean)*1.85+128)):mode==='otsu'?(v>threshold?255:0):v;
+  pixels[i]=pixels[i+1]=pixels[i+2]=adjusted;
+ }
+ g.putImageData(d,0,0);return c;
 }
 function extractIngredientOCR(raw,selected){
  const original=String(raw||'').replace(/\r/g,'\n');
@@ -374,16 +382,19 @@ function ocrQuality(t,confidence){
 }
 async function readOCR(image,append=false,selected=true){
  const run=++ingredientOCRRequest,bar=barcode;
- const message=$('ocrMessage');message.textContent='Reading selected ingredient area…';
+ const message=$('ocrMessage');message.textContent='Reading the selected ingredient area…';
  try{
   await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',()=>!!window.Tesseract);
   if(run!==ingredientOCRRequest||bar!==barcode)return;
   if(!ocrWorker)ocrWorker=await Tesseract.createWorker('eng');
-  // A single narrow ingredient panel is best treated as a block of text.
-  try{await ocrWorker.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1'});}catch{}
   let best='',bestScore=-Infinity,bestConfidence=0,bestReliable=false;
-  for(const mode of ['original','contrast','gray','threshold']){
+  // Test different page segmentation and contrast modes, keeping the strongest candidate.
+  // Small label text often needs a different segmentation from a normal paragraph.
+  const attempts=[['contrast','6'],['original','6'],['gray','6'],['contrast','11'],['otsu','6'],['original','11']];
+  for(let i=0;i<attempts.length;i++){
    if(run!==ingredientOCRRequest||bar!==barcode)return;
+   const [mode,psm]=attempts[i];message.textContent=`Reading selected ingredients (${i+1} of ${attempts.length})…`;
+   try{await ocrWorker.setParameters({tessedit_pageseg_mode:psm,preserve_interword_spaces:'1',user_defined_dpi:'300'});}catch{}
    const prepared=enhancedImage(image,mode);
    const result=await ocrWorker.recognize(prepared);
    if(run!==ingredientOCRRequest||bar!==barcode)return;
@@ -392,28 +403,23 @@ async function readOCR(image,append=false,selected=true){
    const quality=ocrQuality(candidate,confidence);
    const score=quality.score+(quality.reliable?100:0);
    if(candidate&&score>bestScore){best=candidate;bestScore=score;bestConfidence=confidence;bestReliable=quality.reliable;}
-   if(quality.reliable&&confidence>=93&&quality.known>=4)break;
+   if(quality.reliable&&confidence>=90&&quality.known>=5)break;
   }
   if(run!==ingredientOCRRequest||bar!==barcode)return;
   const words=best.match(/[A-Za-z]{2,}/g)||[];
   const incomplete=!bestReliable||words.length===0||bestConfidence<58||/\b(?:[A-Z]{1,3})$/.test(best)||((best.match(/\(/g)||[]).length!==(best.match(/\)/g)||[]).length);
+  $('ocrExtracted').value=best;
+  $('ocrReviewBox').style.display=best?'block':'none';
   if(incomplete){
-   $('ocrExtracted').value=best;$('ocrReviewBox').style.display=best?'block':'none';message.textContent='OCR could not reliably read this label. No ingredients were changed. Retake a closer, sharper photo with the ingredient text filling the frame, or correct the proposed text manually. Do not verify the garbled text.';
+   message.textContent='The reader cannot reliably recognize this photograph. No ingredients were changed. The text below is only a draft: correct every word against the label, or take a closer, sharper photo. Do not verify garbled text.';
+   if(best)$('ocrReviewBox').scrollIntoView({behavior:'smooth',block:'center'});
    return;
   }
   const existing=clean($('ingredients').value);
-  if(existing&&!append){
-   // A correct barcode/database ingredient list must never be destroyed by OCR.
-   $('ocrExtracted').value=best;$('ocrReviewBox').style.display='block';
-   message.textContent='Photo text extracted. Compare it with the package. Your existing ingredient list is preserved; tap Use This Text Instead only if the photograph is more accurate.';
-   $('ocrReviewBox').scrollIntoView({behavior:'smooth',block:'center'});
-   return;
-  }
   $('ocrExtracted').value=append?mergeIngredientPhotos(existing,best):best;
-  $('ocrReviewBox').style.display='block';
-  message.textContent='OCR text is ready for review. Compare every word with the label and correct mistakes before using it. Nothing has been automatically applied.';
+  message.textContent='Ingredient text extracted for review. Check EVERY word against the package before applying it. Existing ingredients have not been changed.';
   $('ocrReviewBox').scrollIntoView({behavior:'smooth',block:'center'});
- }catch(e){if(run===ingredientOCRRequest)message.textContent='Ingredient photo reading failed: '+e.message+'. Try reselecting or entering the text manually.';}
+ }catch(e){if(run===ingredientOCRRequest)message.textContent='Ingredient photo reading failed: '+e.message+'. Try a sharper photograph or type the ingredients.';}
 }
 $('useOCRText').onclick=()=>{
  const next=clean($('ocrExtracted').value);if(!next)return;
@@ -462,7 +468,7 @@ function cropSelectionToImage(){
  return c;
 }
 $('readCrop').onclick=async()=>{
- const cropped=cropSelectionToImage();if(!cropped){$('ocrMessage').textContent='Move the ingredients inside the green box first.';return;}
+ const cropped=cropSelectionToImage();if(!cropped||cropped.width<90||cropped.height<24){$('ocrMessage').textContent='Move the ingredients inside the green box first.';return;}
  await readOCR(cropped,ingredientPhotoCount>0,true);
 };
 $('readFullIngredient').onclick=async()=>{
