@@ -468,9 +468,28 @@ async function loadPublicAdmin(){
      for(const sibling of actions.querySelectorAll('button'))sibling.disabled=true;
      try{
       $('adminMessage').textContent='Saving review to Supabase…';
+      // A new barcode must exist before the existing database review RPC can approve it.
+      // Create only for an explicitly approved correction, never for a rejection.
+      if(approve){
+       if(!valid(c.barcode))throw Error('Invalid barcode. Cannot approve this report.');
+       const matches=await Promise.all(variants(c.barcode).map(code=>request('/rest/v1/products?barcode=eq.'+encodeURIComponent(code)+'&select=id,barcode,product_name,brand,ingredients,vegan_status,image_url&limit=1',{authenticated:true})));
+       let current=matches.flat().find(row=>sameBarcode(row.barcode,c.barcode));
+       if(!current){
+        const name=clean(c.product_name),brand=clean(c.brand),ingredients=clean(c.ingredients);
+        if(!name||!brand)throw Error('A new product needs both a product name and brand before approval.');
+        // Never treat missing or incomplete ingredients as a verified Vegan result.
+        const result=classify(ingredients);
+        const payload={barcode:digits(c.barcode),product_name:name,brand,ingredients,vegan_status:result.status,vegan_reason:result.reasons.join('; ')||'Ingredients require verification'};
+        // A supporting evidence photo is not automatically a replacement product photo.
+        if(photo&&c.image_url)payload.image_url=c.image_url;
+        const created=await request('/rest/v1/products',{method:'POST',authenticated:true,body:payload,extra:{Prefer:'return=representation'}});
+        if(!Array.isArray(created)||!created[0]?.id)throw Error('Product creation was not confirmed by Supabase. Correction remains pending.');
+        current=created[0];
+       }
+      }
       await request('/rest/v1/rpc/vv_review_public_correction',{method:'POST',authenticated:true,body:{p_id:c.id,p_approve:approve}});
       const review=await request('/rest/v1/vv_public_corrections?id=eq.'+encodeURIComponent(c.id)+'&select=id,status&limit=1',{authenticated:true});
-      if(review?.[0]?.status==='pending')throw Error('Supabase did not mark this correction as reviewed. Check the vv_review_public_correction database function and its permissions.');
+      if(!review?.[0]||review[0].status==='pending')throw Error('Supabase did not mark this correction as reviewed. Check the vv_review_public_correction database function and its permissions.');
       if(approve){
        const products=await request('/rest/v1/products?barcode=eq.'+encodeURIComponent(c.barcode)+'&select=product_name,brand,ingredients,image_url&limit=1',{authenticated:true});
        const saved=products?.[0];
