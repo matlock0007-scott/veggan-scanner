@@ -115,7 +115,7 @@ const views=document.createElement('p');views.className='small muted vvPublicVie
 async function vvAltSearch(term){
  const fields='code,product_name,product_name_en,brands,ingredients_text,ingredients_text_en,ingredients_analysis_tags,countries_tags,image_front_small_url,image_front_url,image_url,nutriments';
  const cloudSearch=request('/rest/v1/products?select=*&vegan_status=ilike.Vegan&product_name=ilike.'+encodeURIComponent('*'+vvAltNormalized(term).split(' ').filter(w=>w&&w!=='and'&&w!=='with').join('*')+'*')+'&limit=150').then(rows=>(Array.isArray(rows)?rows:[]).map(p=>vvAltRow(p,'Verified Vegan')).filter(Boolean));
- const fetchOff=async(url)=>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),14000);try{const r=await fetch(url,{signal:controller.signal,headers:{Accept:'application/json'}});if(!r.ok)throw Error('Search HTTP '+r.status);const data=await r.json();return (data.products||[]).map(p=>vvAltRow(p,'Open Food Facts')).filter(Boolean);}finally{clearTimeout(timer);}};
+ const fetchOff=async(url)=>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6500);try{const r=await fetch(url,{signal:controller.signal,headers:{Accept:'application/json'}});if(!r.ok)throw Error('Search HTTP '+r.status);const data=await r.json();return (data.products||[]).map(p=>vvAltRow(p,'Open Food Facts')).filter(Boolean);}finally{clearTimeout(timer);}};
  const legacy=new URLSearchParams({search_terms:term,search_simple:'1',action:'process',json:'1',page_size:'100',fields});
  const modern=new URLSearchParams({search_terms:term,page_size:'100',fields});
  const batches=await Promise.allSettled([cloudSearch,fetchOff('https://world.openfoodfacts.org/cgi/search.pl?'+legacy),fetchOff('https://world.openfoodfacts.org/api/v2/search?'+modern)]);
@@ -170,14 +170,36 @@ async function vvFindAlternatives(mode="scanned"){
  try{const saved=JSON.parse(localStorage.getItem(cacheKey)||'null');if(saved&&Array.isArray(saved.rows)&&Date.now()-saved.time<86400000)cached=saved.rows.filter(a=>a&&valid(a.code)&&classify(a.ingredients).status==='Vegan');}catch{}
  if(cached.length){rows=cached.slice();note.textContent='Showing saved matches while checking for more…';}
 
- function render(final){const region=regionEl.value;const filtered=region==='us'?rows.filter(a=>!a.countries?.length||a.countries.includes('en:united-states')):rows;const {exact,related,other,fallback}=vvAltGroups(filtered,term);results.replaceChildren();let count=0;const group=(label,items)=>{if(!items.length)return;const h=document.createElement('h4');h.textContent=label;results.append(h);vvAltVariety(items).forEach(a=>{const card=vvRenderAlt(a);results.append(card);vvWatchAlternative(card,a);count++;});};group('Closest product matches',exact);group(meal?'Similar vegan prepared dishes — not exact matches':'Same product type — not exact matches',related);group('Other vegan prepared meals — different dishes',other.filter(a=>vvAltCloseDish(a.name,term)));if(exact.length+related.length+other.length<6)group('Ingredient substitutes only — not complete meals',fallback);
+ function googleFooter(){
+   const cat=vvAlternativeCategory(term);
+   const phrase=meal?'vegan '+term:({egg:'vegan egg replacer',milk:'vegan plant based milk',cheese:'vegan dairy free cheese',butter:'vegan butter'}[cat]||'vegan '+term);
+   const footer=document.createElement('div');footer.className='card';footer.style.marginTop='18px';
+   const heading=document.createElement('strong');heading.textContent='Search more vegan alternatives on Google Shopping';footer.append(heading);
+   const explanation=document.createElement('p');explanation.className='small muted';explanation.textContent='Google Shopping may show non-vegan or unavailable products. Check the exact product, ingredients, and retailer listing before buying. Google results are not verified by this app.';footer.append(explanation);
+   const link=document.createElement('a');link.className='vvProductLink';link.target='_blank';link.rel='noopener noreferrer';link.textContent='🔎 Search Google Shopping: '+phrase;
+   link.href='https://www.google.com/search?'+new URLSearchParams({q:phrase,tbm:'shop'}).toString();footer.append(link);
+   results.append(footer);
+ }
+ function render(final){const region=regionEl.value;const filtered=region==='us'?rows.filter(a=>!a.countries?.length||a.countries.includes('en:united-states')):rows;const {exact,related,other,fallback}=vvAltGroups(filtered,term);results.replaceChildren();let count=0;const group=(label,items)=>{if(!items.length)return;const h=document.createElement('h4');h.textContent=label;results.append(h);vvAltVariety(items).forEach(a=>{const card=vvRenderAlt(a);results.append(card);vvWatchAlternative(card,a);count++;});};group('Closest product matches',exact);group(meal?'Similar vegan prepared dishes — not exact matches':'Same product type — not exact matches',related);group('Other vegan prepared meals — different dishes',other.filter(a=>vvAltCloseDish(a.name,term)));if(exact.length+related.length+other.length<6)group('Ingredient substitutes only — not complete meals',fallback);googleFooter();
  if(!final){note.textContent=count?'Showing available matches; checking remaining sources…':'Searching for vegan alternatives…';return;}
  note.textContent=count?(!exact.length&&!related.length&&meal?'No comparable prepared dish found. ':'')+'Ingredient screening is not certification; check current packaging. Results are independent of advertising. Results come from available product databases, not Google’s full index.'+(unavailable?' A search source was unavailable.':''):(unavailable?'No matching vegan alternatives from available sources. A search source was unavailable.':'No matching vegan alternatives found.')+(region==='us'?' Try All regions for products without US market data.':'')+' Try editing the product name or type.';}
  try{
    if(cached.length)render(false);
-   const terms=vvAltSearchTerms(term);
-   // Run the complete query set every time: early exits caused inconsistent counts.
-   const batches=[];for(let i=0;i<terms.length;i+=3){const group=await Promise.all(terms.slice(i,i+3).map(async q=>{try{return await vvAltSearch(q);}catch{return {rows:[],unavailable:true};}}));batches.push(...group);if(serial!==(isOther?vvOtherSerial:vvAlternativeSerial))return;}
+   // Search in parallel rather than waiting for sequential groups of three.
+   // Display verified results as soon as a source returns, then update as others finish.
+   const terms=vvAltSearchTerms(term).slice(0,10);
+   const batches=[];let completed=0;
+   await Promise.all(terms.map(async q=>{
+     let batch;try{batch=await vvAltSearch(q);}catch{batch={rows:[],unavailable:true};}
+     if(serial!==(isOther?vvOtherSerial:vvAlternativeSerial))return;
+     batches.push(batch);completed++;
+     if(batch.rows.length){
+       const known=new Map(rows.map(a=>[vvCanonical(a.code),a]));
+       for(const a of batch.rows){const key=vvCanonical(a.code);if(!key)continue;const old=known.get(key);if(!old||(!old.image&&a.image))known.set(key,a);}
+       rows=[...known.values()];
+       render(false);
+     }else if(completed===terms.length&&!rows.length){render(false);}
+   }));
    if(serial!==(isOther?vvOtherSerial:vvAlternativeSerial))return;
    unavailable=batches.some(b=>b.unavailable);
    const fresh=batches.flatMap(b=>b.rows);
