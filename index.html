@@ -84,9 +84,9 @@ function vvAltIsRecipeComponent(name){return /\b(?:pre measured|premeasured|reci
 function vvAltPrepared(name){return vvAltMeal(name)&&!vvAltIsRecipeComponent(name)&&!/\b(?:wrappers?|skins?|seasoning|sauce|gravy|broth|stock|mix|flour|dough|crust|topping)\b/.test(vvAltNormalized(name).replace(/\b(?:with|in) (?:[a-z]+ ){0,3}(?:sauce|gravy|broth)\b/g,''));}
 function vvAltMealQueries(term){const n=vvAltNormalized(term);if(/\bdumplings?\b/.test(n))return ['dumplings','pot pie'];if(/\bpot pies?\b/.test(n))return ['pot pie','casserole'];if(/\b(?:lasag(?:na|ne)|pasta|spaghetti|ravioli|mac(?:aroni)? and cheese)\b/.test(n))return ['pasta','lasagna'];if(/\b(?:noodles?|rice)\b/.test(n))return ['rice bowl','noodle bowl'];if(/\b(?:burritos?|enchiladas?)\b/.test(n))return ['burrito','enchilada'];if(/\bpizza\b/.test(n))return ['pizza'];if(/\bcurr(?:y|ies)\b/.test(n))return ['curry'];if(/\bstews?\b/.test(n))return ['stew'];return ['frozen meal','dinner'];}
 function vvAltIngredient(term){const n=vvAltNormalized(term);return /\bchicken\b/.test(n)?'chicken':/\bbeef\b/.test(n)?'beef':/\bpork\b/.test(n)?'pork':/\bturkey\b/.test(n)?'turkey':/\bcheese\b/.test(n)?'cheese':'';}
-function vvAlternativeCategory(name){const n=clean(name).toLowerCase();const types=[[/\bpancakes?\b/,'pancakes'],[/\bwaffles?\b/,'waffles'],[/\bmuffins?\b/,'muffins'],[/\bice cream\b|\bgelato\b/,'ice cream'],[/\bmayonnaise\b|\bmayo\b/,'mayonnaise'],[/\bcream cheese\b/,'cream cheese'],[/\bcheese\b/,'cheese'],[/\byog(?:h)?urt\b/,'yogurt'],[/\bcreamer\b/,'creamer'],[/\bbutter\b/,'butter'],[/\bmilk\b/,'milk'],[/\bchicken\s+nuggets?\b|\bnuggets?\b/,'nuggets'],[/\bburgers?\b|\bpatties\b/,'burger'],[/\bsausages?\b|\bhot dogs?\b/,'sausage'],[/\bbacon\b/,'bacon'],[/\beggs?\b/,'egg'],[/\bchicken\b/,'chicken'],[/\btuna\b/,'tuna'],[/\bpizza\b/,'pizza'],[/\bchocolate\b/,'chocolate'],[/\bcookies?\b/,'cookies'],[/\bgumm(?:y|ies)\b/,'gummies'],[/\bshampoo\b/,'shampoo'],[/\bsoap\b/,'soap']];return types.find(([re])=>re.test(n))?.[1]||clean(name).replace(/\b\d+(?:\.\d+)?\s*(?:oz|g|kg|ml|lb)\b/gi,'').replace(/[^a-z0-9\s-]/gi,' ').trim().slice(0,80);}
+function vvAlternativeCategory(name){const n=clean(name).toLowerCase();const types=[[/\bpancakes?\b/,'pancakes'],[/\bwaffles?\b/,'waffles'],[/\bmuffins?\b/,'muffins'],[/\bice cream\b|\bgelato\b/,'ice cream'],[/\bmayonnaise\b|\bmayo\b/,'mayonnaise'],[/\bcream cheese\b/,'cream cheese'],[/\bcheese\b/,'cheese'],[/\byog(?:h)?urt\b/,'yogurt'],[/\bcreamer\b/,'creamer'],[/\bbutter\b/,'butter'],[/\bmilk\b/,'milk'],[/\bchicken\s+nuggets?\b|\bnuggets?\b/,'nuggets'],[/\bburgers?\b|\bpatties\b/,'burger'],[/\bsausages?\b|\bhot dogs?\b/,'sausage'],[/\bbacon\b/,'bacon'],[/\beggs?\b/,'egg'],[/\bchicken\b/,'chicken'],[/\btuna\b/,'tuna'],[/\bpizza\b/,'pizza'],[/\bchocolate\b/,'chocolate'],[/\bcookies?\b/,'cookies'],[/\bgumm(?:y|ies)\b/,'gummies'],[/\bshampoo\b/,'shampoo'],[/\bsoap\b/,'soap'],[/\b(?:carbonated water|sparkling water|seltzer|club soda|sparkling mineral water|sparkling spring water)\b/,'sparkling water']];return types.find(([re])=>re.test(n))?.[1]||clean(name).replace(/\b\d+(?:\.\d+)?\s*(?:oz|g|kg|ml|lb)\b/gi,'').replace(/[^a-z0-9\s-]/gi,' ').trim().slice(0,80);}
 function vvAltImage(url){try{const u=new URL(url);return u.protocol==='https:'?u.href:'';}catch{return '';}}
-function vvAltRow(p,source){const fromCloud=source==='Verified Vegan';const name=clean(fromCloud?p.product_name:p.product_name_en||p.product_name);const brand=clean(fromCloud?p.brand:p.brands);const code=digits(fromCloud?p.barcode:p.code);const ingredients=parseIngredients(fromCloud?p.ingredients:p.ingredients_text_en||p.ingredients_text||'');if(!name||!brand||!valid(code)||sameBarcode(code,barcode)||!ingredients||classify(ingredients).status!=='Vegan')return null;if(fromCloud?normalizedStatus(p.vegan_status)!=='Vegan':Array.isArray(p.ingredients_analysis_tags)&&p.ingredients_analysis_tags.some(t=>/^(?:en:)?non-vegan$/.test(t)))return null;const nu=fromCloud?p:p.nutriments||{};return {name,brand,code,source,ingredients,image:vvAltImage(fromCloud?p.image_url:p.image_front_url||p.image_url||p.image_front_small_url),protein:nu.protein_100g??nu.proteins_100g,carbs:nu.carb_100g??nu.carbohydrates_100g,carbTotal:nu['carbohydrates-total_100g']??nu.total_carbohydrates_100g,carbKind:fromCloud?'unknown':'excluding-fiber',fiber:nu.fiber_100g,fat:nu.fat_100g,sugar:nu.sugar_100g??nu.sugars_100g,countries:fromCloud?(Array.isArray(p.countries_tags)?p.countries_tags:[]):(Array.isArray(p.countries_tags)?p.countries_tags:[])};}
+function vvAltRow(p,source){const fromCloud=source==='Verified Vegan';const name=clean(fromCloud?p.product_name:p.product_name_en||p.product_name);const brand=clean(fromCloud?p.brand:p.brands);const code=digits(fromCloud?p.barcode:p.code);const ingredients=parseIngredients(fromCloud?p.ingredients:p.ingredients_text_en||p.ingredients_text||'');const plainWater=/\b(?:sparkling|carbonated|seltzer|club soda|mineral water)\b/i.test(name)&&!/\b(?:alcohol|beer|wine|cocktail|tonic syrup)\b/i.test(name);const missingWaterIngredients=plainWater&&!ingredients&&!/\b(?:flavou?r|infused|sweetened|energy|vitamin|juice|kombucha)\b/i.test(name);if(!name||!brand||!valid(code)||sameBarcode(code,barcode)||(!missingWaterIngredients&&(!ingredients||classify(ingredients).status!=='Vegan')))return null;if(fromCloud?normalizedStatus(p.vegan_status)!=='Vegan':Array.isArray(p.ingredients_analysis_tags)&&p.ingredients_analysis_tags.some(t=>/^(?:en:)?non-vegan$/.test(t)))return null;const nu=fromCloud?p:p.nutriments||{};return {name,brand,code,source,ingredients:missingWaterIngredients?'Ingredients not listed — check product packaging':ingredients,image:vvAltImage(fromCloud?p.image_url:p.image_front_url||p.image_url||p.image_front_small_url),protein:nu.protein_100g??nu.proteins_100g,carbs:nu.carb_100g??nu.carbohydrates_100g,carbTotal:nu['carbohydrates-total_100g']??nu.total_carbohydrates_100g,carbKind:fromCloud?'unknown':'excluding-fiber',fiber:nu.fiber_100g,fat:nu.fat_100g,sugar:nu.sugar_100g??nu.sugars_100g,countries:fromCloud?(Array.isArray(p.countries_tags)?p.countries_tags:[]):(Array.isArray(p.countries_tags)?p.countries_tags:[])};}
 const vvFavoriteKey='vv-alternative-favorites';
 function vvFavoriteMap(){try{const raw=JSON.parse(localStorage.getItem(vvFavoriteKey)||'{}');return raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:{};}catch{return {};}}
 function vvFavoriteCode(a){return vvCanonical(a.code);}
@@ -147,7 +147,8 @@ function vvAltSearchTerms(term){
  burger:['vegan burger','plant based burger','veggie burger','meatless patty'],
  sausage:['vegan sausage','plant based sausage','meatless sausage'],
  mayonnaise:['vegan mayonnaise','egg free mayo','plant based mayo'],
- 'ice cream':['vegan ice cream','non dairy frozen dessert','oat frozen dessert','coconut ice cream']
+ 'ice cream':['vegan ice cream','non dairy frozen dessert','oat frozen dessert','coconut ice cream'],
+ 'sparkling water':['sparkling water','carbonated water','seltzer','sparkling mineral water','sparkling spring water','club soda','sparkling drinking water','flavored sparkling water','sparkling beverage','sparkling water lime','sparkling water lemon']
  };
  return [...new Set([category,...(synonyms[category]||[]),term].filter(Boolean))];
 }
@@ -156,11 +157,13 @@ function vvAltRelevant(a,term){
  if(cat==='butter')return !/\b(?:peanut|almond|cashew|sunflower|hazelnut|cocoa|cookie|body|shea) butter\b/.test(n)&&!/\b(?:butter chicken|butter cookies?|butter popcorn|butter flavor|butter lettuce)\b/.test(n);
  if(cat==='milk')return !/\b(?:butter|spread|cheese|cream cheese|chocolate|milkshake|ice cream|dessert|cookies?|candies|candy|thistle|body lotion|soap|shampoo|powdered formula|infant formula)\b/.test(n)&&/\b(?:milk|mylk|plant beverage|soy drink|oat drink|almond drink|cashew drink|pea drink|coconut drink)\b/.test(n);
  if(cat==='cheese')return !/\b(?:cheesecake|cheese crackers?|cheese puffs?|cheese flavored|cheese seasoning|mac and cheese|cheese sauce mix)\b/.test(n);
+ if(cat==='sparkling water')return /\b(?:sparkling|carbonated|seltzer|club soda|mineral water)\b/.test(n)&&!/\b(?:alcohol|beer|wine|cocktail|tonic syrup|soap|cleaner)\b/.test(n);
  if(cat==='egg')return !/\b(?:eggplant|easter egg|chocolate egg|egg roll|egg noodle|egg salad|egg sandwich|egg wash|egg pasta|egg waffle|egg cookie|egg bites|egg tart|egg curry|egg protein bar|eggplant)\b/.test(n);
  return true;
 }
 function vvAltSemanticMatch(a,term){
  const n=vvAltNormalized(a.name),cat=vvAlternativeCategory(term);
+ if(cat==='sparkling water')return /\b(?:sparkling|carbonated|seltzer|club soda|mineral water)\b/.test(n);
  if(cat==='egg')return /\b(?:egg replacer|egg replacement|egg substitute|egg alternative|plant based egg|vegan egg|liquid egg|egg free scramble|eggless scramble|just egg|egg scramble|eggless omelette|eggless omelet)\b/.test(n);
  if(cat==='milk')return /\b(?:milk|mylk|plant beverage|non dairy beverage|oat drink|soy drink|almond drink|cashew drink|pea drink|coconut drink)\b/.test(n);
  if(cat==='butter')return /\b(?:butter|margarine|spread)\b/.test(n);
@@ -177,9 +180,9 @@ async function vvFindAlternatives(mode="scanned"){
  note.textContent='Searching for vegan alternatives…';
  const meal=vvAltMeal(term);let unavailable=false,rows=[];
  const region=regionEl.value;
- const cacheKey='vv-alt-results-v4:'+region+':'+term;
+ const cacheKey='vv-alt-results-v5:'+region+':'+term;
  let cached=[];
- try{const saved=JSON.parse(localStorage.getItem(cacheKey)||'null');if(saved&&Array.isArray(saved.rows)&&Date.now()-saved.time<86400000)cached=saved.rows.filter(a=>a&&valid(a.code)&&classify(a.ingredients).status==='Vegan');}catch{}
+ try{const saved=JSON.parse(localStorage.getItem(cacheKey)||'null');if(saved&&Array.isArray(saved.rows)&&Date.now()-saved.time<86400000)cached=saved.rows.filter(a=>a&&valid(a.code)&&(classify(a.ingredients).status==='Vegan'||(vvAlternativeCategory(term)==='sparkling water'&&a.ingredients==='Ingredients not listed — check product packaging')));}catch{}
  if(cached.length){rows=cached.slice();note.textContent='Showing saved matches while checking for more…';}
 
  function googleFooter(){
@@ -192,9 +195,28 @@ async function vvFindAlternatives(mode="scanned"){
    link.href='https://www.google.com/search?'+new URLSearchParams({q:phrase,tbm:'shop'}).toString();footer.append(link);
    results.append(footer);
  }
- function render(final){const region=regionEl.value;const filtered=region==='us'?rows.filter(a=>!a.countries?.length||a.countries.includes('en:united-states')):rows;const {exact,related,other,fallback}=vvAltGroups(filtered,term);results.replaceChildren();let count=0;const group=(label,items)=>{if(!items.length)return;const h=document.createElement('h4');h.textContent=label;results.append(h);vvAltVariety(items).forEach(a=>{const card=vvRenderAlt(a);results.append(card);vvWatchAlternative(card,a);count++;});};group('Closest product matches',exact);group(meal?'Similar vegan prepared dishes — not exact matches':'Same product type — not exact matches',related);group('Other vegan prepared meals — different dishes',other.filter(a=>vvAltCloseDish(a.name,term)));if(exact.length+related.length+other.length<6)group('Ingredient substitutes only — not complete meals',fallback);googleFooter();
- if(!final){note.textContent=count?'Showing available matches; checking remaining sources…':'Searching for vegan alternatives…';return;}
- note.textContent=count?(!exact.length&&!related.length&&meal?'No comparable prepared dish found. ':'')+'Ingredient screening is not certification; check current packaging. Results are independent of advertising. Results come from available product databases, not Google’s full index.'+(unavailable?' A search source was unavailable.':''):(unavailable?'No matching vegan alternatives from available sources. A search source was unavailable.':'No matching vegan alternatives found.')+(region==='us'?' Try All regions for products without US market data.':'')+' Try editing the product name or type.';}
+ let currentPage=0;
+ function render(final){
+ const region=regionEl.value,filtered=region==='us'?rows.filter(a=>!a.countries?.length||a.countries.includes('en:united-states')):rows;
+ const {exact,related,other,fallback}=vvAltGroups(filtered,term),all=[];
+ const addGroup=(label,items)=>vvAltVariety(items).forEach(a=>all.push({label,a}));
+ addGroup('Closest product matches',exact);
+ addGroup(meal?'Similar vegan prepared dishes — not exact matches':'Same product type — not exact matches',related);
+ addGroup('Other vegan prepared meals — different dishes',other.filter(a=>vvAltCloseDish(a.name,term)));
+ if(exact.length+related.length+other.length<6)addGroup('Ingredient substitutes only — not complete meals',fallback);
+ const pages=Math.max(1,Math.ceil(all.length/10));currentPage=Math.min(currentPage,pages-1);
+ results.replaceChildren();let last='';for(const {label,a} of all.slice(currentPage*10,currentPage*10+10)){
+ if(label!==last){const h=document.createElement('h4');h.textContent=label;results.append(h);last=label;}
+ const card=vvRenderAlt(a);results.append(card);vvWatchAlternative(card,a);
+ }
+ if(all.length>10){const nav=document.createElement('div');nav.style.cssText='display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin:16px 0';
+ const prev=document.createElement('button');prev.type='button';prev.className='secondary';prev.textContent='Previous';prev.disabled=currentPage===0;prev.onclick=()=>{currentPage--;render(true);};
+ const indicator=document.createElement('span');indicator.textContent='Page '+(currentPage+1)+' of '+pages;
+ const next=document.createElement('button');next.type='button';next.className='secondary';next.textContent='Next 10';next.disabled=currentPage>=pages-1;next.onclick=()=>{currentPage++;render(true);};nav.append(prev,indicator,next);results.append(nav);}
+ googleFooter();
+ if(!final){note.textContent=all.length?'Showing available matches; checking remaining sources…':'Searching for vegan alternatives…';return;}
+ note.textContent=all.length?all.length+' matching products found; showing up to 10 per page. Ingredient screening is not certification; check current packaging. Products without ingredient lists require verification. Results are independent of advertising.'+(unavailable?' A search source was unavailable.':''):(unavailable?'No matching products from available sources. A search source was unavailable.':'No matching products found in available databases.')+(region==='us'?' Try Rest of the World for more results.':'');}
+
  try{
    if(cached.length)render(false);
    // Search in parallel rather than waiting for sequential groups of three.
