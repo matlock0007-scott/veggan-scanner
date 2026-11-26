@@ -121,7 +121,7 @@ const VERIFIED_CACHE='vv-verified-products-v2';
 function readVerified(code){try{const x=JSON.parse(localStorage.getItem(VERIFIED_CACHE)||'{}');return variants(code).map(v=>x[v]).find(v=>v&&['Vegan','Not Vegan'].includes(v.status))||null;}catch{return null;}}
 // FIX: save an already verified status even when the photo-only record has no ingredient text.
 function rememberVerified(code,ingredients,result){if(!valid(code)||!['Vegan','Not Vegan'].includes(result?.status))return;try{const all=JSON.parse(localStorage.getItem(VERIFIED_CACHE)||'{}');const old=readVerified(code);all[digits(code)]={ingredients:quality(ingredients)?parseIngredients(ingredients):old?.ingredients||'',status:result.status,updated_at:new Date().toISOString()};const keys=Object.keys(all);if(keys.length>500)keys.sort((a,b)=>String(all[a].updated_at).localeCompare(String(all[b].updated_at))).slice(0,keys.length-500).forEach(k=>delete all[k]);localStorage.setItem(VERIFIED_CACHE,JSON.stringify(all));}catch{}}
-function status(s){const quick=$('vvQuickAlternatives');quick.hidden=s!=='Not Vegan'&&s!=='Vegan';quick.style.display=(s==='Not Vegan'||s==='Vegan')?'flex':'none';$('vvQuickUS').textContent=s==='Vegan'?'🌱 More Vegan Options US':'🌱 Vegan Alternatives — US';$('vvQuickWorld').textContent='🌍 Rest of the World';$('vvOtherPanel').hidden=s!=='Not Vegan';if(s!=='Not Vegan'&&s!=='Vegan')vvCloseAlternatives();$('productStatus').textContent=s;$('productStatus').className='status '+(s==='Vegan'?'vegan':s==='Not Vegan'?'notvegan':'unknown');vvRefreshMainPublic();if(!$('vvFavoritesPanel').hidden)vvRenderFavorites();}
+function status(s){const quick=$('vvQuickAlternatives');quick.hidden=s!=='Not Vegan'&&s!=='Vegan';quick.style.display=(s==='Not Vegan'||s==='Vegan')?'flex':'none';$('vvQuickUS').textContent=s==='Vegan'?'🌱 More Vegan Options US':'🌱 Vegan Alternatives — US';$('vvQuickWorld').textContent='🌍 Rest of the World';$('vvOtherPanel').hidden=s!=='Not Vegan'&&s!=='Vegan';if(s!=='Not Vegan'&&s!=='Vegan')vvCloseAlternatives();$('productStatus').textContent=s;$('productStatus').className='status '+(s==='Vegan'?'vegan':s==='Not Vegan'?'notvegan':'unknown');vvRefreshMainPublic();if(!$('vvFavoritesPanel').hidden)vvRenderFavorites();}
 // Vegan alternatives: independent, on-demand discovery; never modifies scanned product data.
 let vvAlternativeSerial=0;
 function vvCloseAlternatives(){vvAlternativeSerial++;$('vvAlternativesPanel').hidden=true;$('vvAlternatives').setAttribute('aria-expanded','false');$('vvAlternativesResults').replaceChildren();$('vvAlternativesNote').textContent='';$('vvAlternativesQuery').value='';$('vvAlternativesSearch').disabled=false;}
@@ -154,7 +154,7 @@ async function vvAltContributePhoto(a,button){
  catch(e){button.textContent='❌ Upload failed — tap to retry';button.disabled=false;button.title=e.message;}
  };picker.oncancel=()=>picker.remove();picker.click();
 }
-function vvRenderAlt(a,track=true){const card=document.createElement('article');card.className='vvAlternativeCard';if(!a.image&&valid(a.code)){const code=a.code;fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json?fields=code,image_front_url,image_url',{signal:AbortSignal.timeout(5000)}).then(r=>r.ok?r.json():null).then(data=>{const url=vvAltImage(data?.product?.image_front_url||data?.product?.image_url);if(url&&card.isConnected){const img=document.createElement('img');img.src=url;img.alt=a.name;img.loading='eager';img.decoding='async';img.onerror=()=>img.remove();card.querySelector('.vvPhotoMissing')?.remove();card.prepend(img);}}).catch(()=>{}).finally(()=>{const placeholder=card.querySelector('.vvPhotoMissing');if(placeholder)placeholder.textContent='Product photo unavailable';});}if(a.image){const img=document.createElement('img');img.src=a.image;img.alt=a.name;img.loading='eager';img.decoding='async';img.onerror=()=>{img.remove();photoAdd.textContent='📷 Add Product Photo';const placeholder=document.createElement('span');placeholder.className='small muted';placeholder.textContent='Product photo unavailable';card.prepend(placeholder);};card.append(img);}if(!a.image){const missing=document.createElement('span');missing.className='small muted vvPhotoMissing';missing.textContent='Loading product photo…';card.append(missing);}const body=document.createElement('div'),title=document.createElement('strong');title.textContent=a.name;body.append(title);const add=t=>{const p=document.createElement('p');p.textContent=t;body.append(p);};if(a.brand)add(a.brand);add(a.source+' • Vegan ingredient screening');if(a.countries?.length)add('Market listing: '+(a.countries.includes('en:united-states')?'United States':'Outside US / other listed markets')+' (stock not confirmed)');else add('Market listing: Not specified (stock not confirmed)');const num=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))?Number(v):null;
+function vvRenderAlt(a,track=true){const card=document.createElement('article');card.className='vvAlternativeCard';if(!a.image&&valid(a.code)){const code=a.code;fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json?fields=code,image_front_url,image_url',{signal:AbortSignal.timeout(5000)}).then(r=>r.ok?r.json():null).then(data=>{const url=vvAltImage(data?.product?.image_front_url||data?.product?.image_url);if(url&&card.isConnected){const img=document.createElement('img');img.src=url;img.alt=a.name;img.loading='eager';img.decoding='async';img.onerror=()=>img.remove();card.querySelector('.vvPhotoMissing')?.remove();card.prepend(img);}}).catch(()=>{}).finally(()=>{const placeholder=card.querySelector('.vvPhotoMissing');if(placeholder)placeholder.textContent='Product photo unavailable';});}if(a.image){const img=document.createElement('img');img.src=a.image;img.alt=a.name;img.loading='eager';img.decoding='async';img.onerror=()=>{img.remove();photoAdd.textContent='📷 Add Product Photo';const placeholder=document.createElement('span');placeholder.className='small muted';placeholder.textContent='Product photo unavailable';card.prepend(placeholder);};card.append(img);}if(!a.image){const missing=document.createElement('span');missing.className='small muted vvPhotoMissing';missing.textContent='Loading product photo…';card.append(missing);}const body=document.createElement('div'),title=document.createElement('strong');title.textContent=a.name;body.append(title);const add=t=>{const p=document.createElement('p');p.textContent=t;body.append(p);};if(a.brand)add(a.brand);add(a.source+(a.ingredients==='Ingredients not listed — check product packaging'?' • Needs Verification — ingredient list unavailable':' • Vegan ingredient screening'));if(a.countries?.length)add('Market listing: '+(a.countries.includes('en:united-states')?'United States':'Outside US / other listed markets')+' (stock not confirmed)');else add('Market listing: Not specified (stock not confirmed)');const num=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))?Number(v):null;
 const carb=num(a.carbs),fiber=num(a.fiber),explicitTotal=num(a.carbTotal);
 const total=explicitTotal!==null?explicitTotal:(a.carbKind==='excluding-fiber'&&carb!==null&&fiber!==null?carb+fiber:null);
 const net=explicitTotal!==null&&fiber!==null?Math.max(0,explicitTotal-fiber):(a.carbKind==='excluding-fiber'?carb:null);
@@ -174,13 +174,15 @@ vvAutoProductLink(a).then(result=>{if(result&&link.isConnected){link.href=result
 card.append(body);return card;}
 // Product discovery uses two Open Food Facts search endpoints, with ingredient screening
 // applied to every result. A failed source does not cancel other sources.
-async function vvAltSearch(term){
+async function vvAltSearch(term,region='world',waterCategory=''){
  const fields='code,product_name,product_name_en,brands,ingredients_text,ingredients_text_en,ingredients_analysis_tags,countries_tags,image_front_small_url,image_front_url,image_url,nutriments';
- const cloudSearch=request('/rest/v1/products?select=*&vegan_status=ilike.Vegan&product_name=ilike.'+encodeURIComponent('*'+vvAltNormalized(term).split(' ').filter(w=>w&&w!=='and'&&w!=='with').join('*')+'*')+'&limit=150').then(rows=>(Array.isArray(rows)?rows:[]).map(p=>vvAltRow(p,'Verified Vegan')).filter(Boolean));
+ const cloudSearch=waterCategory?Promise.resolve([]):request('/rest/v1/products?select=*&vegan_status=ilike.Vegan&product_name=ilike.'+encodeURIComponent('*'+vvAltNormalized(term).split(' ').filter(w=>w&&w!=='and'&&w!=='with').join('*')+'*')+'&limit=150').then(rows=>(Array.isArray(rows)?rows:[]).map(p=>vvAltRow(p,'Verified Vegan')).filter(Boolean));
  const fetchOff=async(url)=>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6500);try{const r=await fetch(url,{signal:controller.signal,headers:{Accept:'application/json'}});if(!r.ok)throw Error('Search HTTP '+r.status);const data=await r.json();return (data.products||[]).map(p=>vvAltRow(p,'Open Food Facts')).filter(Boolean);}finally{clearTimeout(timer);}};
  const legacy=new URLSearchParams({search_terms:term,search_simple:'1',action:'process',json:'1',page_size:'100',fields});
  const modern=new URLSearchParams({search_terms:term,page_size:'100',fields});
- const batches=await Promise.allSettled([cloudSearch,fetchOff('https://world.openfoodfacts.org/cgi/search.pl?'+legacy),fetchOff('https://world.openfoodfacts.org/api/v2/search?'+modern)]);
+ const categoryParams=new URLSearchParams({categories_tags:waterCategory,page_size:'100',fields});
+ if(region==='us')categoryParams.set('countries_tags','en:united-states');
+ const batches=await Promise.allSettled(waterCategory?[fetchOff('https://world.openfoodfacts.org/api/v2/search?'+categoryParams)]:[cloudSearch,fetchOff('https://world.openfoodfacts.org/cgi/search.pl?'+legacy),fetchOff('https://world.openfoodfacts.org/api/v2/search?'+modern)]);
  return {rows:batches.flatMap(b=>b.status==='fulfilled'?b.value:[]),unavailable:batches.every(b=>b.status==='rejected')};
 }
 function vvAltRank(rows,predicate,term){const target=vvAltWords(term);const score=a=>{const w=new Set(vvAltWords(a.name));return target.filter(x=>w.has(x)).length;};const sorted=rows.filter(predicate).sort((a,b)=>score(b)-score(a)||Number(b.source==='Verified Vegan')-Number(a.source==='Verified Vegan')||Number(!!b.image)-Number(!!a.image));const seen=new Set();return sorted.filter(a=>{if(variants(a.code).some(v=>seen.has(v)))return false;variants(a.code).forEach(v=>seen.add(v));return true;});}
@@ -198,7 +200,7 @@ function vvAltSearchTerms(term){
  sausage:['vegan sausage','plant based sausage','meatless sausage'],
  mayonnaise:['vegan mayonnaise','egg free mayo','plant based mayo'],
  'ice cream':['vegan ice cream','non dairy frozen dessert','oat frozen dessert','coconut ice cream'],
- 'sparkling water':['sparkling water','carbonated water','seltzer','sparkling mineral water','sparkling spring water','club soda','sparkling drinking water','flavored sparkling water','sparkling beverage','sparkling water lime','sparkling water lemon','mineral water','natural mineral water','still mineral water','spring water','still water']
+ 'sparkling water':['mineral water','carbonated water','seltzer','sparkling mineral water','spring water','still water','sparkling spring water','club soda','natural mineral water','sparkling drinking water','flavored sparkling water','sparkling water lime','sparkling water lemon','still mineral water']
  };
  return [...new Set([category,...(synonyms[category]||[]),term].filter(Boolean))];
 }
@@ -230,7 +232,8 @@ async function vvFindAlternatives(mode="scanned"){
  note.textContent='Searching for vegan alternatives…';
  const meal=vvAltMeal(term);let unavailable=false,rows=[];
  const region=regionEl.value;
- const cacheKey='vv-alt-results-v5:'+region+':'+term;
+ const waterSearch=vvAlternativeCategory(term)==='sparkling water';
+ const cacheKey=(waterSearch?'vv-alt-water-v6:':'vv-alt-results-v5:')+region+':'+term;
  let cached=[];
  try{const saved=JSON.parse(localStorage.getItem(cacheKey)||'null');if(saved&&Array.isArray(saved.rows)&&Date.now()-saved.time<86400000)cached=saved.rows.filter(a=>a&&valid(a.code)&&(classify(a.ingredients).status==='Vegan'||(vvAlternativeCategory(term)==='sparkling water'&&a.ingredients==='Ingredients not listed — check product packaging')));}catch{}
  if(cached.length){rows=cached.slice();note.textContent='Showing saved matches while checking for more…';}
@@ -271,10 +274,11 @@ async function vvFindAlternatives(mode="scanned"){
    if(cached.length)render(false);
    // Search in parallel rather than waiting for sequential groups of three.
    // Display verified results as soon as a source returns, then update as others finish.
-   const terms=vvAltSearchTerms(term).slice(0,10);
+   const terms=vvAltSearchTerms(term).slice(0,10).map(q=>({q}));
+   if(waterSearch)terms.push(...['en:mineral-waters','en:carbonated-waters','en:spring-waters'].map(category=>({q:'',category})));
    const batches=[];let completed=0;
-   await Promise.all(terms.map(async q=>{
-     let batch;try{batch=await vvAltSearch(q);}catch{batch={rows:[],unavailable:true};}
+   await Promise.all(terms.map(async ({q,category})=>{
+     let batch;try{batch=await vvAltSearch(q,region,category);}catch{batch={rows:[],unavailable:true};}
      if(serial!==(isOther?vvOtherSerial:vvAlternativeSerial))return;
      batches.push(batch);completed++;
      if(batch.rows.length){
