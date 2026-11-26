@@ -137,6 +137,7 @@ function vvAltIngredient(term){const n=vvAltNormalized(term);return /\bchicken\b
 function vvAlternativeCategory(name){const n=clean(name).toLowerCase();if(/\b(?:angel[ -]hair|capellini|capelli d[’' ]angelo|thin spaghetti|spaghettini)\b/.test(n)&&!vvAltIsRecipeComponent(n)&&!/\b(?:with|in)\b.*\b(?:sauce|chicken|beef|pork|shrimp)\b/.test(n))return 'angel hair pasta';const types=[[/\bpancakes?\b/,'pancakes'],[/\bwaffles?\b/,'waffles'],[/\bmuffins?\b/,'muffins'],[/\bice cream\b|\bgelato\b/,'ice cream'],[/\bmayonnaise\b|\bmayo\b/,'mayonnaise'],[/\bcream cheese\b/,'cream cheese'],[/\bcheese\b/,'cheese'],[/\byog(?:h)?urt\b/,'yogurt'],[/\bcreamer\b/,'creamer'],[/\bbutter\b/,'butter'],[/\bmilk\b/,'milk'],[/\bchicken\s+nuggets?\b|\bnuggets?\b/,'nuggets'],[/\bburgers?\b|\bpatties\b/,'burger'],[/\bsausages?\b|\bhot dogs?\b/,'sausage'],[/\bbacon\b/,'bacon'],[/\beggs?\b/,'egg'],[/\bchicken\b/,'chicken'],[/\btuna\b/,'tuna'],[/\bpizza\b/,'pizza'],[/\bchocolate\b/,'chocolate'],[/\bcookies?\b/,'cookies'],[/\bgumm(?:y|ies)\b/,'gummies'],[/\bshampoo\b/,'shampoo'],[/\bsoap\b/,'soap'],[/\b(?:mineral water|spring water|still water|carbonated water|sparkling water|seltzer|club soda|sparkling mineral water|sparkling spring water)\b/,'sparkling water']];return types.find(([re])=>re.test(n))?.[1]||clean(name).replace(/\b\d+(?:\.\d+)?\s*(?:oz|g|kg|ml|lb)\b/gi,'').replace(/[^a-z0-9\s-]/gi,' ').trim().slice(0,80);}
 // Universal food-category discovery. The tested water and angel-hair routes remain unchanged.
 const vvTypeRules=[
+ [/\begg (?:replacers?|replacements?|substitutes?)\b/,'egg replacer',['egg replacer','egg replacement','egg substitute','egg alternative'],/\b(?:egg replacers?|egg replacements?|egg substitutes?|egg alternatives?)\b/],
  [/\b(?:a\s*1|steak sauce|brown sauce|worcestershire(?: sauce)?)\b/,'steak sauce',['steak sauce','brown sauce','worcestershire sauce','barbecue sauce'],/\b(?:steak sauce|brown sauce|worcestershire(?: sauce)?|barbecue sauce|barbeque sauce|bbq sauce)\b/],
  [/\b(?:barbecue|barbeque|bbq) sauce\b/,'barbecue sauce',['barbecue sauce','bbq sauce','barbeque sauce'],/\b(?:barbecue|barbeque|bbq) sauce\b/],
  [/\b(?:hot sauce|chili sauce|chilli sauce|pepper sauce|sriracha)\b/,'hot sauce',['hot sauce','chili sauce','sriracha'],/\b(?:hot sauce|chili sauce|chilli sauce|pepper sauce|sriracha)\b/],
@@ -187,11 +188,23 @@ const vvRuleCategoryTags={
  'barbecue sauce':['en:barbecue-sauces'],'hot sauce':['en:hot-sauces'],'ketchup':['en:ketchups'],'mustard':['en:mustards'],
  'salad dressing':['en:salad-dressings'],'pasta sauce':['en:pasta-sauces'],'crackers':['en:crackers'],'chips':['en:chips-and-fries'],
  'breakfast cereal':['en:breakfast-cereals'],'bread':['en:breads'],'tofu':['en:tofu'],'hummus':['en:hummus'],
- 'milk':['en:plant-based-milks'],'butter':['en:margarines'],'cheese':['en:plant-based-cheeses'],'egg':['en:egg-substitutes'],
+ 'egg replacer':['en:egg-substitutes'],'milk':['en:plant-based-milks'],'butter':['en:margarines'],'cheese':['en:plant-based-cheeses'],'egg':['en:egg-substitutes'],
  'mayonnaise':['en:mayonnaises'],'yogurt':['en:plant-based-yogurts'],'ice cream':['en:plant-based-ice-creams']
 };
 function vvGeneralTags(info,tags,term){const discovered=vvTypeTags(tags,term);const mapped=vvRuleCategoryTags[info.rule?info.rule[1]:info.legacy]||[];return [...new Set([...mapped,...discovered])].slice(0,4);}
-function vvGeneralQueries(term,info,tags=[]){const words=vvAltWords(term).filter(w=>!['organic','natural','premium','delicious','fresh','family','pack','flavor','flavour','original','classic','new','free','gluten'].includes(w));const tail=words.length>2?words.slice(-2).join(' '):'';const preferred=info.rule?info.rule[2]:vvAltSearchTerms(term);const categoryNames=tags.map(t=>t.replace(/^en:/,'').replace(/-/g,' '));const list=[...preferred,term,...categoryNames,(!info.known&&!info.rule?tail:'')];return [...new Set(list.map(q=>clean(q)).filter(Boolean))].slice(0,8);}
+function vvPrimaryType(term,info=vvTypeInfo(term),tags=[]){
+ const n=vvAltNormalized(term),cat=info.legacy;
+ if(cat==='angel hair pasta')return cat;
+ if(info.rule){const type=info.rule[1];if(type==='steak sauce'){if(/\bworcestershire\b/.test(n))return 'worcestershire sauce';if(/\bbrown sauce\b/.test(n))return 'brown sauce';}if(type==='savory seasoning sauce'){const match=n.match(/\b(?:soy sauce|tamari|coconut aminos|teriyaki sauce)\b/);if(match)return match[0];}if(type==='pasta'){const shape=n.match(/\b(?:spaghetti|penne|fusilli|linguine|fettuccine|macaroni|noodles?)\b/);if(shape)return shape[0];}if(type==='nut butter'){const match=n.match(/\b(?:peanut|almond|cashew|hazelnut|sunflower|nut|seed) butter\b/);if(match)return match[0];}return type;}
+ if(cat==='egg')return /\begg (?:replacers?|replacements?|substitutes?)\b/.test(n)?'egg replacer':'eggs';
+ if(cat==='cheese'){const variety=n.match(/\b(?:cheddar|mozzarella|parmesan|feta|gouda|provolone|swiss)\b/);if(variety)return variety[0]+' cheese';}
+ if(cat==='sparkling water'){const type=n.match(/\b(?:sparkling mineral water|carbonated water|sparkling spring water|mineral water|spring water|still water|sparkling water|seltzer|club soda)\b/);return type?type[0]:cat;}
+ if(info.known&&!info.meal)return cat;
+ if(!info.known&&!info.meal){const tag=vvTypeTags(tags,term)[0];if(tag){const label=tag.replace(/^en:/,'').replace(/-/g,' ');if(vvTagWords(tag).length)return label;}}
+ return n.replace(/\b(?:original|classic|traditional|signature|premium|organic|natural)\b/g,' ').replace(/\s+/g,' ').trim()||n;
+}
+function vvVeganPhrase(type){return 'vegan '+vvAltNormalized(type);}
+function vvGeneralQueries(term,info,tags=[]){const words=vvAltWords(term).filter(w=>!['organic','natural','premium','delicious','fresh','family','pack','flavor','flavour','original','classic','new','free','gluten'].includes(w));const tail=words.length>2?words.slice(-2).join(' '):'';const preferred=info.rule?info.rule[2]:vvAltSearchTerms(term);const categoryNames=tags.map(t=>t.replace(/^en:/,'').replace(/-/g,' '));const type=vvPrimaryType(term,info,tags);const list=[vvVeganPhrase(type),type,...preferred,term,...categoryNames,(!info.known&&!info.rule?tail:'')];return [...new Set(list.map(q=>clean(q)).filter(Boolean))].slice(0,8);}
 function vvGeneralMatch(a,term,info,tags){const n=vvAltNormalized(a.name);if(info.rule){return info.rule[3].test(n)&&!(/\b(?:body lotion|shampoo|cleaner|soap|dog food|cat food)\b/.test(n))&&!(info.rule[1]==='pasta'&&/\b(?:sauce|seasoning|soup|salad|meal|dinner|kit|mix)\b/.test(n))&&!(info.rule[1].includes('sauce')&&/\b(?:chips?|crisps|popcorn|crackers?|nuts?|jerky|seasoning mix|flavou?red|recipe kit)\b/.test(n));}if(info.known||info.meal)return vvAltRelevant(a,term)&&(info.meal?vvAltCloseDish(a.name,term):vvAltSemanticMatch(a,term));if(vvAltMatches(a.name,term))return true;const tail=vvAltWords(term).filter(w=>!['organic','natural','premium','delicious','fresh','family','pack','flavor','flavour','original','classic','new','free','gluten'].includes(w)).slice(-2);if(tail.length===2&&tail.every(w=>w.length>2)&&vvAltMatches(a.name,tail.join(' '))&&!vvAltIsRecipeComponent(a.name))return true;const shared=tags.filter(t=>a.categories?.includes(t));return shared.some(t=>vvTagWords(t).length>0)&&!vvAltIsRecipeComponent(a.name);}
 const vvGeneralInFlight=new Map(),vvGeneralRecent=new Map();
 let vvSearchStarts=[],vvSearchBlockedUntil=0;
@@ -323,14 +336,14 @@ function vvAltRelevant(a,term){
  if(cat==='milk')return !/\b(?:butter|spread|cheese|cream cheese|chocolate|milkshake|ice cream|dessert|cookies?|candies|candy|thistle|body lotion|soap|shampoo|powdered formula|infant formula)\b/.test(n)&&/\b(?:milk|mylk|plant beverage|soy drink|oat drink|almond drink|cashew drink|pea drink|coconut drink)\b/.test(n);
  if(cat==='cheese')return !/\b(?:cheesecake|cheese crackers?|cheese puffs?|cheese flavored|cheese seasoning|mac and cheese|cheese sauce mix)\b/.test(n);
  if(cat==='sparkling water')return /\b(?:sparkling|carbonated|seltzer|club soda|mineral water|spring water|still water)\b/.test(n)&&!/\b(?:alcohol|beer|wine|cocktail|tonic syrup|soap|cleaner)\b/.test(n);
- if(cat==='egg')return !/\b(?:eggplant|easter egg|chocolate egg|egg roll|egg noodle|egg salad|egg sandwich|egg wash|egg pasta|egg waffle|egg cookie|egg bites|egg tart|egg curry|egg protein bar|eggplant)\b/.test(n);
+ if(cat==='egg')return !/\b(?:eggplant|easter eggs?|chocolate eggs?|egg rolls?|egg noodles?|egg salad|egg sandwich(?:es)?|egg wash|egg pasta|egg waffles?|egg cookies?|egg bites|egg tarts?|egg curry|egg protein bars?)\b/.test(n);
  return true;
 }
 function vvAltSemanticMatch(a,term){
  const n=vvAltNormalized(a.name),cat=vvAlternativeCategory(term);
  if(cat==='angel hair pasta')return vvAltPastaShape(n);
  if(cat==='sparkling water')return /\b(?:sparkling|carbonated|seltzer|club soda|mineral water|spring water|still water)\b/.test(n);
- if(cat==='egg')return /\b(?:egg replacer|egg replacement|egg substitute|egg alternative|plant based egg|vegan egg|liquid egg|egg free scramble|eggless scramble|just egg|egg scramble|eggless omelette|eggless omelet)\b/.test(n);
+ if(cat==='egg')return /\b(?:eggs?|eggless scramble|eggless omelette|eggless omelet)\b/.test(n)&&!/\b(?:cookies?|cakes?|muffins?|noodles?|pasta|bread|sandwich(?:es)?|waffles?|pancakes?|chocolate|cand(?:y|ies)|crackers?|sauce|mayonnaise|mayo)\b/.test(n);
  if(cat==='milk')return /\b(?:milk|mylk|plant beverage|non dairy beverage|oat drink|soy drink|almond drink|cashew drink|pea drink|coconut drink)\b/.test(n);
  if(cat==='butter')return /\b(?:butter|margarine|spread)\b/.test(n);
  if(cat==='cheese')return /\b(?:cheese|cheddar|mozzarella|parmesan|feta|gouda)\b/.test(n);
@@ -359,7 +372,7 @@ async function vvFindAlternatives(mode="scanned"){
 
  function googleFooter(){
    const cat=vvAlternativeCategory(term);
-   const phrase=meal?'vegan '+term:({egg:'vegan egg replacer',milk:'vegan plant based milk',cheese:'vegan dairy free cheese',butter:'vegan butter'}[cat]||'vegan '+term);
+   const phrase=vvVeganPhrase(vvPrimaryType(term,info||vvTypeInfo(term),dynamicTags));
    const footer=document.createElement('div');footer.className='card';footer.style.marginTop='18px';
    const heading=document.createElement('strong');heading.textContent='Search more vegan alternatives on Google Shopping';footer.append(heading);
    const explanation=document.createElement('p');explanation.className='small muted';explanation.textContent='Google Shopping may show non-vegan or unavailable products. Check the exact product, ingredients, and retailer listing before buying. Google results are not verified by this app.';footer.append(explanation);
@@ -373,7 +386,7 @@ async function vvFindAlternatives(mode="scanned"){
  if(final)renderPending=false;
  const region=regionEl.value,filtered=region==='us'?rows.filter(a=>!a.countries?.length||a.countries.includes('en:united-states')):rows;
  const eligible=filtered.filter(vvAltEligible);
- const groups=general&&!meal?(()=>{const exact=vvAltRank(eligible,a=>vvGeneralMatch(a,term,info,dynamicTags)&&vvAltMatches(a.name,term),term),seen=new Set(exact.map(a=>vvCanonical(a.code)));return {exact,related:vvAltRank(eligible,a=>!seen.has(vvCanonical(a.code))&&vvGeneralMatch(a,term,info,dynamicTags),term),other:[],fallback:[]};})():vvAltGroups(eligible,term);
+ const type=vvPrimaryType(term,info||vvTypeInfo(term),dynamicTags);const exactType=a=>vvAltMatches(a.name,type)||(type==='eggs'&&/\begg\b/.test(vvAltNormalized(a.name)));const groups=general&&!meal?(()=>{const exact=vvAltRank(eligible,a=>vvGeneralMatch(a,term,info,dynamicTags)&&exactType(a),type),seen=new Set(exact.map(a=>vvCanonical(a.code)));return {exact,related:vvAltRank(eligible,a=>!seen.has(vvCanonical(a.code))&&vvGeneralMatch(a,term,info,dynamicTags),type),other:[],fallback:[]};})():vvAltGroups(eligible,term);
  const {exact,related,other,fallback}=groups,all=[];
  const addGroup=(label,items)=>vvRegionRank(vvAltVariety(items),region).forEach(a=>all.push({label,a}));
  addGroup('Closest product matches',exact);
@@ -405,24 +418,23 @@ async function vvFindAlternatives(mode="scanned"){
      const run=async(kind,q,page=1,market='')=>{const key=[kind,q,page,market].join('|');if(!active()||!q||completed.has(key)||(kind!=='cloud'&&(rateLimited||offCalls>=6)))return;completed.set(key,null);if(kind!=='cloud')offCalls++;try{const batch=await vvGeneralSource(kind,q,region,page,market);if(!active())return;successes++;completed.set(key,{kind,q,page,market,more:batch.more});merge(batch.rows);scheduleRender();}catch(e){failures++;if(e?.status===429||e?.status===503)rateLimited=true;}};
      const count=()=>rows.filter(a=>(region==='world'?vvInternational(a):!a.countries?.length||a.countries.includes('en:united-states'))&&vvAltEligible(a)&&vvGeneralMatch(a,term,info,dynamicTags)).length;
      // One focused text request and one category request, plus the local database.
-     const primary=[run('text',queries[0]),run('cloud',queries[0])];
-     if(queries[1])primary.push(run('cloud',queries[1]));
+     const primary=[run('text',queries[0]),run('text',queries[1]),run('cloud',queries[1])];
      if(dynamicTags[0])primary.push(run('category',dynamicTags[0],1,region==='us'?'united-states':''));
      if(region==='world'&&dynamicTags[0]&&count()<10)primary.push(run('category',dynamicTags[1]||dynamicTags[0],1,'-united-states'));
-     const categoryTask=(async()=>{if(!isOther&&(!info.rule||!dynamicTags.length)){const tags=await vvDiscoverCategory(barcode,$('productName').value,$('brand').value);if(!active())return;if(!info.rule&&!info.known&&!info.meal){for(const t of vvTypeTags(tags,term)){const label=t.replace(/^en:/,'').replace(/-/g,' ').replace(/\bsauces\b/g,'sauce').replace(/\bdressings\b/g,'dressing');const inferred=vvTypeInfo(label);if(inferred.rule){Object.assign(info,inferred);break;}}}dynamicTags=vvGeneralTags(info,[...dynamicTags,...tags],term);render(false);if(dynamicTags[0])await run('category',dynamicTags[0]);}})();
+     const categoryTask=(async()=>{if(!isOther&&(!info.rule||!dynamicTags.length)){const initialType=vvPrimaryType(term,info,dynamicTags);const tags=await vvDiscoverCategory(barcode,$('productName').value,$('brand').value);if(!active())return;if(!info.rule&&!info.known&&!info.meal){for(const t of vvTypeTags(tags,term)){const label=t.replace(/^en:/,'').replace(/-/g,' ').replace(/\bsauces\b/g,'sauce').replace(/\bdressings\b/g,'dressing');const inferred=vvTypeInfo(label);if(inferred.rule){Object.assign(info,inferred);break;}}}dynamicTags=vvGeneralTags(info,[...dynamicTags,...tags],term);render(false);if(dynamicTags[0]){const inferredType=vvPrimaryType(term,info,dynamicTags);if(inferredType!==initialType)await Promise.all([run('text',vvVeganPhrase(inferredType)),run('text',inferredType),run('category',dynamicTags[0])]);else await run('category',dynamicTags[0]);}}})();
      await Promise.all([...primary,categoryTask]);if(!active())return;
      // Expand to related names and distinct category pages when the first pass is sparse.
      const expanded=vvGeneralQueries(term,info,dynamicTags);
-     if(count()<20){const extra=[run('text',expanded[1]),run('cloud',expanded[2])];if(region==='world'&&dynamicTags.length){extra.push(run('category',dynamicTags[0],1,dynamicTags[1]?'-united-states':'united-kingdom'));}else if(dynamicTags.length)extra.push(run('category',dynamicTags[1]||dynamicTags[0],1,dynamicTags[1]?'united-states':''));await Promise.all(extra);}
+     if(count()<20){const extra=[run('text',expanded[2]),run('cloud',expanded[2])];if(region==='world'&&dynamicTags.length){extra.push(run('category',dynamicTags[0],1,dynamicTags[1]?'-united-states':'united-kingdom'));}else if(dynamicTags.length)extra.push(run('category',dynamicTags[1]||dynamicTags[0],1,dynamicTags[1]?'united-states':''));await Promise.all(extra);}
      if(!active())return;
-     if(count()<20){const done=[...completed.values()];const next=(region==='world'?done.find(x=>x?.more&&x.kind==='category'&&x.market):null)||done.find(x=>x?.more&&x.kind==='category')||done.find(x=>x?.more&&x.kind==='text');await Promise.all([run('text',expanded[2]),next?run(next.kind,next.q,2,next.market):run('category',dynamicTags[2])]);}
+     if(count()<20){const done=[...completed.values()];const next=(region==='world'?done.find(x=>x?.more&&x.kind==='category'&&x.market):null)||done.find(x=>x?.more&&x.kind==='category')||done.find(x=>x?.more&&x.kind==='text');await Promise.all([run('text',expanded[3]),next?run(next.kind,next.q,2,next.market):run('category',dynamicTags[2])]);}
      if(!active())return;
-     if(count()<10&&offCalls<6){if(region==='world'&&dynamicTags[1])await run('category',dynamicTags[1]);if(count()<10&&offCalls<6)await run('text',expanded[3]);}
+     if(count()<10&&offCalls<6){if(region==='world'&&dynamicTags[1])await run('category',dynamicTags[1]);if(count()<10&&offCalls<6)await run('text',expanded[4]);}
      if(!active())return;unavailable=failures>0;try{if(rows.length&&successes)localStorage.setItem(cacheKey,JSON.stringify({time:Date.now(),rows,tags:dynamicTags}));}catch{}render(true);return;
    }
    // Search in parallel rather than waiting for sequential groups of three.
    // Display verified results as soon as a source returns, then update as others finish.
-   const terms=vvAltSearchTerms(term).slice(0,10).map(q=>({q}));
+   const type=vvPrimaryType(term);const terms=[...new Set([vvVeganPhrase(type),type,...vvAltSearchTerms(term)])].slice(0,10).map(q=>({q}));
    if(waterSearch)terms.unshift(...['en:mineral-waters','en:carbonated-waters','en:spring-waters'].map(category=>({q:'',category})));
    if(pastaShapeSearch)terms.unshift(...['en:spaghetti','en:pastas'].map(category=>({q:'',category})));
    const batches=[];let completed=0;
