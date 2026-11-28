@@ -1,0 +1,60 @@
+name: Verified Vegan database connection test
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  connection-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check connection and catalog tables (read-only)
+        env:
+          VV_DATABASE_URL: ${{ secrets.VV_DATABASE_URL }}
+        run: |
+          python3 - <<'PY'
+          import os, re, subprocess, sys
+          from urllib.parse import urlsplit, unquote
+
+          def fail(message):
+              print('::error::' + message)
+              sys.exit(1)
+
+          raw = os.environ.get('VV_DATABASE_URL', '')
+          try:
+              u = urlsplit(raw)
+              if (raw != raw.strip() or any(c.isspace() for c in raw)
+                  or u.scheme != 'postgresql' or u.hostname != 'aws-1-us-east-1.pooler.supabase.com'
+                  or u.port != 5432 or u.path != '/postgres' or u.query or u.fragment
+                  or not re.fullmatch(r'postgres\.[a-z0-9]+', u.username or '')
+                  or not u.password or '[YOUR-PASSWORD]' in u.password
+                  or raw.count('@') != 1 or re.search(r'%(?![0-9a-fA-F]{2})', u.password)):
+                  raise ValueError()
+              password = unquote(u.password, errors='strict')
+              if not password or any(ord(c) < 32 for c in password):
+                  raise ValueError()
+          except (ValueError, UnicodeError):
+              fail('Invalid session pooler connection string. Copy the complete URI with the current password.')
+          print('PASS: connection string format and expected host')
+          env = {k: v for k, v in os.environ.items() if not k.startswith('PG') and k != 'VV_DATABASE_URL'}
+          env.update(PGHOST=u.hostname, PGPORT='5432', PGDATABASE='postgres',
+                     PGUSER=u.username, PGPASSWORD=password, PGSSLMODE='require',
+                     PGCONNECT_TIMEOUT='15', PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=15000')
+          sql = "SELECT CASE WHEN to_regclass('public.vv_bulk_off') IS NOT NULL AND to_regclass('public.vv_bulk_usda') IS NOT NULL THEN 'tables-present' ELSE 'tables-missing' END;"
+          try:
+              p = subprocess.run(['psql', '-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', '-c', sql],
+                                 env=env, capture_output=True, text=True, timeout=45)
+          except (OSError, subprocess.TimeoutExpired):
+              fail('Connection test could not run or timed out. No data was changed.')
+          if p.returncode:
+              e = p.stderr.lower()
+              if 'password authentication failed' in e or 'authentication failed' in e:
+                  fail('Database authentication failed. Check the current password.')
+              if 'could not translate host name' in e or 'name resolution' in e:
+                  fail('Database host DNS lookup failed.')
+              fail('Database connection or read-only query failed. Credentials and raw errors suppressed.')
+          print('PASS: database connection and read-only query')
+          if p.stdout.strip() != 'tables-present':
+              fail('One or both bulk catalog tables are missing or not visible.')
+          print('PASS: both bulk catalog tables exist. No data was changed.')
+          PY
