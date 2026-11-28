@@ -1,0 +1,306 @@
+name: Verified Vegan bulk catalog
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Replace ONLY the two bulk catalog tables after a successful build (requires VV_DATABASE_URL secret)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: verified-vegan-bulk-catalog
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare self-contained import tools
+        run: |
+          set -euo pipefail
+          mkdir -p vv-bulk-setup
+          cat > vv-bulk-setup/screen.cjs <<'VV_FILE_0_END'
+          const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
+          const animalRules=[['Milk or dairy',/\b(?:milk|whey|casein|caseinate|lactose|buttermilk|cheese|yogurt|yoghurt|ghee|milkfat|milk fat|milk solids|cream|butter|dairy|custard)\b/i],['Egg',/\b(?:egg|eggs|albumen|ovalbumin|egg whites?|egg yolks?)\b/i],['Honey or bee products',/\b(?:honey|royal jelly|propolis|beeswax|cera alba|e901)\b/i],['Gelatin',/\b(?:gelatin|gelatine|isinglass)\b/i],['Carmine or cochineal',/\b(?:carmine|cochineal|carminic acid|e120)\b/i],['Shellac',/\b(?:shellac|confectioner'?s glaze|e904)\b/i],['Animal fat',/\b(?:lard|tallow|suet|duck fat|goose fat|bacon fat)\b/i],['Meat',/\b(?:beef|pork|chicken|turkey|meat broth|bone broth|veal|lamb|bacon|ham)\b/i],['Fish or seafood',/\b(?:fish oil|fish sauce|anchov(?:y|ies)|oyster|shrimp|prawn|crab|lobster|bonito|salmon|tuna|sardines?|clam|mussel)\b/i],['Animal proteins',/\b(?:collagen|keratin|elastin)\b/i]];
+          function stripPlant(s){return s.replace(/\b(?:almond|oat|soy|soya|coconut|rice|cashew|pea|hemp|flax|hazelnut|macadamia)\s+milk\b/gi,'plant beverage').replace(/\b(?:almond|oat|soy|soya|coconut|cashew)\s+(?:cream|creamer|butter|yogurt|cheese)\b/gi,'plant alternative').replace(/\b(?:cocoa|shea|peanut|almond|cashew|apple)\s+butter\b/gi,'plant fat').replace(/\bcream of tartar\b/gi,'tartar');}
+          function parseIngredients(raw){let t=String(raw||'').replace(/\r/g,'\n');const h=/\bingredients?\s*[:\-]\s*/i.exec(t);if(h)t=t.slice(h.index+h[0].length);const stop=/\b(?:may\s+(?:also\s+)?contain\s*:|contains\s*:\s*(?!less\s+than)|nutrition facts|distributed by|manufactured by|total fat\s*\d|serving size|directions\s*:|recipe\s*:)\b/i.exec(t);return clean((stop?t.slice(0,stop.index):t)).slice(0,3500);}
+          function quality(t){return !!t&&t.length<=3500&&!/\b(?:nutrition facts|serving size|daily value|distributed by|www\.)\b/i.test(t)&&/[a-z]{3}/i.test(t)&&!(/\b(?:preheat oven|cook until|in a skillet)\b/i.test(t));}
+          function classify(raw){const t=parseIngredients(raw);if(!quality(t))return {status:'Needs Verification',reasons:[],explanation:'No reliable ingredient list available.',caution:'Check the full package ingredients.'};const screened=stripPlant(t);const reasons=animalRules.filter(([_,re])=>re.test(screened)).map(x=>x[0]);return reasons.length?{status:'Not Vegan',reasons,explanation:'Animal-derived ingredients detected.',caution:'Confirm ingredients belong to this exact product.'}:{status:'Vegan',reasons:['No explicitly animal-derived ingredients detected.'],explanation:'Vegan by ingredient-text screening.',caution:'This screening is not manufacturer certification. Some ingredient origins require further verification.'};}
+          const vvLabelMissing=/\b(?:ingredients? (?:not (?:listed|available|provided|known)|unavailable|unknown|missing|to be added)|no ingredients? (?:listed|available|provided|information)|check (?:the |current |product )?packag(?:e|ing)|not specified|not applicable|unknown|unavailable|not provided|not disclosed|see (?:packag(?:e|ing)|label)|(?:more|other) ingredients|pending verification)\b|^(?:n\/?a|none|null|tbd|[-–—.]+)$/i;
+          const vvLabelAnimal=/\b(?:fish|fishmeal|seafood|squid|octopus|cuttlefish|scallops?|crayfish|crustaceans?|mollus[ck]s?|mutton|venison|duck|goose|rabbit|poultry|meat|animal (?:fat|oil|protein|stock|enzymes?)|rennet|pepsin|lactalbumin|lactoglobulin|caseinates?|whey protein|milk powder|dried milk|egg powder|eggwhite|egg white|egg yolk|chicken stock|beef stock|bone stock|lard|tallow|suet|e\s*(?:120|441|542|901|904)|dashi|katsuobushi|pancetta|prosciutto|mortadella|chorizo|surimi|lait|lactos[eé]|milch|molke|butterreinfett|sahne|eiklar|eigelb|gelatine|leche|suero de leche|huevo|manteca de cerdo|anchoas?|latte|siero di latte|uova|acciughe|leite|ovos?|mel de abelha|gelatina|miel|fromage|beurre|oeufs?|œufs?|anchois|saindoux|honig|schmalz|sardellen|fisch|garnelen)\b/i;
+          // These names alone do not identify the source printed on the label.
+          const vvLabelUncertain=/\b(?:mono[ -]?(?:and|&)\s*di[ -]?glycerides?|monoglycerides?|diglycerides?|glycerin(?:e)?|glycerol|stearic acid|magnesium stearate|calcium stearate|vitamin d3|cholecalciferol|l[ -]?cysteine|e\s*(?:422|470[ab]?|471|472[a-f]?|481|482|570|572|920)|enzymes?|lipase|natural meat flavou?r|(?:natural |artificial )?flavou?rs?|flavou?rings?|(?:ribonucleotides?|inosinate|guanylate)|e\s*(?:375|627|631|635))\b/i;
+          const vvLabelEnglish=/\b(?:water|salt|sugar|vinegar|tomato(?:es)?|spices?|flou?r|wheat|rice|corn|maize|oat[s]?|soy[a]?|soybeans?|oil|starch|potato(?:es)?|fruit|vegetable[s]?|pepper[s]?|onion[s]?|garlic|yeast|extract|acid|sodium|potassium|calcium|magnesium|carbon dioxide|carbonation|minerals?|flavou?rs?|flavou?ring|gum|lecithin|protein|fiber|fibre|syrup|molasses|cocoa|chocolate|coffee|tea|coconut|almond[s]?|cashew[s]?|peanut[s]?|beans?|lentils?|peas?|palm|konjac|shirataki|semolina|durum|tamarind|dates?|raisins?|apples?|lemon|lime|orange|berries|mustard|paprika|turmeric|cumin|coriander|ginger|celery|carrot[s]?|basil|oregano|cinnamon|vanilla|pectin|agar|seaweed|mushrooms?|seeds?|nuts?|vitamins?|bicarbonate|chloride|sulphate|sulfate|aspartame|sucralose|dextrose|glucose|fructose|maltodextrin|malt|inulin|oligosaccharides|sorbate|benzoate|citrate|lactate|lactic|malic|citric|ascorbic|tocopherol[s]?|silicon dioxide|colour[s]?|color[s]?|hummus|chickpeas?|quinoa|barley|rye|flax|hemp|sesame|sunflower|safflower|rapeseed|canola|olive[s]?|avocado|banana[s]?|pineapple|strawberr(?:y|ies)|raspberr(?:y|ies)|blueberr(?:y|ies))\b/i;
+          // Exact, simple translations only. Unrecognized native-language ingredients are not guessed.
+          const vvSimpleLabelTerms=new Map(Object.entries({
+           'eau':'water','eau minérale':'mineral water','eau minérale naturelle':'natural mineral water','eau gazéifiée':'carbonated water','eau gazeuse':'carbonated water','eau de source':'spring water','gaz carbonique':'carbon dioxide','dioxyde de carbone':'carbon dioxide','sel':'salt','sucre':'sugar','vinaigre':'vinegar','tomates':'tomatoes','tomate':'tomato',
+           'wasser':'water','mineralwasser':'mineral water','natürliches mineralwasser':'natural mineral water','kohlensäurehaltiges wasser':'carbonated water','quellwasser':'spring water','kohlensäure':'carbon dioxide','kohlendioxid':'carbon dioxide','salz':'salt','zucker':'sugar','essig':'vinegar','tomaten':'tomatoes',
+           'agua':'water','agua mineral':'mineral water','agua mineral natural':'natural mineral water','agua carbonatada':'carbonated water','agua con gas':'carbonated water','dióxido de carbono':'carbon dioxide','gas carbónico':'carbon dioxide','sal':'salt','azúcar':'sugar','vinagre':'vinegar',
+           'acqua':'water','acqua minerale':'mineral water','acqua minerale naturale':'natural mineral water','acqua gassata':'carbonated water','anidride carbonica':'carbon dioxide','sale':'salt','zucchero':'sugar','aceto':'vinegar','pomodori':'tomatoes',
+           'água':'water','água mineral':'mineral water','água mineral natural':'natural mineral water','água gaseificada':'carbonated water','dióxido de carbono':'carbon dioxide','açúcar':'sugar',
+           '水':'water','天然水':'natural water','炭酸水':'carbonated water','二酸化炭素':'carbon dioxide','食塩':'salt','砂糖':'sugar','矿泉水':'mineral water','天然矿泉水':'natural mineral water','二氧化碳':'carbon dioxide','食用盐':'salt','白砂糖':'sugar'
+          }));
+          function vvLabelScreen(raw,language=''){
+           const full=String(raw??'').trim();if(!full||full.length>3500||/[,;]\s*$/.test(full)||vvLabelMissing.test(full)||/\.{3}|…|\[\s*(?:illegible|unreadable|unknown)\s*\]/i.test(full))return '';
+           const lang=String(language||'').toLowerCase().split(/[-_]/)[0];
+           // Cross-contact statements are not ingredients; mandatory allergen declarations are not ignored.
+           const beforeAdvisory=full.split(/\b(?:may\s+(?:also\s+)?contain|made (?:in|on) (?:a |the )?(?:facility|equipment)|processed (?:in|on) (?:a |the )?(?:facility|equipment)|traces? of)\b/i)[0];
+           let source=beforeAdvisory.replace(/^\s*(?:ingrédients|zutaten|ingredientes|ingredienti|成分|原材料名|配料)\s*[:：]\s*/i,'').trim();
+           let t=parseIngredients(source),screen=t;
+           if(!t||vvLabelMissing.test(t))return '';
+           // For explicit foreign text or unmarked simple foreign labels, translate only complete exact lists.
+           const parts=t.replace(/[。.;；]+$/,'').split(/[,;、，；]/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+           const translated=parts.length&&parts.every(x=>vvSimpleLabelTerms.has(x));
+           if(translated&&(lang!=='en'||!vvLabelEnglish.test(t)))screen=parts.map(x=>vvSimpleLabelTerms.get(x)).join(', ');
+           else if(lang&&lang!=='en')return '';
+           else if(/[^\x00-\x7F\u00A0-\u024F\u2000-\u206F\u20AC\u2122]/.test(t))return '';
+           else if(!lang&&(!vvLabelEnglish.test(t)||parts.some(x=>/[a-z]{3}/i.test(x)&&!vvLabelEnglish.test(x)&&!/^e\s*\d{3}[a-z]?$/i.test(x))))return '';
+           if(!quality(screen)||!vvLabelEnglish.test(screen)||classify(screen).status!=='Vegan')return '';
+           const checked=stripPlant(screen).replace(/\b(?:microbial|vegetable|plant[ -]derived|plant[ -]based|fungal)\s+(?:rennet|enzymes?|lipase|glycerin(?:e)?|glycerol|mono[ -]?(?:and|&)\s*di[ -]?glycerides?|monoglycerides?|diglycerides?|flavou?rs?|flavou?rings?)\b/gi,'plant ingredient');
+           if(vvLabelAnimal.test(checked)||vvLabelUncertain.test(checked))return '';
+           const declared=/\bcontains\s*:?\s+(?!less than|\d+%)([^.;\n]+)/i.exec(beforeAdvisory);
+           if(declared&&(classify(declared[1]).status==='Not Vegan'||vvLabelAnimal.test(stripPlant(declared[1]))))return '';
+           return screen;
+          }
+          function vvAltAnalysisBlocked(tags){return (Array.isArray(tags)?tags:[]).some(t=>/^(?:en:)?(?:non-vegan|maybe-vegan|vegan-status-unknown)$/.test(String(t)));}
+          
+          module.exports={vvLabelScreen,vvAltAnalysisBlocked};
+          VV_FILE_0_END
+          cat > vv-bulk-setup/import.cjs <<'VV_FILE_1_END'
+          'use strict';
+          const fs=require('node:fs'),readline=require('node:readline'),path=require('node:path');
+          const {vvLabelScreen,vvAltAnalysisBlocked}=require('./screen.cjs');
+          const rules=[
+           ['angel hair pasta',/\b(?:angel[ -]hair|capellini|capelli d.angelo|spaghettini)\b/i],
+           ['dumplings',/\b(?:dumplings?|gyoza|potstickers?|pierog[yi]|wontons?)\b/i],
+           ['pot pie',/\bpot pies?\b/i],['casserole',/\bcasseroles?\b/i],
+           ['noodles',/\b(?:noodles?|ramen|udon|soba|vermicelli|chow mein)\b/i],
+           ['pasta',/\b(?:pasta|spaghetti|penne|fusilli|linguine|fettuccine|macaroni|rigatoni|farfalle|orzo|rotini|shells)\b/i],
+           ['ice cream',/\b(?:ice cream|gelato|sorbet|frozen dessert)\b/i],
+           ['cream cheese',/\bcream cheese\b/i],['cheese',/\b(?:cheese|cheddar|mozzarella|parmesan|feta|gouda)\b/i],
+           ['egg replacer',/\b(?:egg (?:replacers?|replacements?|substitutes?|alternatives?)|eggless (?:scramble|omelet)|just egg)\b/i],
+           ['egg',/\b(?:eggs?|omelet|omelette)\b/i],
+           ['nut butter',/\b(?:peanut|almond|cashew|hazelnut|sunflower|nut|seed) butter\b/i],
+           ['butter',/\b(?:butter|margarine|vegetable spread|buttery spread)\b/i],
+           ['milk',/\b(?:milk|mylk|(?:oat|soy|soya|almond|cashew|coconut|rice|pea|hemp) (?:drink|beverage))\b/i],
+           ['sparkling water',/\b(?:sparkling water|sparkling mineral water|carbonated water|sparkling spring water|seltzer|club soda|mineral water|spring water|still water)\b/i],
+           ['mayonnaise',/\b(?:mayonnaise|mayo)\b/i],['yogurt',/\byog(?:h)?urt\b/i],['creamer',/\bcreamer\b/i],
+           ['nuggets',/\bnuggets?\b/i],['burger',/\b(?:burgers?|patties)\b/i],['sausage',/\b(?:sausages?|hot dogs?)\b/i],['bacon',/\bbacon\b/i],
+           ['pizza',/\bpizza\b/i],['chicken',/\b(?:chicken|chick[’' -]?n)\b/i],['tuna',/\btuna\b/i],
+           ['pasta sauce',/\b(?:pasta sauce|marinara|tomato sauce|alfredo sauce)\b/i],['barbecue sauce',/\b(?:barbecue|barbeque|bbq) sauce\b/i],['steak sauce',/\b(?:steak sauce|worcestershire|brown sauce)\b/i],['hot sauce',/\b(?:hot sauce|chili sauce|sriracha)\b/i],['savory seasoning sauce',/\b(?:soy sauce|tamari|teriyaki sauce|coconut aminos)\b/i],
+           ['ketchup',/\b(?:ketchup|catsup)\b/i],['mustard',/\bmustard\b/i],['salsa',/\bsalsa\b/i],['salad dressing',/\b(?:dressing|vinaigrette)\b/i],
+           ['pancakes',/\bpancakes?\b/i],['waffles',/\bwaffles?\b/i],['muffins',/\bmuffins?\b/i],['cookies',/\bcookies?\b/i],['chocolate',/\bchocolate\b/i],['gummies',/\bgumm(?:y|ies)\b/i],['chips',/\b(?:chips?|crisps)\b/i],['pretzels',/\bpretzels?\b/i],['popcorn',/\bpopcorn\b/i],['crackers',/\bcrackers?\b/i],
+           ['breakfast cereal',/\b(?:cereals?|granola|muesli|oatmeal|porridge|corn flakes)\b/i],['bread',/\b(?:bread|bagels?|buns?|rolls?)\b/i],['tofu',/\btofu\b/i],['hummus',/\b(?:hummus|houmous)\b/i],['juice',/\b(?:juice|nectar)\b/i],['soup',/\b(?:soup|broth|stock)\b/i],['grain',/\b(?:rice|quinoa|couscous|bulgur)\b/i],['flour or starch',/\b(?:flour|starch)\b/i],['legumes',/\b(?:beans?|lentils?|chickpeas?)\b/i],['fruit preserves',/\b(?:jam|jelly|marmalade|preserves)\b/i],['pickles',/\b(?:pickles?|gherkins?)\b/i],['snack bar',/\b(?:protein|granola|cereal|energy|snack) bars?\b/i],['seasoning',/\b(?:seasoning|spice|paprika|pepper|cumin|turmeric|cinnamon)\b/i]
+          ];
+          function category(name,tags=''){
+           // Keep the product name primary, and avoid putting pasta sauces in the dry pasta family.
+           if(/\b(?:pasta|spaghetti|tomato|marinara|alfredo) sauce\b/i.test(name))return 'pasta sauce';
+           return rules.find(([,re])=>re.test(name))?.[0]||rules.find(([,re])=>re.test(tags.replace(/[-_:]/g,' ')))?.[0]||'other';
+          }
+          function gtin(code){if(!/^(?:\d{8}|\d{12}|\d{13}|\d{14})$/.test(code))return false;let sum=0;for(let i=code.length-2,m=3;i>=0;i--,m=4-m)sum+=Number(code[i])*m;return (10-sum%10)%10===Number(code.at(-1));}
+          function normalize(r){
+           const code=String(r.code||'').trim(),name=String(r.name||'').trim(),brand=String(r.brand||'').trim(),country=String(r.country||''),dataset=r.dataset;
+           if(!gtin(code)||!name||name.length>300||!brand||brand.length>200||!/^en:[a-z][a-z-]+$/.test(country)||['en:world','en:unknown','en:international','en:other','en:unspecified'].includes(country))return null;
+           if(!['off','usda'].includes(dataset)||vvAltAnalysisBlocked((r.tags||[]).map(t=>String(t).trim()))||!vvLabelScreen(r.ingredients,r.lang??''))return null;
+           // Browser catalog consumes English labels; do not label a foreign transcription as English.
+           const lang=String(r.lang||'').toLowerCase().split(/[-_]/)[0];if(lang&&lang!=='en')return null;
+           if(!vvLabelScreen(r.ingredients,'en'))return null;
+           if(dataset==='off'&&!String(r.url).startsWith('https://world.openfoodfacts.org/product/'))return null;
+           if(dataset==='usda'&&!/^https:\/\/fdc\.nal\.usda\.gov\/food-details\/\d+\/nutrients$/.test(r.url))return null;
+           return {dataset,code:code.padStart(14,'0'),name,brand,category:category(name,r.categories||''),ingredients:String(r.ingredients).trim(),country,url:r.url,image:'',source_date:String(r.source_date||'').slice(0,30)};
+          }
+          function csv(x){return '"'+String(x??'').replace(/"/g,'""')+'"';}
+          async function main(){
+           const out=process.argv[2]||'output';fs.mkdirSync(out,{recursive:true});const bySource={off:new Map(),usda:new Map()},stats={seen:0,accepted:0,invalid:0};
+           const maxPerBucket=Number(process.env.VV_PER_FAMILY||500);if(!Number.isInteger(maxPerBucket)||maxPerBucket<1||maxPerBucket>2000)throw Error('VV_PER_FAMILY must be 1–2000');
+           const buckets=new Map();
+           for await(const line of readline.createInterface({input:process.stdin,crlfDelay:Infinity})){
+            const raw=JSON.parse(line);stats.seen++;const r=normalize(raw);if(!r){stats.invalid++;continue;}
+            const map=bySource[r.dataset],key=r.code+'|'+r.country;if(map.has(key))continue;
+            const region=r.country==='en:united-states'?'us':'world',bucket=r.dataset+'|'+region+'|'+r.category;
+            if(!buckets.has(bucket))buckets.set(bucket,{n:0,brands:new Map(),countries:new Map()});const b=buckets.get(bucket),brand=r.brand.toLowerCase(),limit=r.category==='other'?maxPerBucket*2:maxPerBucket;
+            if(b.n>=limit||(b.brands.get(brand)||0)>=Math.max(3,Math.floor(limit/20)))continue;
+            // International records from one market cannot occupy the whole family.
+            if(region==='world'&&(b.countries.get(r.country)||0)>=Math.ceil(limit*0.7))continue;
+            map.set(key,r);b.n++;b.brands.set(brand,(b.brands.get(brand)||0)+1);b.countries.set(r.country,(b.countries.get(r.country)||0)+1);stats.accepted++;
+           }
+           const fields=['code','name','brand','category','ingredients','country','url','image','source_date'];
+           for(const [source,map] of Object.entries(bySource)){
+            const stream=fs.createWriteStream(path.join(out,'vv_bulk_'+source+'.csv'));stream.write(fields.join(',')+'\n');
+            for(const r of map.values())if(!stream.write(fields.map(f=>csv(r[f])).join(',')+'\n'))await new Promise(resolve=>stream.once('drain',resolve));
+            await new Promise((resolve,reject)=>{stream.once('error',reject);stream.end(resolve);});
+           }
+           const report={...stats,source_counts:Object.fromEntries(Object.entries(bySource).map(([k,v])=>[k,v.size])),coverage:Object.fromEntries([...buckets].map(([k,v])=>[k,{products:v.n,brands:v.brands.size,countries:v.countries.size}]))};
+           fs.writeFileSync(path.join(out,'coverage.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report.source_counts));
+          }
+          module.exports={category,gtin,normalize};if(require.main===module)main().catch(e=>{console.error(e);process.exitCode=1;});
+          VV_FILE_1_END
+          cat > vv-bulk-setup/import.py <<'VV_FILE_2_END'
+          #!/usr/bin/env python3
+          """Convert official OFF TSV.gz and USDA branded CSV ZIP to screened import CSVs."""
+          import argparse,csv,gzip,io,json,os,pathlib,re,sqlite3,subprocess,tempfile,zipfile
+          HERE=pathlib.Path(__file__).resolve().parent
+          csv.field_size_limit(10_000_000)
+          USDA_MARKETS={'united states':'en:united-states','usa':'en:united-states','canada':'en:canada','australia':'en:australia','new zealand':'en:new-zealand'}
+          UNKNOWN={'en:world','en:unknown','en:international','en:other','en:unspecified'}
+          def countries(s):
+           return sorted({x.strip() for x in (s or '').split(',') if re.fullmatch(r'en:[a-z][a-z-]+',x.strip()) and x.strip() not in UNKNOWN})
+          def off_rows(path):
+           with gzip.open(path,'rt',encoding='utf-8-sig',newline='') as f:
+            rd=csv.DictReader(f,delimiter='\t');required={'code','product_name','brands','ingredients_text','countries_tags'}
+            if not required.issubset(rd.fieldnames or []):raise ValueError('Unexpected Open Food Facts TSV schema: missing '+str(required-set(rd.fieldnames or [])))
+            for r in rd:
+             if str(r.get('obsolete') or '').lower() in ('1','true','yes'):continue
+             name=r.get('product_name_en') or r.get('product_name');eng=r.get('ingredients_text_en');lang=r.get('lang') or r.get('lc') or ''
+             # TSV often lacks language metadata. Use the same conservative unmarked-label checks as the app.
+             if eng:lang='en'
+             ing=eng or r.get('ingredients_text');code=(r.get('code') or '').strip()
+             if not (code and name and r.get('brands') and ing):continue
+             for country in countries(r.get('countries_tags')):
+              yield dict(dataset='off',code=code,name=name,brand=r['brands'],ingredients=ing,country=country,url='https://world.openfoodfacts.org/product/'+code,lang=lang,tags=(r.get('ingredients_analysis_tags') or '').split(','),categories=r.get('categories_tags') or '',source_date=r.get('last_modified_datetime') or '')
+          def zip_csv(z,name):
+           matches=[p for p in z.namelist() if pathlib.PurePosixPath(p).name==name]
+           if len(matches)!=1:raise ValueError('Missing or ambiguous USDA file '+name)
+           return io.TextIOWrapper(z.open(matches[0]),encoding='utf-8-sig',newline='')
+          def usda_rows(path):
+           # Select the most recent record BEFORE screening ingredients. Never resurrect an older vegan recipe.
+           with zipfile.ZipFile(path) as z, tempfile.TemporaryDirectory() as td:
+            db=sqlite3.connect(str(pathlib.Path(td)/'latest.sqlite'));db.execute('PRAGMA journal_mode=OFF');db.execute('PRAGMA synchronous=OFF')
+            db.execute('CREATE TABLE latest (code TEXT,country TEXT,version TEXT,fdc_id TEXT,brand TEXT,ingredients TEXT,category TEXT,discontinued TEXT,PRIMARY KEY(code,country)) WITHOUT ROWID')
+            with zip_csv(z,'branded_food.csv') as f:
+             rd=csv.DictReader(f);required={'fdc_id','gtin_upc','ingredients','market_country','modified_date'}
+             if not required.issubset(rd.fieldnames or []):raise ValueError('Unexpected USDA branded_food.csv schema')
+             for r in rd:
+              code=(r.get('gtin_upc') or '').strip();country=USDA_MARKETS.get((r.get('market_country') or '').strip().lower());fid=r.get('fdc_id') or ''
+              if not (re.fullmatch(r'\d{8,14}',code) and country and fid.isdigit()):continue
+              date=max(r.get('modified_date') or '',r.get('available_date') or '');version=date+'|'+fid.zfill(15)
+              db.execute('INSERT INTO latest VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(code,country) DO UPDATE SET version=excluded.version,fdc_id=excluded.fdc_id,brand=excluded.brand,ingredients=excluded.ingredients,category=excluded.category,discontinued=excluded.discontinued WHERE excluded.version>latest.version',(code.zfill(14),country,version,fid,r.get('brand_name') or r.get('brand_owner') or '',r.get('ingredients') or '',r.get('branded_food_category') or '',r.get('discontinued_date') or ''))
+            db.execute('CREATE INDEX by_fdc ON latest(fdc_id)');db.commit()
+            with zip_csv(z,'food.csv') as f:
+             rd=csv.DictReader(f)
+             if not {'fdc_id','description'}.issubset(rd.fieldnames or []):raise ValueError('Unexpected USDA food.csv schema')
+             for r in rd:
+              fid=r.get('fdc_id') or '';name=r.get('description') or ''
+              for code,country,version,brand,ing,cat,discontinued in db.execute('SELECT code,country,version,brand,ingredients,category,discontinued FROM latest WHERE fdc_id=?',(fid,)):
+               if discontinued or not(name and brand and ing):continue
+               yield dict(dataset='usda',code=code,name=name,brand=brand,ingredients=ing,country=country,url=f'https://fdc.nal.usda.gov/food-details/{fid}/nutrients',lang='en',tags=[],categories=cat,source_date=version.split('|')[0])
+            db.close()
+          def main():
+           p=argparse.ArgumentParser();p.add_argument('--off');p.add_argument('--usda');p.add_argument('--out',default='output');a=p.parse_args()
+           if not a.off and not a.usda:p.error('provide --off and/or --usda')
+           process=subprocess.Popen(['node',str(HERE/'import.cjs'),a.out],stdin=subprocess.PIPE,text=True,encoding='utf-8')
+           try:
+            for gen in ([off_rows(a.off)] if a.off else [])+([usda_rows(a.usda)] if a.usda else []):
+             for row in gen:process.stdin.write(json.dumps(row,ensure_ascii=False)+'\n')
+            process.stdin.close()
+            if process.wait():raise RuntimeError('Screening failed')
+           except BaseException:
+            process.kill();process.wait();raise
+           report=json.loads((pathlib.Path(a.out)/'coverage.json').read_text())
+           for source,selected in [('off',a.off),('usda',a.usda)]:
+            if selected and not report['source_counts'][source]:raise RuntimeError(f'{source}: zero accepted products — check source schema')
+          if __name__=='__main__':main()
+          VV_FILE_2_END
+          cat > vv-bulk-setup/test_import.py <<'VV_FILE_3_END'
+          import csv,gzip,io,json,os,pathlib,subprocess,sys,tempfile,zipfile
+          HERE=pathlib.Path(__file__).resolve().parent
+          
+          def gtin(n):
+           s=f'{n:011d}';return s+str((-sum(int(c)*(3 if i%2==0 else 1) for i,c in enumerate(s[::-1])))%10)
+          
+          def dump(rows,sep=','):
+           buf=io.StringIO(newline='');w=csv.DictWriter(buf,fieldnames=list(rows[0]),delimiter=sep);w.writeheader();w.writerows(rows);return buf.getvalue()
+          with tempfile.TemporaryDirectory() as td:
+           d=pathlib.Path(td);off=d/'off.gz';usda=d/'usda.zip';out=d/'out'
+           base=dict(code=gtin(100),product_name='Rice noodles',brands='Fixture A',ingredients_text='Rice flour, water, salt',countries_tags='en:united-states,en:canada',lang='en',ingredients_analysis_tags='en:vegan',categories_tags='en:noodles',obsolete='')
+           with gzip.open(off,'wt',encoding='utf-8',newline='') as f:
+            f.write(dump([base,{**base,'code':gtin(101),'product_name':'Chicken noodles','ingredients_text':'Wheat flour, oil, salt, flavouring, E635','ingredients_analysis_tags':'en:maybe-vegan'},{**base,'code':gtin(102),'countries_tags':'en:world'},{**base,'code':gtin(103),'ingredients_text':'Wheat flour, egg, salt'},{**base,'code':gtin(104),'ingredients_text':'Rice flour, water, salt. May contain milk and eggs.'},{**base,'code':gtin(105),'ingredients_text':'Rice flour, water, salt','ingredients_analysis_tags':'en:vegan-status-unknown'}],'\t'))
+           b=dict(fdc_id='101',gtin_upc=gtin(201),ingredients='Wheat flour, water, salt',market_country='United States',modified_date='2025-01-01',available_date='',brand_name='Fixture B',brand_owner='',branded_food_category='Pasta by Shape & Type',discontinued_date='')
+           bs=[b,{**b,'fdc_id':'102','ingredients':'Wheat flour, egg, salt','modified_date':'2026-01-01'},{**b,'fdc_id':'103','gtin_upc':gtin(202),'ingredients':'Rice flour, water, salt'},{**b,'fdc_id':'104','gtin_upc':gtin(203),'discontinued_date':'2026-01-01'},{**b,'fdc_id':'105','gtin_upc':gtin(204),'market_country':'Canada'},{**b,'fdc_id':'106','gtin_upc':gtin(205),'market_country':'Unknown'}]
+           with zipfile.ZipFile(usda,'w') as z:
+            z.writestr('data/branded_food.csv',dump(bs));z.writestr('data/food.csv',dump([dict(fdc_id=r['fdc_id'],description='RICE NOODLES') for r in bs]))
+           subprocess.run([sys.executable,str(HERE/'import.py'),'--off',str(off),'--usda',str(usda),'--out',str(out)],check=True)
+           def rows(name):
+            with (out/name).open(newline='') as f:return list(csv.DictReader(f))
+           off_rows=rows('vv_bulk_off.csv');usda_rows=rows('vv_bulk_usda.csv')
+           assert len(off_rows)==4,off_rows;assert len(usda_rows)==2,usda_rows
+           assert all(r['category']=='noodles' for r in off_rows+usda_rows)
+           assert {r['country'] for r in off_rows}=={'en:united-states','en:canada'}
+           assert not any(r['code']==gtin(201).zfill(14) for r in usda_rows),'Old formula revived'
+           assert not any(r['code']==gtin(101).zfill(14) for r in off_rows),'Uncertain additive accepted'
+           assert all(r['code']!=gtin(105).zfill(14) for r in off_rows)
+           assert all(r['url'].startswith('https://world.openfoodfacts.org/product/') for r in off_rows)
+           assert json.loads((out/'coverage.json').read_text())['source_counts']=={'off':4,'usda':2}
+           print('PASS: import, region filtering, duplicates, current formulation, discontinued records, ambiguous ingredients, cross-contact, source URLs, coverage report')
+          VV_FILE_3_END
+          cat > vv-bulk-setup/check_publish.py <<'VV_FILE_4_END'
+          import json,sys
+          r=json.load(open(sys.argv[1]));counts=r['source_counts'];coverage=r['coverage']
+          if min(counts.get('off',0),counts.get('usda',0))<1000:raise SystemExit('Refusing automated replacement: fewer than 1,000 screened rows in one source. Inspect coverage report.')
+          for region in ('us','world'):
+           for category in ('noodles','pasta','milk','butter','cheese','ice cream','sparkling water'):
+            n=sum(coverage.get(f'{source}|{region}|{category}',{}).get('products',0) for source in ('off','usda'))
+            if n<10:raise SystemExit(f'Refusing automated replacement: {region} {category}: only {n} candidates. Review coverage.')
+          print('Minimum candidate coverage checks passed. App-level relevance and device checks are still required.')
+          VV_FILE_4_END
+          cat > vv-bulk-setup/DATA-LICENSES.txt <<'VV_FILE_5_END'
+          vv_bulk_off.csv: derived from Open Food Facts, https://world.openfoodfacts.org/data,
+          under the Open Database License (ODbL) 1.0, https://opendatacommons.org/licenses/odbl/1-0/.
+          Retain attribution, make the derived OFF database available under ODbL when publicly used,
+          and keep it independently exportable. Supabase's vv_bulk_off table is publicly readable
+          and can be exported through its REST API. This importer does not copy product images.
+          
+          vv_bulk_usda.csv: USDA FoodData Central branded foods,
+          https://fdc.nal.usda.gov/download-datasets/ (April 2026 release).
+          See https://fdc.nal.usda.gov/data-documentation/ for source documentation.
+          
+          These are ingredient-screened candidate records, not vegan certification or stock guarantees.
+          Ingredients and formulations may change. Preserve the exact source record link.
+          VV_FILE_5_END
+      - name: Validate importer
+        run: python vv-bulk-setup/test_import.py
+      - name: Fetch official bulk exports
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/vv"
+          curl --fail --location --retry 3 --retry-delay 10 --max-time 1800 https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz -o "$RUNNER_TEMP/vv/off.tsv.gz"
+          curl --fail --location --retry 3 --retry-delay 10 --max-time 1800 https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_branded_food_csv_2026-04-30.zip -o "$RUNNER_TEMP/vv/usda.zip"
+      - name: Build bounded and screened source catalogs
+        run: |
+          set -euo pipefail
+          python vv-bulk-setup/import.py --off "$RUNNER_TEMP/vv/off.tsv.gz" --usda "$RUNNER_TEMP/vv/usda.zip" --out "$RUNNER_TEMP/vv/output"
+          cp vv-bulk-setup/DATA-LICENSES.txt "$RUNNER_TEMP/vv/output/"
+          cat "$RUNNER_TEMP/vv/output/coverage.json"
+      - name: Save catalogs and coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-vegan-catalogs
+          path: ${{ runner.temp }}/vv/output/
+          retention-days: 30
+      - name: Publish validated catalog snapshot (optional)
+        if: inputs.publish == true
+        env:
+          VV_DATABASE_URL: ${{ secrets.VV_DATABASE_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          test -n "$VV_DATABASE_URL" || { echo 'Missing VV_DATABASE_URL repository secret. Download the catalog artifact for manual import.'; exit 1; }
+          command -v psql >/dev/null || { sudo apt-get update; sudo apt-get install -y postgresql-client; }
+          cd "$RUNNER_TEMP/vv/output"
+          python "$GITHUB_WORKSPACE/vv-bulk-setup/check_publish.py" coverage.json
+          psql "$VV_DATABASE_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN;
+          SET LOCAL lock_timeout = '10s';
+          TRUNCATE public.vv_bulk_off,public.vv_bulk_usda;
+          \copy public.vv_bulk_off(code,name,brand,category,ingredients,country,url,image,source_date) FROM 'vv_bulk_off.csv' WITH (FORMAT csv, HEADER true)
+          \copy public.vv_bulk_usda(code,name,brand,category,ingredients,country,url,image,source_date) FROM 'vv_bulk_usda.csv' WITH (FORMAT csv, HEADER true)
+          COMMIT;
+          SQL
